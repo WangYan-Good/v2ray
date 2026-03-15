@@ -579,11 +579,11 @@ main() {
 
     # chmod
     chmod +x $is_core_bin $is_sh_bin /usr/bin/jq
-    msg ok "  - 已设置执行权限"
+    msg ok "  - 已设置执行权限：$is_core_bin, $is_sh_bin, /usr/bin/jq (+x)"
 
     # create log dir
     mkdir -p $is_log_dir
-    msg ok "  - 已创建日志目录"
+    msg ok "  - 已创建日志目录：$is_log_dir (access.log, error.log)"
 
     # show a tips msg
     msg ok "生成配置文件..."
