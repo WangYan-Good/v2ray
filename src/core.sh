@@ -1879,7 +1879,10 @@ main() {
         esac
         is_dont_auto_exit=
         [[ $is_api_fail ]] && manage restart &
-        [[ $is_del_host ]] && { [[ $is_caddy ]] && manage restart caddy &; [[ $is_nginx ]] && manage restart nginx &; }
+        [[ $is_del_host ]] && {
+            [[ $is_caddy ]] && manage restart caddy &
+            [[ $is_nginx ]] && manage restart nginx &
+        }
         ;;
     dns)
         load dns.sh

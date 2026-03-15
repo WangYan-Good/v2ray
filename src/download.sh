@@ -13,9 +13,9 @@ get_latest_version() {
         url="https://api.github.com/repos/$is_caddy_repo/releases/latest?v=$RANDOM"
         ;;
     nginx)
-        name="Nginx"
-        # Nginx 不需要从 GitHub 下载，使用包管理器安装
+        # Nginx 使用包管理器安装，不需要获取版本
         latest_ver=system
+        return
         ;;
     esac
     latest_ver=$(_wget -qO- $url | grep tag_name | grep -E -o 'v([0-9.]+)')
