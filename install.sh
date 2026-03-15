@@ -770,49 +770,36 @@ main() {
 
     load core.sh
     
-    # 安装完成后引导用户配置第一个节点
+    # 安装完成后引导用户配置第一个节点（与 v2ray add 完全一致）
     echo
     echo "=========================================="
     echo "    安装完成！现在配置第一个 V2Ray 节点"
     echo "=========================================="
     echo
+    
+    # 显示所有协议选项（与 v2ray add 命令完全一致）
     echo "请选择协议类型:"
-    echo "1) VMess-WS-TLS (推荐，适合 Cloudflare)"
-    echo "2) VLESS-gRPC-TLS (高性能)"
-    echo "3) VLESS-WS-TLS (平衡选择)"
-    echo "4) Trojan-WS-TLS (伪装性强)"
-    echo "5) 跳过，稍后手动配置"
+    for i in "${!protocol_list[@]}"; do
+        num=$((i + 1))
+        echo "$num) ${protocol_list[$i]}"
+    done
+    echo "$((${#protocol_list[@]} + 1))) 跳过，稍后手动配置"
     echo
 
     while :; do
-        echo -ne "请输入选择 [1-5] (默认:1): "
+        echo -ne "请输入选择 [1-$((${#protocol_list[@]} + 1))] (默认:1): "
         read protocol_choice
         [[ ! $protocol_choice ]] && protocol_choice=1
-        case $protocol_choice in
-        1)
-            protocol_type="vmess-ws-tls"
+        
+        if [[ $protocol_choice -le ${#protocol_list[@]} ]]; then
+            protocol_type=${protocol_list[$((protocol_choice - 1))]}
             break
-            ;;
-        2)
-            protocol_type="vless-grpc-tls"
-            break
-            ;;
-        3)
-            protocol_type="vless-ws-tls"
-            break
-            ;;
-        4)
-            protocol_type="trojan-ws-tls"
-            break
-            ;;
-        5)
+        elif [[ $protocol_choice -eq $((${#protocol_list[@]} + 1)) ]]; then
             msg ok "已跳过，安装后可以使用 'v2ray add' 命令添加配置"
             exit_and_del_tmpdir ok
-            ;;
-        *)
-            echo "输入无效，请输入 1-5"
-            ;;
-        esac
+        else
+            echo "输入无效，请输入 1-$((${#protocol_list[@]} + 1))"
+        fi
     done
 
     echo
