@@ -17,6 +17,7 @@
 6. [配置参考](#配置参考)
 7. [故障排查](#故障排查)
 8. [常见问题](#常见问题)
+9. [Cloudflare 代理配置](#cloudflare-代理配置)
 
 ---
 
@@ -1392,6 +1393,274 @@ v2ray log none
 ```bash
 v2ray client 配置名.json
 ```
+
+### Q: 支持 Cloudflare 代理吗？
+
+**A:** 支持。配置 WebSocket 或 gRPC 协议后，在 Cloudflare DNS 设置中将域名代理状态设为 **Proxied (橙色云)** 即可。
+
+```bash
+# 添加 VMess-WS-TLS 配置
+v2ray add vmess-ws-tls your-domain.com
+
+# 或添加 VLESS-gRPC-TLS 配置
+v2ray add vless-grpc-tls grpc.your-domain.com
+```
+
+**Cloudflare 配置要点:**
+
+| 设置项 | 推荐配置 | 说明 |
+|--------|----------|------|
+| **SSL/TLS 模式** | Full 或 Full (Strict) | 必须启用 HTTPS |
+| **Proxy 状态** | Proxied (橙色云) | 启用 CDN 代理 |
+| **WebSocket 支持** | 自动支持 | 无需额外配置 |
+| **gRPC 支持** | 需在 Network 设置中启用 | Cloudflare → Network → gRPC |
+
+**优势:**
+- 🛡️ **隐藏真实 IP**: Cloudflare 作为中间层，隐藏 VPS 真实 IP
+- 🛡️ **DDoS 防护**: 利用 Cloudflare 的防护能力
+- 🚀 **CDN 加速**: 全球节点加速访问
+- 🔒 **免费 TLS**: 即使不申请证书，也可用 Cloudflare 的通用证书
+
+**注意事项:**
+- ⚠️ 不支持 `VMess-TCP` (无 TLS)、`mKCP`、`QUIC` 等协议
+- ⚠️ Cloudflare 只支持特定端口 (80, 443, 8443, 2053, 2083, 2087, 2096 等)
+
+---
+
+## Cloudflare 代理配置
+
+### 概述
+
+本项目完全支持通过 Cloudflare CDN 代理流量。使用 Cloudflare 可以隐藏服务器真实 IP、获得 DDoS 防护、享受全球 CDN 加速。
+
+### 支持的协议
+
+| 协议 | 传输方式 | Cloudflare 支持 | 推荐度 |
+|------|----------|----------------|--------|
+| VMess | WebSocket + TLS | ✅ 完美支持 | ⭐⭐⭐⭐⭐ |
+| VLESS | WebSocket + TLS | ✅ 完美支持 | ⭐⭐⭐⭐⭐ |
+| VLESS | gRPC + TLS | ✅ 完美支持 | ⭐⭐⭐⭐ |
+| Trojan | WebSocket + TLS | ✅ 完美支持 | ⭐⭐⭐⭐ |
+| Trojan | gRPC + TLS | ✅ 完美支持 | ⭐⭐⭐⭐ |
+| VMess | H2 + TLS | ✅ 支持 | ⭐⭐⭐ |
+| VMess | TCP (无 TLS) | ❌ 不支持 | - |
+| VMess | mKCP / QUIC | ❌ 不支持 (UDP) | - |
+
+### 快速配置
+
+#### 步骤 1: 添加 V2Ray 配置
+
+```bash
+# 推荐：VMess + WebSocket + TLS
+v2ray add vmess-ws-tls your-domain.com
+
+# 或：VLESS + gRPC + TLS
+v2ray add vless-grpc-tls grpc.your-domain.com
+
+# 或：Trojan + WebSocket + TLS
+v2ray add trojan-ws-tls trojan.your-domain.com
+```
+
+#### 步骤 2: 配置 Cloudflare DNS
+
+1. 登录 Cloudflare 控制台
+2. 进入 **DNS** 设置页面
+3. 添加或编辑 A 记录:
+   - **Name**: `your-domain` 或 `@`
+   - **Content**: 你的 VPS IP 地址
+   - **Proxy status**: **Proxied** (橙色云) ☁️→🌩️
+
+```
+类型    名称              内容          代理状态
+A       your-domain.com   x.x.x.x       Proxied 🌩️
+A       www               x.x.x.x       Proxied 🌩️
+```
+
+#### 步骤 3: 配置 Cloudflare SSL/TLS
+
+1. 进入 **SSL/TLS** 设置页面
+2. 选择加密模式:
+   - **Full**: 基础加密 (推荐)
+   - **Full (Strict)**: 严格验证证书 (需要有效证书)
+
+```
+SSL/TLS → Overview → Full 或 Full (Strict)
+```
+
+#### 步骤 4: (可选) 启用 gRPC 支持
+
+如果使用 gRPC 协议:
+
+1. 进入 **Network** 设置页面
+2. 找到 **gRPC** 选项
+3. 开启 **Enable gRPC**
+
+```
+Network → gRPC → Enable gRPC ✓
+```
+
+### Cloudflare 设置详解
+
+#### SSL/TLS 模式对比
+
+| 模式 | 说明 | 推荐场景 |
+|------|------|----------|
+| **Off** | 不加密 | ❌ 不推荐 |
+| **Flexible** | 仅客户端到 Cloudflare 加密 | ⚠️ 安全性较低 |
+| **Full** | 全程加密，不验证源站证书 | ✅ 推荐 (自签名证书) |
+| **Full (Strict)** | 全程加密，验证源站证书 | ✅✅ 最推荐 (有效证书) |
+
+**建议**: 使用本脚本会自动申请 Let's Encrypt 证书，推荐使用 **Full (Strict)** 模式。
+
+#### 端口限制
+
+Cloudflare 仅代理特定端口，推荐使用:
+
+| 端口 | 用途 |
+|------|------|
+| 80 | HTTP (自动跳转 HTTPS) |
+| 443 | HTTPS (推荐) |
+| 8443 | HTTPS 备用 |
+| 2053, 2083, 2087, 2096 | HTTPS 备用端口 |
+
+#### WebSocket 配置
+
+Cloudflare 自动支持 WebSocket，无需额外配置:
+
+- **最大消息大小**: 100 MB
+- **空闲超时**: 100 秒
+- **连接超时**: 30 秒
+
+#### gRPC 配置
+
+启用 gRPC 需要手动开启:
+
+1. **Cloudflare 控制台** → **Network** → **gRPC** → **Enable**
+2. 确保使用 **443** 或其他 HTTPS 端口
+3. 客户端需支持 gRPC
+
+### 优势与注意事项
+
+#### 优势
+
+✅ **隐藏真实 IP**: Cloudflare 作为反向代理，隐藏 VPS 真实 IP 地址
+
+✅ **DDoS 防护**: 免费享受 Cloudflare 的 DDoS 攻击防护
+
+✅ **CDN 加速**: 全球 200+ 数据中心，加速访问速度
+
+✅ **免费 TLS**: 即使不申请证书，也可使用 Cloudflare 通用证书
+
+✅ **WAF 防护**: Web 应用防火墙，阻挡恶意请求
+
+✅ **Analytics**: 详细的流量分析和统计
+
+#### 注意事项
+
+⚠️ **协议限制**: Cloudflare 仅代理 HTTP/HTTPS/gRPC 流量
+- 不支持: TCP (无 TLS)、mKCP、QUIC 等基于 UDP 的协议
+
+⚠️ **端口限制**: 只能使用 Cloudflare 支持的端口列表
+
+⚠️ **WebSocket 超时**: 空闲连接 100 秒后可能断开，建议客户端配置重连
+
+⚠️ **带宽限制**: 
+- 免费版：每月 100,000 次请求
+- Pro 版：每月 1,000,000 次请求
+- Business 版：无限
+
+⚠️ **规则限制**: 遵守 Cloudflare 服务条款，不得用于违法用途
+
+### 客户端配置示例
+
+#### VMess + WebSocket + TLS
+
+```json
+{
+  "v": "2",
+  "ps": "VMess-WS-TLS",
+  "add": "your-domain.com",
+  "port": "443",
+  "id": "uuid-here",
+  "aid": "0",
+  "net": "ws",
+  "type": "none",
+  "host": "your-domain.com",
+  "path": "/your-path",
+  "tls": "tls",
+  "sni": "your-domain.com"
+}
+```
+
+#### VLESS + gRPC + TLS
+
+```json
+{
+  "v": "0",
+  "ps": "VLESS-gRPC-TLS",
+  "add": "grpc.your-domain.com",
+  "port": "443",
+  "id": "uuid-here",
+  "flow": "",
+  "net": "grpc",
+  "type": "none",
+  "host": "",
+  "path": "path",
+  "tls": "tls",
+  "sni": "grpc.your-domain.com",
+  "alpn": "h2"
+}
+```
+
+### 故障排查
+
+#### Cloudflare 显示 521/522 错误
+
+**原因**: Cloudflare 无法连接到源站
+
+**解决**:
+```bash
+# 检查 V2Ray 状态
+v2ray status
+
+# 检查 Nginx/Caddy 状态
+v2ray status nginx
+# 或
+v2ray status caddy
+
+# 检查防火墙
+ufw status
+
+# 检查端口监听
+netstat -tlnp | grep :443
+```
+
+#### WebSocket 连接失败
+
+**检查 Nginx 配置**:
+```bash
+cat /etc/nginx/v2ray/your-domain.com.conf
+```
+
+确保包含 WebSocket 升级头:
+```nginx
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "upgrade";
+```
+
+#### gRPC 无法连接
+
+1. 确认 Cloudflare 已启用 gRPC 支持
+2. 检查客户端是否支持 gRPC
+3. 确保使用 443 端口
+
+### 性能优化建议
+
+1. **启用 Cloudflare 缓存**: 对静态资源启用缓存
+2. **使用 Argo Smart Routing**: 优化路由 (付费功能)
+3. **开启 HTTP/2**: Cloudflare 默认支持
+4. **开启 HTTP/3**: 在 **Network** 设置中启用
+5. **使用 Polish**: 自动优化图片 (付费功能)
 
 ---
 
