@@ -935,7 +935,7 @@ v2ray client 配置名.json
 
 ### 许可证
 
-MIT License
+GPL-3.0 License
 
 ### 致谢
 
