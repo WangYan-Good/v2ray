@@ -69,14 +69,17 @@ EOF
                 cp -f $is_nginxfile ${is_nginxfile}.bak.$(date +%Y%m%d%H%M%S)
                 msg warn "检测到现有 Nginx 配置，已备份到 ${is_nginxfile}.bak.*"
 
-                # 在 http 块中添加 V2Ray 导入（在最后一个 } 之前）
+                # 在 http 块中添加 V2Ray 导入（在 http 块的最后一个 } 之前）
                 # 使用 awk 更可靠，避免 sed 转义问题
                 local tmp_conf=$(mktemp)
+                local in_http=0
                 awk -v inc="    include $is_nginx_conf/*.conf;" '
-                    /^}$/ {
+                    /^http[[:space:]]*\{/ { in_http=1 }
+                    in_http && /^}$/ {
                         print "    # 导入 V2Ray 配置（自动 TLS 站点）"
                         print inc
                         print ""
+                        in_http=0
                     }
                     {print}
                 ' $is_nginxfile > $tmp_conf
