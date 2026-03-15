@@ -492,8 +492,14 @@ nginx_test() {
 # 重新加载 Nginx
 nginx_reload() {
     if [[ -f $is_nginx_bin ]]; then
-        $is_nginx_bin -s reload
-        return $?
+        # 检查 Nginx 是否正在运行
+        if pgrep -f "nginx: master" &>/dev/null; then
+            $is_nginx_bin -s reload &>/dev/null
+            return $?
+        else
+            # Nginx 未运行，跳过重载
+            return 0
+        fi
     fi
     return 1
 }
