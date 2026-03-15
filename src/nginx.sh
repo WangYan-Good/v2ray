@@ -85,11 +85,11 @@ EOF
                     ;;
                 2)
                     msg warn "跳过配置，保留现有配置"
-                    return
+                    return 0
                     ;;
                 3)
                     msg warn "请手动编辑：${is_nginx_site_file}"
-                    return
+                    return 0
                     ;;
                 *)
                     msg "输入无效，请输入 1-3"
@@ -165,7 +165,12 @@ server {
 }
 "
         # 自动申请 Certbot 证书
-        nginx_certbot issue ${host}
+        if ! nginx_certbot issue ${host}; then
+            msg err "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
+            msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
+            return 1
+        fi
+        return 0
         ;;
     
     *h2*)
@@ -255,9 +260,14 @@ server {
 }
 "
         # 自动申请 Certbot 证书
-        nginx_certbot issue ${host}
+        if ! nginx_certbot issue ${host}; then
+            msg err "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
+            msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
+            return 1
+        fi
+        return 0
         ;;
-    
+
     *grpc*)
         # 检测配置冲突
         [[ -f ${is_nginx_site_file} ]] && {
@@ -278,11 +288,11 @@ server {
                     ;;
                 2)
                     msg warn "跳过配置，保留现有配置"
-                    return
+                    return 0
                     ;;
                 3)
                     msg warn "请手动编辑：${is_nginx_site_file}"
-                    return
+                    return 0
                     ;;
                 *)
                     msg "输入无效，请输入 1-3"
@@ -343,9 +353,14 @@ server {
 }
 "
         # 自动申请 Certbot 证书
-        nginx_certbot issue ${host}
+        if ! nginx_certbot issue ${host}; then
+            msg err "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
+            msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
+            return 1
+        fi
+        return 0
         ;;
-    
+
     proxy)
         # 伪装网站配置（反向代理到目标网站）
         cat >${is_nginx_site_file}.add <<<"
@@ -381,15 +396,34 @@ server {
 nginx_certbot() {
     local action=$1
     local domain=$2
-    
+
     case $action in
     issue)
         # 申请证书
         msg warn "使用 Certbot 申请证书：${domain}"
-        
+
         # 确保 webroot 目录存在
         mkdir -p /var/www/certbot
-        
+
+        # 确保 Nginx 已启动（Certbot webroot 模式需要）
+        if ! pgrep -f "nginx: master" &>/dev/null; then
+            msg warn "Nginx 未运行，正在启动..."
+            systemctl start nginx &>/dev/null
+            sleep 2
+            if ! pgrep -f "nginx: master" &>/dev/null; then
+                msg err "Nginx 启动失败，无法申请证书"
+                return 1
+            fi
+            msg ok "Nginx 已启动"
+        fi
+
+        # 测试 Nginx 配置
+        if ! nginx -t &>/dev/null; then
+            msg err "Nginx 配置测试失败"
+            nginx -t 2>&1 | tail -5
+            return 1
+        fi
+
         # 使用 webroot 模式申请（不影响现有服务）
         certbot certonly --webroot \
             -w /var/www/certbot \
@@ -399,9 +433,9 @@ nginx_certbot() {
             --non-interactive \
             --force-renewal \
             --key-type ecdsa
-        
+
         local cert_status=$?
-        
+
         if [[ $cert_status -eq 0 ]]; then
             msg ok "证书申请成功"
             # 重新加载 Nginx
@@ -409,16 +443,21 @@ nginx_certbot() {
             return 0
         else
             msg err "证书申请失败"
+            msg warn "请检查:"
+            msg "  1. 域名是否正确解析到服务器 IP"
+            msg "  2. 防火墙是否开放 80 端口"
+            msg "  3. Nginx 是否正常运行"
+            msg "  4. 查看详细日志：tail -20 /var/log/letsencrypt/letsencrypt.log"
             return 1
         fi
         ;;
-    
+
     renew)
         # 续期证书
         msg warn "续期证书..."
         certbot renew --quiet --deploy-hook "systemctl reload nginx"
         ;;
-    
+
     esac
 }
 
