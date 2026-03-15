@@ -72,15 +72,24 @@ EOF
                 # 在 http 块中添加 V2Ray 导入（在 http 块的最后一个 } 之前）
                 # 使用 awk 更可靠，避免 sed 转义问题
                 local tmp_conf=$(mktemp)
-                local in_http=0
+                # 使用更健壮的正则表达式匹配 http 块
                 awk -v inc="    include $is_nginx_conf/*.conf;" '
-                    /^http[[:space:]]*\{/ { in_http=1 }
-                    in_http && /^}$/ {
+                    # 匹配 http 块开始（允许行首空格，http 后空格，{ 前空格）
+                    /^[[:space:]]*http[[:space:]]*\{/ {
+                        in_http=1
+                        print
+                        next
+                    }
+                    # 在 http 块内的 } 前插入（允许行首空格）
+                    in_http && /^[[:space:]]*\}[[:space:]]*$/ {
                         print "    # 导入 V2Ray 配置（自动 TLS 站点）"
                         print inc
                         print ""
+                        print
                         in_http=0
+                        next
                     }
+                    # 打印其他行
                     {print}
                 ' $is_nginxfile > $tmp_conf
 
