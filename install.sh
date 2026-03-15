@@ -346,26 +346,70 @@ main() {
     # 先检查是否有 --uninstall 参数（需要在检查已安装之前处理）
     for arg in "$@"; do
         if [[ $arg == '--uninstall' ]]; then
-            # 执行卸载
+            msg warn "开始卸载 V2Ray 和相关组件..."
+            
+            # 步骤 1: 检查并卸载 V2Ray
             if [[ -f /usr/local/bin/v2ray ]]; then
+                msg warn "[步骤 1/6] 检测到 v2ray 命令，使用交互式卸载..."
                 v2ray uninstall
-            else
-                # 直接删除文件
-                rm -rf /etc/v2ray /var/log/v2ray /usr/local/bin/v2ray
-                sed -i '/v2ray/d' /root/.bashrc
-                # 如果选择了卸载 caddy/nginx
-                if [[ -f /usr/local/bin/caddy ]]; then
-                    systemctl stop caddy &>/dev/null
-                    systemctl disable caddy &>/dev/null
-                    rm -rf /etc/caddy /usr/local/bin/caddy /lib/systemd/system/caddy.service
-                fi
-                if [[ -f /usr/sbin/nginx ]]; then
-                    systemctl stop nginx &>/dev/null
-                    systemctl disable nginx &>/dev/null
-                    rm -rf /etc/nginx /lib/systemd/system/nginx.service
-                fi
-                msg ok "卸载完成!"
+                exit
             fi
+            
+            # 步骤 1: 删除 V2Ray 文件
+            msg warn "[步骤 1/6] 删除 V2Ray 文件..."
+            if [[ -d /etc/v2ray ]]; then
+                rm -rf /etc/v2ray
+                msg ok "  - 已删除 /etc/v2ray"
+            fi
+            if [[ -d /var/log/v2ray ]]; then
+                rm -rf /var/log/v2ray
+                msg ok "  - 已删除 /var/log/v2ray"
+            fi
+            if [[ -f /usr/local/bin/v2ray ]]; then
+                rm -f /usr/local/bin/v2ray
+                msg ok "  - 已删除 /usr/local/bin/v2ray"
+            fi
+            
+            # 步骤 2: 清理 bashrc
+            msg warn "[步骤 2/6] 清理 bashrc 配置..."
+            sed -i '/v2ray/d' /root/.bashrc
+            msg ok "  - 已清理 /root/.bashrc"
+            
+            # 步骤 3: 停止并卸载 Caddy（如果存在）
+            if [[ -f /usr/local/bin/caddy ]]; then
+                msg warn "[步骤 3/6] 检测到 Caddy，停止并卸载..."
+                systemctl stop caddy &>/dev/null && msg ok "  - 已停止 Caddy 服务"
+                systemctl disable caddy &>/dev/null && msg ok "  - 已禁用 Caddy 服务"
+                rm -rf /etc/caddy /usr/local/bin/caddy /lib/systemd/system/caddy.service
+                msg ok "  - 已删除 Caddy 文件"
+            else
+                msg warn "[步骤 3/6] 未检测到 Caddy，跳过"
+            fi
+            
+            # 步骤 4: 停止并卸载 Nginx（如果存在）
+            if [[ -f /usr/sbin/nginx ]]; then
+                msg warn "[步骤 4/6] 检测到 Nginx，停止并卸载..."
+                systemctl stop nginx &>/dev/null && msg ok "  - 已停止 Nginx 服务"
+                systemctl disable nginx &>/dev/null && msg ok "  - 已禁用 Nginx 服务"
+                rm -rf /etc/nginx /lib/systemd/system/nginx.service
+                msg ok "  - 已删除 Nginx 文件"
+            else
+                msg warn "[步骤 4/6] 未检测到 Nginx，跳过"
+            fi
+            
+            # 步骤 5: 清理 systemd
+            msg warn "[步骤 5/6] 清理 systemd 配置..."
+            systemctl daemon-reload &>/dev/null
+            msg ok "  - 已重载 systemd 配置"
+            
+            # 步骤 6: 完成
+            msg warn "[步骤 6/6] 卸载完成!"
+            msg ok "\n卸载完成！"
+            msg "已删除:"
+            msg "  - V2Ray 核心和脚本"
+            [[ -f /usr/local/bin/caddy ]] || msg "  - Caddy (如果已安装)"
+            [[ -f /usr/sbin/nginx ]] || msg "  - Nginx (如果已安装)"
+            msg "\n如需重新安装，请运行：./install.sh"
             exit
         fi
     done
