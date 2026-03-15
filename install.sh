@@ -319,6 +319,12 @@ exit_and_del_tmpdir() {
 # main
 main() {
 
+    # 自动检测本地安装模式
+    if [[ -f ${PWD}/src/core.sh && -f ${PWD}/v2ray.sh ]]; then
+        msg warn "检测到本地脚本，使用本地安装模式"
+        local_install=1
+    fi
+
     # check old version
     [[ -f $is_sh_bin && -d $is_core_dir/bin && -d $is_sh_dir && -d $is_conf_dir ]] && {
         err "检测到脚本已安装, 如需重装请使用${green} ${is_core} reinstall ${none}命令."
