@@ -1461,33 +1461,63 @@ v2ray add vless-grpc-tls grpc.your-domain.com
 v2ray add trojan-ws-tls trojan.your-domain.com
 ```
 
-#### 步骤 2: 配置 Cloudflare DNS
+#### 步骤 2: 配置 Cloudflare DNS（阶段 1 - 申请证书）
+
+> ⚠️ **申请 Let's Encrypt 证书时，必须关闭 Cloudflare 代理！**
+> 
+> 原因：Let's Encrypt 需要直接访问你的服务器验证域名所有权。
 
 1. 登录 Cloudflare 控制台
 2. 进入 **DNS** 设置页面
 3. 添加或编辑 A 记录:
    - **Name**: `your-domain` 或 `@`
    - **Content**: 你的 VPS IP 地址
-   - **Proxy status**: **Proxied** (橙色云) ☁️→🌩️
+   - **Proxy status**: **DNS only** (灰色云) ☁️
+
+```
+类型    名称              内容          代理状态
+A       your-domain.com   x.x.x.x       DNS only ☁️
+```
+
+4. **等待 DNS 生效**（通常 1-5 分钟）
+5. **验证解析**: `dig your-domain.com` 应返回你的 VPS IP
+
+#### 步骤 3: 运行脚本添加配置
+
+```bash
+v2ray add vmess-ws-tls your-domain.com
+```
+
+脚本会自动：
+- ✅ 验证域名解析
+- ✅ 自动启动 Nginx（如果未运行）
+- ✅ 申请 Let's Encrypt 证书
+- ✅ 配置 Nginx 反向代理
+- ✅ 生成 V2Ray 配置
+
+> 💡 **提示**：如果证书申请失败，脚本会给出详细提示和解决建议。
+
+#### 步骤 4: 开启 Cloudflare 代理（阶段 2 - 正常使用）
+
+> 配置完成后，可以开启 Cloudflare 代理享受 CDN 和防护
+
+1. 回到 Cloudflare **DNS** 设置页面
+2. 将代理状态改为 **Proxied** (橙色云) 🌩️
 
 ```
 类型    名称              内容          代理状态
 A       your-domain.com   x.x.x.x       Proxied 🌩️
-A       www               x.x.x.x       Proxied 🌩️
 ```
 
-#### 步骤 3: 配置 Cloudflare SSL/TLS
-
-1. 进入 **SSL/TLS** 设置页面
-2. 选择加密模式:
-   - **Full**: 基础加密 (推荐)
-   - **Full (Strict)**: 严格验证证书 (需要有效证书)
+3. **SSL/TLS** 设置:
+   - 进入 **SSL/TLS** → **Overview**
+   - 选择 **Full** 或 **Full (Strict)**
 
 ```
-SSL/TLS → Overview → Full 或 Full (Strict)
+SSL/TLS → Overview → Full (Strict) ✓
 ```
 
-#### 步骤 4: (可选) 启用 gRPC 支持
+#### 步骤 5: (可选) 启用 gRPC 支持
 
 如果使用 gRPC 协议:
 
@@ -1613,6 +1643,63 @@ Cloudflare 自动支持 WebSocket，无需额外配置:
 ```
 
 ### 故障排查
+
+#### 证书申请失败：Connection refused
+
+**错误信息**:
+```
+Detail: 72.11.140.248: Fetching http://your-domain.com/.well-known/acme-challenge/...
+        Connection refused
+```
+
+**原因**: Nginx 未运行，80 端口无法访问
+
+**解决**（脚本已自动修复）:
+```bash
+# 脚本会自动执行以下操作：
+# 1. 检测 Nginx 状态
+# 2. 自动启动 Nginx
+# 3. 测试 Nginx 配置
+# 4. 重新申请证书
+
+# 如果仍然失败，手动执行：
+systemctl start nginx
+certbot certonly --webroot -w /var/www/certbot -d your-domain.com
+```
+
+**脚本自动处理流程**:
+```
+1. 检测 Nginx 是否运行 → 未运行
+2. 自动启动 Nginx → systemctl start nginx
+3. 测试 Nginx 配置 → nginx -t
+4. 申请证书 → certbot certonly --webroot
+5. 成功 → 重载 Nginx
+6. 失败 → 给出详细提示
+```
+
+**常见失败原因**:
+- ❌ 域名未解析到 VPS IP（Cloudflare 未关闭代理）
+- ❌ 防火墙未开放 80 端口
+- ❌ Nginx 配置错误
+- ❌ 端口被其他程序占用
+
+**检查命令**:
+```bash
+# 验证 DNS 解析
+dig your-domain.com +short
+
+# 检查防火墙
+ufw status
+
+# 检查 80 端口
+netstat -tlnp | grep :80
+
+# 测试 HTTP 访问
+curl -I http://your-domain.com/.well-known/acme-challenge/test
+
+# 查看 Certbot 日志
+tail -20 /var/log/letsencrypt/letsencrypt.log
+```
 
 #### Cloudflare 显示 521/522 错误
 
