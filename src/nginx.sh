@@ -206,7 +206,7 @@ server {
     }
 
     # 伪装网站配置 (可选)
-    import ${is_nginx_site_file}.add
+    include ${is_nginx_site_file}.add;
 }
 "
         # 自动申请 Certbot 证书
@@ -301,7 +301,7 @@ server {
         proxy_read_timeout 300s;
     }
 
-    import ${is_nginx_site_file}.add
+    include ${is_nginx_site_file}.add;
 }
 "
         # 自动申请 Certbot 证书
@@ -394,7 +394,7 @@ server {
         grpc_read_timeout 300s;
     }
 
-    import ${is_nginx_site_file}.add
+    include ${is_nginx_site_file}.add;
 }
 "
         # 自动申请 Certbot 证书
