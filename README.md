@@ -1757,6 +1757,7 @@ proxy_set_header Connection "upgrade";
 
 - **GitHub**: https://github.com/WangYan-Good/v2ray
 - **文档**: https://wangyan-good.github.io/v2ray/
+- **Telegram**: https://t.me/tg233boy
 - **V2Ray 官方**: https://www.v2fly.org
 - **Nginx 官方**: https://nginx.org
 - **Certbot 官方**: https://certbot.eff.org
