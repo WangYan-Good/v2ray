@@ -421,11 +421,51 @@ main() {
     fi
 
     # check old version
+    # 检查旧版本（提供交互式选项）
     [[ -f $is_sh_bin && -d $is_core_dir/bin && -d $is_sh_dir && -d $is_conf_dir ]] && {
-        err "检测到脚本已安装, 如需重装请使用${green} ${is_core} reinstall ${none}命令."
+        msg warn "检测到脚本已安装!"
+        msg "当前安装信息:"
+        msg "  - 脚本目录：$is_sh_dir"
+        msg "  - 核心目录：$is_core_dir/bin"
+        msg "  - 配置目录：$is_conf_dir"
+        msg "  - 日志目录：$is_log_dir"
+        msg "\n请选择:"
+        msg "1) 重新安装 (保留配置)"
+        msg "2) 卸载后重新安装"
+        msg "3) 退出"
+        
+        while :; do
+            echo -ne "请输入选择 [1-3] (默认:3): "
+            read reinstall_choice
+            [[ ! $reinstall_choice ]] && reinstall_choice=3
+            case $reinstall_choice in
+            1)
+                msg warn "执行重新安装..."
+                break
+                ;;
+            2)
+                msg warn "执行卸载..."
+                if [[ -f /usr/local/bin/v2ray ]]; then
+                    v2ray uninstall
+                else
+                    rm -rf $is_sh_dir $is_core_dir $is_conf_dir $is_log_dir
+                    sed -i "/$is_core/d" /root/.bashrc
+                    msg ok "卸载完成!"
+                fi
+                msg warn "继续安装..."
+                break
+                ;;
+            3)
+                msg "已退出安装程序"
+                msg "如需重新安装，请使用：$is_core reinstall"
+                exit 0
+                ;;
+            *)
+                msg "输入无效，请输入 1-3"
+                ;;
+            esac
+        done
     }
-
-    # check parameters
     [[ $# -gt 0 ]] && pass_args $@
 
     # show welcome msg
