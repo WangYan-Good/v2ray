@@ -472,7 +472,8 @@ nginx_certbot() {
         nginx -s reload &>/dev/null
         sleep 1
 
-        # 验证挑战文件是否可访问
+        # 验证挑战文件是否可访问（带进度条）
+        msg warn "验证 Nginx 配置..."
         local test_file="/var/www/certbot/.well-known/acme-challenge/test"
         mkdir -p "$(dirname $test_file)"
         echo "test" > $test_file
@@ -486,19 +487,21 @@ nginx_certbot() {
         rm -f $test_file
         msg ok "Nginx 配置验证通过"
 
-        # 使用 webroot 模式申请（不影响现有服务）
-        certbot certonly --webroot \
+        # 申请证书（带进度条）
+        msg warn "正在申请 SSL 证书..."
+        
+        # 使用管道显示 certbot 进度
+        if certbot certonly --webroot \
             -w /var/www/certbot \
             -d ${domain} \
             --email admin@${domain} \
             --agree-tos \
             --non-interactive \
             --force-renewal \
-            --key-type ecdsa
-
-        local cert_status=$?
-
-        if [[ $cert_status -eq 0 ]]; then
+            --key-type ecdsa 2>&1 | while IFS= read -r line; do
+                # 显示 Certbot 输出
+                [[ $line ]] && msg info "  $line"
+            done; then
             msg ok "证书申请成功"
             # 重新加载 Nginx
             systemctl reload nginx &>/dev/null
