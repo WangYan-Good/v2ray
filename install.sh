@@ -343,6 +343,33 @@ exit_and_del_tmpdir() {
 # main
 main() {
 
+    # 先检查是否有 --uninstall 参数（需要在检查已安装之前处理）
+    for arg in "$@"; do
+        if [[ $arg == '--uninstall' ]]; then
+            # 执行卸载
+            if [[ -f /usr/local/bin/v2ray ]]; then
+                v2ray uninstall
+            else
+                # 直接删除文件
+                rm -rf /etc/v2ray /var/log/v2ray /usr/local/bin/v2ray
+                sed -i '/v2ray/d' /root/.bashrc
+                # 如果选择了卸载 caddy/nginx
+                if [[ -f /usr/local/bin/caddy ]]; then
+                    systemctl stop caddy &>/dev/null
+                    systemctl disable caddy &>/dev/null
+                    rm -rf /etc/caddy /usr/local/bin/caddy /lib/systemd/system/caddy.service
+                fi
+                if [[ -f /usr/sbin/nginx ]]; then
+                    systemctl stop nginx &>/dev/null
+                    systemctl disable nginx &>/dev/null
+                    rm -rf /etc/nginx /lib/systemd/system/nginx.service
+                fi
+                msg ok "卸载完成!"
+            fi
+            exit
+        fi
+    done
+
     # 自动检测本地安装模式
     if [[ -f ${PWD}/src/core.sh && -f ${PWD}/v2ray.sh ]]; then
         msg warn "检测到本地脚本，使用本地安装模式"
