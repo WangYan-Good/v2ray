@@ -770,6 +770,15 @@ main() {
 
     load core.sh
     
+    # 初始化 TLS 配置（Nginx 或 Caddy）
+    if [[ $is_install_nginx ]]; then
+        msg warn "初始化 Nginx 配置..."
+        create nginx new
+    elif [[ $is_install_caddy ]]; then
+        msg warn "初始化 Caddy 配置..."
+        create caddy new
+    fi
+
     # 安装完成后引导用户配置第一个节点（与 v2ray add 完全一致）
     echo
     echo "=========================================="
