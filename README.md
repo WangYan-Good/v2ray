@@ -173,17 +173,54 @@ chmod +x install.sh
 
 ### TLS 方案选择
 
-安装脚本支持两种 TLS 方案：
+安装脚本支持两种 TLS 方案，并**智能检测已安装的服务**：
 
 **交互式选择**（默认）：
+
+脚本会自动检测已安装的 Web 服务，并提供相应的选项：
+
+#### 场景 1：Caddy 和 Nginx 都已安装
+
+```
+选择 TLS 配置方案:
+检测到 Caddy 和 Nginx 都已安装，请选择:
+1) 使用 Caddy
+2) 使用 Nginx
+3) 停止 Caddy，使用 Nginx
+4) 停止 Nginx，使用 Caddy
+请输入选择 [1-4] (默认:2):
+```
+
+#### 场景 2：仅 Caddy 已安装
+
+```
+选择 TLS 配置方案:
+检测到 Caddy 已安装，请选择:
+1) 使用 Caddy (默认)
+2) 停止 Caddy，改用 Nginx
+请输入选择 [1-2] (默认:1):
+```
+
+#### 场景 3：仅 Nginx 已安装
+
+```
+选择 TLS 配置方案:
+检测到 Nginx 已安装，请选择:
+1) 使用 Nginx (默认)
+2) 停止 Nginx，改用 Caddy
+请输入选择 [1-2] (默认:1):
+```
+
+#### 场景 4：都未安装（全新系统）
+
 ```
 选择 TLS 配置方案:
 1) Caddy (简洁，适合单站点)
-2) Nginx + Certbot (灵活，适合多站点共存)
+2) Nginx + Certbot (灵活，适合多站点共存) (默认)
 请输入选择 [1-2] (默认:2):
 ```
 
-**命令行指定**：
+**命令行指定**（跳过交互）：
 ```bash
 ./install.sh --tls nginx   # 使用 Nginx
 ./install.sh --tls caddy   # 使用 Caddy
