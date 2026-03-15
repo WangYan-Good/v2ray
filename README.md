@@ -1396,34 +1396,62 @@ v2ray client 配置名.json
 
 ### Q: 支持 Cloudflare 代理吗？
 
-**A:** 支持。配置 WebSocket 或 gRPC 协议后，在 Cloudflare DNS 设置中将域名代理状态设为 **Proxied (橙色云)** 即可。
+**A:** 支持。配置流程分为两个阶段：
 
+**阶段 1 - 申请证书（必须关闭代理）:**
 ```bash
-# 添加 VMess-WS-TLS 配置
+# 1. Cloudflare DNS 设置：DNS only (灰色云) ☁️
+# 2. 添加配置
 v2ray add vmess-ws-tls your-domain.com
-
-# 或添加 VLESS-gRPC-TLS 配置
-v2ray add vless-grpc-tls grpc.your-domain.com
+# 3. 脚本自动申请 Let's Encrypt 证书
 ```
+
+**阶段 2 - 正常使用（开启代理享受 CDN）:**
+```bash
+# 1. Cloudflare DNS 设置：Proxied (橙色云) 🌩️
+# 2. SSL/TLS 模式：Full 或 Full (Strict)
+# 3. 正常使用
+```
+
+> ⚠️ **重要**: 申请证书时必须关闭 Cloudflare 代理，因为 Let's Encrypt 需要直接访问你的服务器验证域名所有权。
 
 **Cloudflare 配置要点:**
 
 | 设置项 | 推荐配置 | 说明 |
 |--------|----------|------|
 | **SSL/TLS 模式** | Full 或 Full (Strict) | 必须启用 HTTPS |
-| **Proxy 状态** | Proxied (橙色云) | 启用 CDN 代理 |
+| **Proxy 状态（申请证书时）** | DNS only (灰色云) | 让 Let's Encrypt 验证域名 |
+| **Proxy 状态（正常使用）** | Proxied (橙色云) | 启用 CDN 代理 |
 | **WebSocket 支持** | 自动支持 | 无需额外配置 |
 | **gRPC 支持** | 需在 Network 设置中启用 | Cloudflare → Network → gRPC |
 
 **优势:**
 - 🛡️ **隐藏真实 IP**: Cloudflare 作为中间层，隐藏 VPS 真实 IP
 - 🛡️ **DDoS 防护**: 利用 Cloudflare 的防护能力
-- 🚀 **CDN 加速**: 全球节点加速访问
-- 🔒 **免费 TLS**: 即使不申请证书，也可用 Cloudflare 的通用证书
+- 🚀 **CDN 加速**: 全球 200+ 数据中心，加速访问速度
+- 🔒 **免费 TLS**: 使用 Let's Encrypt 或 Cloudflare 通用证书
 
 **注意事项:**
 - ⚠️ 不支持 `VMess-TCP` (无 TLS)、`mKCP`、`QUIC` 等协议
 - ⚠️ Cloudflare 只支持特定端口 (80, 443, 8443, 2053, 2083, 2087, 2096 等)
+- ⚠️ WebSocket 空闲超时 100 秒，建议客户端配置自动重连
+
+### Q: 域名解析到 Cloudflare IP，脚本提示错误怎么办？
+
+**A:** 这是正常现象。脚本需要验证域名解析到你的 VPS 真实 IP。
+
+**解决方法:**
+1. **临时关闭 Cloudflare 代理**（灰色云）
+2. **等待 DNS 生效**（1-5 分钟）
+3. **运行脚本添加配置**
+4. **配置完成后，重新开启代理**（橙色云）
+
+```bash
+# 验证 DNS 是否生效
+dig your-domain.com
+
+# 应该返回你的 VPS IP，而不是 Cloudflare IP
+```
 
 ---
 
@@ -1447,6 +1475,10 @@ v2ray add vless-grpc-tls grpc.your-domain.com
 | VMess | mKCP / QUIC | ❌ 不支持 (UDP) | - |
 
 ### 快速配置
+
+> ⚠️ **重要提示**: 配置流程分为两个阶段
+> - **阶段 1（申请证书）**: Cloudflare 必须设为 **DNS only (灰色云)** ☁️
+> - **阶段 2（正常使用）**: Cloudflare 可以设为 **Proxied (橙色云)** 🌩️
 
 #### 步骤 1: 添加 V2Ray 配置
 
@@ -1490,12 +1522,9 @@ v2ray add vmess-ws-tls your-domain.com
 
 脚本会自动：
 - ✅ 验证域名解析
-- ✅ 自动启动 Nginx（如果未运行）
 - ✅ 申请 Let's Encrypt 证书
-- ✅ 配置 Nginx 反向代理
+- ✅ 配置 Nginx/Caddy
 - ✅ 生成 V2Ray 配置
-
-> 💡 **提示**：如果证书申请失败，脚本会给出详细提示和解决建议。
 
 #### 步骤 4: 开启 Cloudflare 代理（阶段 2 - 正常使用）
 
@@ -1757,7 +1786,6 @@ proxy_set_header Connection "upgrade";
 
 - **GitHub**: https://github.com/WangYan-Good/v2ray
 - **文档**: https://wangyan-good.github.io/v2ray/
-- **Telegram**: https://t.me/tg233boy
 - **V2Ray 官方**: https://www.v2fly.org
 - **Nginx 官方**: https://nginx.org
 - **Certbot 官方**: https://certbot.eff.org
