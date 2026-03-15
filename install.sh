@@ -770,53 +770,35 @@ main() {
 
     load core.sh
     
-    # 安装完成后引导用户配置第一个节点
+    # 安装完成后引导用户配置第一个节点（与 v2ray add 完全一致）
     echo
     echo "=========================================="
     echo "    安装完成！现在配置第一个 V2Ray 节点"
     echo "=========================================="
     echo
     
-    # 过滤适合安装的协议（带 TLS 的）
-    is_tls_protocols=()
-    for p in "${protocol_list[@]}"; do
-        [[ $p == *TLS* ]] && is_tls_protocols+=("$p")
-    done
-    
+    # 显示所有协议选项（与 v2ray add 命令完全一致）
     echo "请选择协议类型:"
-    for i in "${!is_tls_protocols[@]}"; do
+    for i in "${!protocol_list[@]}"; do
         num=$((i + 1))
-        case ${is_tls_protocols[$i]} in
-        *VMess-WS-TLS*)
-            echo "$num) ${is_tls_protocols[$i]} (推荐，适合 Cloudflare)"
-            ;;
-        *VLESS-gRPC-TLS*)
-            echo "$num) ${is_tls_protocols[$i]} (高性能)"
-            ;;
-        *Trojan-WS-TLS*)
-            echo "$num) ${is_tls_protocols[$i]} (伪装性强)"
-            ;;
-        *)
-            echo "$num) ${is_tls_protocols[$i]}"
-            ;;
-        esac
+        echo "$num) ${protocol_list[$i]}"
     done
-    echo "$((${#is_tls_protocols[@]} + 1))) 跳过，稍后手动配置"
+    echo "$((${#protocol_list[@]} + 1))) 跳过，稍后手动配置"
     echo
 
     while :; do
-        echo -ne "请输入选择 [1-$((${#is_tls_protocols[@]} + 1))] (默认:1): "
+        echo -ne "请输入选择 [1-$((${#protocol_list[@]} + 1))] (默认:1): "
         read protocol_choice
         [[ ! $protocol_choice ]] && protocol_choice=1
         
-        if [[ $protocol_choice -le ${#is_tls_protocols[@]} ]]; then
-            protocol_type=${is_tls_protocols[$((protocol_choice - 1))]}
+        if [[ $protocol_choice -le ${#protocol_list[@]} ]]; then
+            protocol_type=${protocol_list[$((protocol_choice - 1))]}
             break
-        elif [[ $protocol_choice -eq $((${#is_tls_protocols[@]} + 1)) ]]; then
+        elif [[ $protocol_choice -eq $((${#protocol_list[@]} + 1)) ]]; then
             msg ok "已跳过，安装后可以使用 'v2ray add' 命令添加配置"
             exit_and_del_tmpdir ok
         else
-            echo "输入无效，请输入 1-$((${#is_tls_protocols[@]} + 1))"
+            echo "输入无效，请输入 1-$((${#protocol_list[@]} + 1))"
         fi
     done
 
