@@ -226,6 +226,116 @@ chmod +x install.sh
 # 05:30:17) 检测到 Caddy 已安装，使用现有 Caddy
 ```
 
+#### Nginx 已安装但想使用 Caddy
+
+如果主机已安装 Nginx，但想改用 Caddy 部署 V2Ray：
+
+**方案 1：停止 Nginx 并安装 Caddy（推荐）**
+
+```bash
+# 1. 停止 Nginx
+systemctl stop nginx
+systemctl disable nginx
+
+# 2. 备份 Nginx 配置（可选）
+cp -rf /etc/nginx /etc/nginx.bak
+
+# 3. 安装 Caddy + V2Ray
+./install.sh --tls caddy
+
+# 输出示例:
+# 05:30:17) 配置 Caddy...
+# 05:30:18) 检测到 Caddy 已安装，使用现有 Caddy
+```
+
+**方案 2：Nginx 和 Caddy 共存（不同域名）**
+
+如果 Nginx 和 Caddy 服务不同域名，可以共存：
+
+```bash
+# Nginx 服务 domain1.com
+# Caddy 服务 domain2.com
+
+# 1. 修改 Nginx 配置，只监听 domain1.com
+# 编辑 /etc/nginx/nginx.conf 或 /etc/nginx/sites-enabled/domain1.com.conf
+server {
+    listen 80;
+    server_name domain1.com;
+    # ... 其他配置
+}
+
+# 2. 安装 Caddy
+./install.sh --tls caddy
+
+# 3. Caddy 会自动处理 domain2.com 的 TLS
+# 两个服务共享 80/443 端口（通过 server_name 区分）
+```
+
+**方案 3：Nginx 使用非标准端口**
+
+```bash
+# 1. 修改 Nginx 使用非标准端口
+# 编辑 /etc/nginx/nginx.conf
+http {
+    server {
+        listen 8080;  # 改为 8080
+        listen 8443 ssl;  # 改为 8443
+        server_name example.com;
+        # ... 其他配置
+    }
+}
+
+# 2. 重启 Nginx
+systemctl restart nginx
+
+# 3. 安装 Caddy（使用标准端口）
+./install.sh --tls caddy
+```
+
+**方案 4：完全迁移到 Caddy**
+
+```bash
+# 1. 备份 Nginx 配置
+cp -rf /etc/nginx /root/nginx_backup
+
+# 2. 停止并卸载 Nginx
+systemctl stop nginx
+systemctl disable nginx
+rm -rf /etc/nginx /lib/systemd/system/nginx.service
+
+# 3. 安装 Caddy + V2Ray
+./install.sh --tls caddy
+
+# 4. 将原有 Nginx 站点迁移到 Caddy
+# 例如：原有 Nginx 配置
+# server {
+#     listen 443 ssl;
+#     server_name example.com;
+#     ssl_certificate /etc/nginx/ssl/example.com/fullchain.pem;
+#     ssl_certificate_key /etc/nginx/ssl/example.com/privkey.pem;
+#     location / {
+#         proxy_pass http://127.0.0.1:8080;
+#     }
+# }
+
+# 对应 Caddy 配置：
+cat > /etc/caddy/Caddyfile << 'EOF'
+example.com {
+    tls /etc/caddy/ssl/example.com.crt /etc/caddy/ssl/example.com.key
+    reverse_proxy / 127.0.0.1:8080
+}
+EOF
+
+# 5. 复制证书（如果需要）
+mkdir -p /etc/caddy/ssl/example.com
+cp /etc/nginx/ssl/example.com/* /etc/caddy/ssl/example.com/
+
+# 6. 重启 Caddy
+systemctl restart caddy
+```
+
+---
+
 #### Caddy 已安装但想使用 Nginx
 
 如果主机已安装 Caddy，但想改用 Nginx 部署 V2Ray：
