@@ -83,7 +83,7 @@
 
 /etc/caddy/                 # Caddy 方案目录
 ├── Caddyfile               # 主配置
-└── 233boy/                 # Caddy 配置
+└── v2ray/                  # V2Ray 站点配置
     └── 域名.conf
 ```
 
@@ -137,7 +137,7 @@ core.sh (核心逻辑)
 
 ```bash
 # 下载安装脚本
-wget -O install.sh https://github.com/233boy/v2ray/releases/latest/download/install.sh
+wget -O install.sh https://github.com/WangYan-Good/v2ray/releases/latest/download/install.sh
 chmod +x install.sh
 
 # 执行安装
@@ -908,8 +908,8 @@ v2ray client 配置名.json
 
 ### 相关链接
 
-- **GitHub**: https://github.com/233boy/v2ray
-- **文档**: https://233boy.com/v2ray/
+- **GitHub**: https://github.com/WangYan-Good/v2ray
+- **文档**: https://wangyan-good.github.io/v2ray/
 - **Telegram**: https://t.me/tg233boy
 - **V2Ray 官方**: https://www.v2fly.org
 - **Nginx 官方**: https://nginx.org

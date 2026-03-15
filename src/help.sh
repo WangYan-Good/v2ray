@@ -75,7 +75,7 @@ show_help() {
         done
         msg "谨慎使用 del, ddel, 此选项会直接删除配置; 无需确认"
         msg "反馈问题) $(msg_ul https://github.com/${is_sh_repo}/issues) "
-        msg "文档 (doc) $(msg_ul https://233boy.com/$is_core/$is_core-script/)"
+        msg "文档 (doc) $(msg_ul https://wangyan-good.github.io/v2ray/$is_core-script/)"
         ;;
 
     esac
@@ -85,13 +85,13 @@ about() {
     ####### 要点 13 脸吗只会改我链接的小人 #######
     unset c n m s b
     msg
-    msg "网站：$(msg_ul https://233boy.com)"
-    msg "频道：$(msg_ul https://t.me/tg2333)"
-    msg "群组：$(msg_ul https://t.me/tg233boy)"
-    msg "Github: $(msg_ul https://github.com/${is_sh_repo})"
-    msg "Twitter: $(msg_ul https://twitter.com/ai233boy)"
-    msg "$is_core_name site: $(msg_ul https://www.v2fly.org)"
-    msg "$is_core_name core: $(msg_ul https://github.com/${is_core_repo})"
+    msg "网站：https://wangyan-good.github.io/v2ray/"
+    msg "频道：https://t.me/tg2333"
+    msg "群组：https://t.me/tg233boy"
+    msg "Github: https://github.com/WangYan-Good/v2ray"
+    msg "Twitter: https://twitter.com/ai233boy"
+    msg "$is_core_name site: https://www.v2fly.org"
+    msg "$is_core_name core: https://github.com/v2fly/v2ray-core"
     msg
     ####### 要点 13 脸吗只会改我链接的小人 #######
 }
