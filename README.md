@@ -189,6 +189,120 @@ chmod +x install.sh
 ./install.sh --tls caddy   # 使用 Caddy
 ```
 
+### 已部署站点的兼容安装
+
+脚本会自动检测并兼容现有的 Web 服务：
+
+#### Nginx 已安装
+
+如果主机已安装 Nginx，脚本会：
+- ✅ 使用现有 Nginx
+- ✅ 使用现有 Certbot（如果已安装）
+- ✅ 备份现有 `nginx.conf` 到 `nginx.conf.bak`
+- ✅ 在现有配置中添加 `include` 导入 V2Ray 配置
+
+```bash
+# 直接安装，脚本自动检测
+./install.sh --tls nginx
+
+# 输出示例:
+# 05:30:17) 检测到 Nginx 已安装，使用现有 Nginx
+# 05:30:18) 检测到 Certbot 已安装，使用现有 Certbot
+# 05:30:18) 已备份现有 nginx.conf 到 /etc/nginx/nginx.conf.bak
+```
+
+#### Caddy 已安装
+
+如果主机已安装 Caddy，脚本会：
+- ✅ 使用现有 Caddy
+- ✅ 不覆盖现有 Caddyfile
+- ✅ 在现有配置基础上添加 import
+
+```bash
+# 直接安装，脚本自动检测
+./install.sh --tls caddy
+
+# 输出示例:
+# 05:30:17) 检测到 Caddy 已安装，使用现有 Caddy
+```
+
+#### 80/443 端口已被占用
+
+如果 80 或 443 端口被其他服务占用：
+
+**方案 1：使用 Nginx（推荐）**
+```bash
+# Nginx 可以与其他服务共享端口（通过 server_name 区分）
+./install.sh --tls nginx
+```
+
+**方案 2：使用非标准端口**
+```bash
+# 安装时脚本会提示端口占用，可以选择使用非标准端口
+# 例如：HTTP 8080, HTTPS 8443
+```
+
+**方案 3：停止占用端口的服务**
+```bash
+# 查看占用端口的服务
+netstat -tlnp | grep :80
+netstat -tlnp | grep :443
+
+# 停止不需要的服务
+systemctl stop apache2
+systemctl disable apache2
+
+# 然后安装
+./install.sh --tls nginx
+```
+
+#### 多站点共存配置示例
+
+假设已有 WordPress 站点在 `blog.example.com`：
+
+```bash
+# 1. 安装 V2Ray（使用 Nginx）
+./install.sh --tls nginx
+
+# 2. 添加 V2Ray 配置
+v2ray add vmess-ws-tls v2ray.example.com
+
+# 3. 手动添加 WordPress 配置（如果脚本没有自动添加）
+cat > /etc/nginx/sites-enabled/blog.example.com.conf << 'EOF'
+server {
+    listen 80;
+    server_name blog.example.com;
+    
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name blog.example.com;
+    
+    ssl_certificate /etc/nginx/ssl/blog.example.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/blog.example.com/privkey.pem;
+    
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+    }
+}
+EOF
+
+# 4. 为 WordPress 申请证书
+certbot certonly --webroot -w /var/www/certbot -d blog.example.com
+
+# 5. 测试并重载
+nginx -t
+systemctl reload nginx
+```
+
 **推荐选择：**
 - 单 V2Ray 域名 → **Caddy**
 - 多域名或已有其他网站 → **Nginx**

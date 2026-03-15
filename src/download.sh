@@ -1,3 +1,5 @@
+#!/bin/bash
+
 get_latest_version() {
     case $1 in
     core)
@@ -63,40 +65,73 @@ download() {
         ;;
     caddy)
         name="Caddy"
-        tmpfile=$tmpdir/caddy.tar.gz
-        # https://github.com/caddyserver/caddy/releases/download/v2.6.4/caddy_2.6.4_linux_amd64.tar.gz
-        link="https://github.com/${is_caddy_repo}/releases/download/${latest_ver}/caddy_${latest_ver:1}_linux_${caddy_arch}.tar.gz"
-        download_file
-        [[ ! $(type -P tar) ]] && {
+        # 检测是否已安装 Caddy
+        if [[ -f $is_caddy_bin ]]; then
+            msg warn "检测到 Caddy 已安装，使用现有 Caddy"
             rm -rf $tmpdir
-            err "请安装 tar"
-        }
-        tar zxf $tmpfile -C $tmpdir
-        cp -f $tmpdir/caddy $is_caddy_bin
-        chmod +x $is_caddy_bin
+        else
+            tmpfile=$tmpdir/caddy.tar.gz
+            link="https://github.com/${is_caddy_repo}/releases/download/${latest_ver}/caddy_${latest_ver:1}_linux_${caddy_arch}.tar.gz"
+            download_file
+            [[ ! $(type -P tar) ]] && {
+                rm -rf $tmpdir
+                err "请安装 tar"
+            }
+            tar zxf $tmpfile -C $tmpdir
+            cp -f $tmpdir/caddy $is_caddy_bin
+            chmod +x $is_caddy_bin
+        fi
         ;;
     nginx)
         name="Nginx + Certbot"
-        msg warn "使用包管理器安装 Nginx 和 Certbot..."
-        if [[ $cmd =~ apt-get ]]; then
-            # Ubuntu/Debian
-            $cmd update -y &>/dev/null
-            $cmd install nginx certbot python3-certbot-nginx -y &>/dev/null
+        msg warn "配置 Nginx + Certbot..."
+        
+        # 检测是否已安装 Nginx
+        if [[ $(type -P nginx) ]]; then
+            msg warn "检测到 Nginx 已安装，使用现有 Nginx"
         else
-            # CentOS
-            $cmd install epel-release -y &>/dev/null
-            $cmd update -y &>/dev/null
-            $cmd install nginx certbot python3-certbot-nginx -y &>/dev/null
+            # 安装 Nginx
+            if [[ $cmd =~ apt-get ]]; then
+                $cmd update -y &>/dev/null
+                $cmd install nginx -y &>/dev/null
+            else
+                $cmd install epel-release -y &>/dev/null
+                $cmd update -y &>/dev/null
+                $cmd install nginx -y &>/dev/null
+            fi
+            if [[ ! $(type -P nginx) ]]; then
+                rm -rf $tmpdir
+                err "Nginx 安装失败"
+            fi
         fi
-        # 检查安装结果
-        if [[ ! $(type -P nginx) ]]; then
-            rm -rf $tmpdir
-            err "Nginx 安装失败"
+        
+        # 检测是否已安装 Certbot
+        if [[ $(type -P certbot) ]]; then
+            msg warn "检测到 Certbot 已安装，使用现有 Certbot"
+        else
+            # 安装 Certbot
+            if [[ $cmd =~ apt-get ]]; then
+                $cmd install certbot python3-certbot-nginx -y &>/dev/null
+            else
+                $cmd install certbot python3-certbot-nginx -y &>/dev/null
+            fi
+            if [[ ! $(type -P certbot) ]]; then
+                rm -rf $tmpdir
+                err "Certbot 安装失败"
+            fi
         fi
-        if [[ ! $(type -P certbot) ]]; then
-            rm -rf $tmpdir
-            err "Certbot 安装失败"
+        
+        # 备份现有 Nginx 配置（如果有）
+        if [[ -f $is_nginxfile && ! -f ${is_nginxfile}.bak ]]; then
+            cp -f $is_nginxfile ${is_nginxfile}.bak
+            msg warn "已备份现有 nginx.conf 到 ${is_nginxfile}.bak"
         fi
+        
+        # 设置开机自启
+        systemctl enable nginx &>/dev/null
+        systemctl daemon-reload
+        
+        rm -rf $tmpdir
         ;;
     esac
     rm -rf $tmpdir
