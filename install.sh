@@ -791,8 +791,66 @@ main() {
     fi
 
     load core.sh
-    # create a tcp config
-    add tcp
+    
+    # 安装完成后引导用户配置第一个节点
+    echo
+    echo "=========================================="
+    echo "    安装完成！现在配置第一个 V2Ray 节点"
+    echo "=========================================="
+    echo
+    echo "请选择协议类型:"
+    echo "1) VMess-WS-TLS (推荐，适合 Cloudflare)"
+    echo "2) VLESS-gRPC-TLS (高性能)"
+    echo "3) VLESS-WS-TLS (平衡选择)"
+    echo "4) Trojan-WS-TLS (伪装性强)"
+    echo "5) 跳过，稍后手动配置"
+    echo
+
+    while :; do
+        echo -ne "请输入选择 [1-5] (默认:1): "
+        read protocol_choice
+        [[ ! $protocol_choice ]] && protocol_choice=1
+        case $protocol_choice in
+        1)
+            protocol_type="vmess-ws-tls"
+            break
+            ;;
+        2)
+            protocol_type="vless-grpc-tls"
+            break
+            ;;
+        3)
+            protocol_type="vless-ws-tls"
+            break
+            ;;
+        4)
+            protocol_type="trojan-ws-tls"
+            break
+            ;;
+        5)
+            msg ok "已跳过，安装后可以使用 'v2ray add' 命令添加配置"
+            exit_and_del_tmpdir ok
+            ;;
+        *)
+            echo "输入无效，请输入 1-5"
+            ;;
+        esac
+    done
+
+    echo
+    echo "请输入域名 (例如：v2ray.example.com):"
+    read -p "> " domain_input
+
+    if [[ $domain_input ]]; then
+        echo
+        msg warn "正在配置 ${yellow}$protocol_type${none} > ${yellow}$domain_input${none}..."
+        add $protocol_type $domain_input
+        echo
+        msg ok "配置完成！使用 'v2ray info' 查看配置信息"
+    else
+        msg warn "未输入域名，已跳过配置"
+    fi
+
     # remove tmp dir and exit.
     exit_and_del_tmpdir ok
 }
