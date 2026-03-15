@@ -456,84 +456,115 @@ main() {
         msg warn "${yellow}\e[4m提醒!!! 无法设置自动同步时间, 可能会影响使用 VMess 协议.${none}"
     }
 
-    # install dependent pkg
+    # [步骤 3/10] 安装依赖包
+    msg warn "[步骤 3/10] 安装依赖包..."
     install_pkg $is_pkg &
+    msg ok "  - 依赖包安装进行中 (后台)"
 
-    # jq
+    # [步骤 4/10] 检查 jq
+    msg warn "[步骤 4/10] 检查 jq..."
     if [[ $(type -P jq) ]]; then
         >$is_jq_ok
+        msg ok "  - jq 已安装"
     else
         jq_not_found=1
+        msg warn "  - jq 未安装，将自动下载"
     fi
-    # if wget installed. download core, sh, jq, get ip
+    # [步骤 5/10] 下载必要文件
+    msg warn "[步骤 5/10] 下载必要文件..."
     [[ $is_wget ]] && {
-        [[ ! $is_core_file ]] && download core &
-        [[ ! $local_install ]] && download sh &
-        [[ $jq_not_found ]] && download jq &
+        [[ ! $is_core_file ]] && { download core & msg ok "  - 开始下载 V2Ray 核心"; }
+        [[ ! $local_install ]] && { download sh & msg ok "  - 开始下载脚本"; }
+        [[ $jq_not_found ]] && { download jq & msg ok "  - 开始下载 jq"; }
         get_ip
+        msg ok "  - 已获取服务器 IP"
     }
 
-    # waiting for background tasks is done
+    # [步骤 6/10] 等待下载完成
+    msg warn "[步骤 6/10] 等待下载完成..."
     wait
+    msg ok "  - 所有文件下载完成"
 
-    # check background tasks status
+    # [步骤 7/10] 检查下载状态
+    msg warn "[步骤 7/10] 检查下载状态..."
     check_status
+    msg ok "  - 所有文件检查通过"
 
-    # test $is_core_file
+    # [步骤 8/10] 测试核心文件
+    msg warn "[步骤 8/10] 测试核心文件..."
     if [[ $is_core_file ]]; then
         unzip -qo $is_core_ok -d $tmpdir/testzip &>/dev/null
         [[ $? != 0 ]] && {
-            msg err "${is_core_name} 文件无法通过测试."
+            msg err "  - 核心文件解压失败"
             exit_and_del_tmpdir
         }
         for i in ${is_core} geoip.dat geosite.dat; do
             [[ ! -f $tmpdir/testzip/$i ]] && is_file_err=1 && break
         done
         [[ $is_file_err ]] && {
-            msg err "${is_core_name} 文件无法通过测试."
+            msg err "  - 核心文件不完整"
             exit_and_del_tmpdir
         }
+        msg ok "  - 核心文件测试通过"
+    else
+        msg ok "  - 使用官方核心文件"
     fi
 
-    # get server ip.
+    # [步骤 9/10] 获取服务器 IP
+    msg warn "[步骤 9/10] 获取服务器 IP..."
     [[ ! $ip ]] && {
-        msg err "获取服务器 IP 失败."
+        msg err "  - 获取服务器 IP 失败"
         exit_and_del_tmpdir
     }
+    msg ok "  - 服务器 IP: $ip"
 
-    # create sh dir...
+    # [步骤 10/10] 安装文件到系统
+    msg warn "[步骤 10/10] 安装文件到系统..."
+    
+    # create sh dir
     mkdir -p $is_sh_dir
+    msg ok "  - 已创建脚本目录"
 
-    # copy sh file or unzip sh zip file.
+    # copy sh file
     if [[ $local_install ]]; then
         cp -rf $PWD/* $is_sh_dir
+        msg ok "  - 已复制本地脚本"
     else
         unzip -qo $is_sh_ok -d $is_sh_dir
+        msg ok "  - 已解压脚本文件"
     fi
 
     # create core bin dir
     mkdir -p $is_core_dir/bin
-    # copy core file or unzip core zip file
+    msg ok "  - 已创建核心目录"
+    
+    # copy core file
     if [[ $is_core_file ]]; then
         cp -rf $tmpdir/testzip/* $is_core_dir/bin
+        msg ok "  - 已复制核心文件"
     else
         unzip -qo $is_core_ok -d $is_core_dir/bin
+        msg ok "  - 已解压核心文件"
     fi
 
     # add alias
     echo "alias $is_core=$is_sh_bin" >>/root/.bashrc
+    msg ok "  - 已添加别名"
 
     # core command
     ln -sf $is_sh_dir/$is_core.sh $is_sh_bin
+    msg ok "  - 已创建命令链接"
 
     # jq
-    [[ $jq_not_found ]] && mv -f $is_jq_ok /usr/bin/jq
+    [[ $jq_not_found ]] && mv -f $is_jq_ok /usr/bin/jq && msg ok "  - 已安装 jq"
 
     # chmod
     chmod +x $is_core_bin $is_sh_bin /usr/bin/jq
+    msg ok "  - 已设置执行权限"
 
     # create log dir
     mkdir -p $is_log_dir
+    msg ok "  - 已创建日志目录"
 
     # show a tips msg
     msg ok "生成配置文件..."
