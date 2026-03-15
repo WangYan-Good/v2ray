@@ -73,6 +73,16 @@ is_sh_dir=$is_core_dir/sh
 is_sh_repo=$author/$is_core
 is_pkg="wget unzip"
 is_config_json=$is_core_dir/config.json
+
+# Nginx 变量
+is_nginx_dir=/etc/nginx
+is_nginxfile=$is_nginx_dir/nginx.conf
+is_nginx_conf=$is_nginx_dir/v2ray
+
+# Caddy 变量
+is_caddy_dir=/etc/caddy
+is_caddyfile=$is_caddy_dir/Caddyfile
+is_caddy_conf=$is_caddy_dir/$author
 tmp_var_lists=(
     tmpcore
     tmpsh
@@ -774,9 +784,13 @@ main() {
     if [[ $is_install_nginx ]]; then
         msg warn "初始化 Nginx 配置..."
         create nginx new
+        # 设置 is_nginx 标志，避免端口占用警告
+        is_nginx=1
     elif [[ $is_install_caddy ]]; then
         msg warn "初始化 Caddy 配置..."
         create caddy new
+        # 设置 is_caddy 标志
+        is_caddy=1
     fi
 
     # 安装完成后引导用户配置第一个节点（与 v2ray add 完全一致）
