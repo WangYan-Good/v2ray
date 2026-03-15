@@ -423,16 +423,19 @@ main() {
     # check old version
     # 检查旧版本（提供交互式选项）
     [[ -f $is_sh_bin && -d $is_core_dir/bin && -d $is_sh_dir && -d $is_conf_dir ]] && {
-        msg warn "检测到脚本已安装!"
-        msg "当前安装信息:"
-        msg "  - 脚本目录：$is_sh_dir"
-        msg "  - 核心目录：$is_core_dir/bin"
-        msg "  - 配置目录：$is_conf_dir"
-        msg "  - 日志目录：$is_log_dir"
-        msg "\n请选择:"
-        msg "1) 重新安装 (保留配置)"
-        msg "2) 卸载后重新安装"
-        msg "3) 退出"
+        echo
+        echo -e "${yellow}检测到脚本已安装!${none}"
+        echo "当前安装信息:"
+        echo "  - 脚本目录：$is_sh_dir"
+        echo "  - 核心目录：$is_core_dir/bin"
+        echo "  - 配置目录：$is_conf_dir"
+        echo "  - 日志目录：$is_log_dir"
+        echo
+        echo "请选择:"
+        echo "1) 重新安装 (保留配置)"
+        echo "2) 卸载后重新安装"
+        echo "3) 退出"
+        echo
         
         while :; do
             echo -ne "请输入选择 [1-3] (默认:3): "
@@ -456,12 +459,12 @@ main() {
                 break
                 ;;
             3)
-                msg "已退出安装程序"
-                msg "如需重新安装，请使用：$is_core reinstall"
+                echo "已退出安装程序"
+                echo "如需重新安装，请使用：$is_core reinstall"
                 exit 0
                 ;;
             *)
-                msg "输入无效，请输入 1-3"
+                 msg "输入无效，请输入 1-3"
                 ;;
             esac
         done
@@ -682,7 +685,7 @@ main() {
                     break
                     ;;
                 *)
-                    msg "输入无效，请输入 1-4"
+                     msg "输入无效，请输入 1-4"
                     ;;
                 esac
             done
@@ -708,7 +711,7 @@ main() {
                     break
                     ;;
                 *)
-                    msg "输入无效，请输入 1-2"
+                     msg "输入无效，请输入 1-2"
                     ;;
                 esac
             done
@@ -734,7 +737,7 @@ main() {
                     break
                     ;;
                 *)
-                    msg "输入无效，请输入 1-2"
+                     msg "输入无效，请输入 1-2"
                     ;;
                 esac
             done
@@ -757,7 +760,7 @@ main() {
                     break
                     ;;
                 *)
-                    msg "输入无效，请输入 1-2"
+                     msg "输入无效，请输入 1-2"
                     ;;
                 esac
             done
