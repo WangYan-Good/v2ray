@@ -154,6 +154,36 @@ chmod +x install.sh
 ./install.sh --uninstall
 ```
 
+### 更新已安装的脚本
+
+如果已安装旧版本脚本，使用以下方法更新：
+
+**方式 1：使用 update.sh 命令（推荐）**
+```bash
+v2ray update.sh
+```
+
+**方式 2：重新安装**
+```bash
+# 1. 卸载旧版本
+./install.sh --uninstall
+
+# 2. 重新安装
+./install.sh --tls nginx
+```
+
+**方式 3：手动更新（保留配置）**
+```bash
+# 1. 复制最新脚本到安装目录
+cp -rf /path/to/v2ray/src/* /etc/v2ray/sh/src/
+
+# 2. 复制主脚本
+cp /path/to/v2ray/v2ray.sh /etc/v2ray/sh/
+
+# 3. 验证版本
+v2ray version
+```
+
 ### 安装过程示例
 
 ```
