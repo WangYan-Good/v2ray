@@ -34,14 +34,14 @@
 
 ### 支持的协议
 
-| 协议 | 传输方式 | TLS | 动态端口 |
-|------|----------|-----|----------|
-| VMess | TCP/mKCP/QUIC | ❌ | ✅ |
-| VMess | WS/H2/gRPC | ✅ | ❌ |
-| VLESS | WS/H2/gRPC | ✅ | ❌ |
-| Trojan | WS/H2/gRPC | ✅ | ❌ |
-| Shadowsocks | TCP | ❌ | ❌ |
-| Socks | TCP | ❌ | ❌ |
+| 协议 | 传输方式 | TLS | 动态端口 | 说明 |
+|------|----------|-----|----------|------|
+| VMess | TCP/mKCP/QUIC | ❌ | ✅ | 基础协议 |
+| VMess | WS/H2/gRPC | ✅ | ❌ | 推荐组合 |
+| VLESS | WS/H2/gRPC | ✅ | ❌ | 新一代协议 |
+| Trojan | WS/H2/gRPC | ✅ | ❌ | 伪装性强 |
+| Shadowsocks | TCP | ❌ | ❌ | 简单快速 |
+| Socks | TCP | ❌ | ❌ | 代理协议 |
 
 ---
 
@@ -214,8 +214,15 @@ v2ray add trojan-ws-tls trojan.example.com
 # VMess-TCP (无 TLS)
 v2ray add vmess-tcp
 
-# Shadowsocks
+# Shadowsocks (简单快速)
 v2ray add ss
+# 或指定端口、密码、加密方式
+v2ray add ss 8388 mypassword aes-256-gcm
+
+# Socks (代理协议)
+v2ray add socks
+# 或指定端口、用户名、密码
+v2ray add socks 1080 myuser mypass
 
 # 使用自动参数
 v2ray add vmess-ws-tls auto
