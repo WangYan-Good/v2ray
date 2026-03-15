@@ -480,6 +480,28 @@ main() {
     # start installing...
     msg warn "开始安装..."
     [[ $is_core_ver ]] && msg warn "${is_core_name} 版本: ${yellow}$is_core_ver${none}"
+
+    # 配置代理（如果未通过命令行参数指定）
+    if [[ ! $proxy && ! $uninstall ]]; then
+        echo
+        echo "配置下载代理（可选）:"
+        echo "如果下载速度慢，可以配置代理加速下载"
+        echo "直接回车跳过，使用直连下载"
+        echo
+        read -p "请输入代理地址 (例如：http://127.0.0.1:2333): " proxy_input
+        if [[ $proxy_input ]]; then
+            # 验证代理地址格式
+            if [[ $proxy_input =~ ^https?:// ]]; then
+                proxy=$proxy_input
+                msg warn "使用代理：${yellow}$proxy${none}"
+            else
+                msg warn "代理地址格式不正确，将使用直连下载"
+            fi
+        else
+            msg ok "跳过代理配置，使用直连下载"
+        fi
+    fi
+
     [[ $proxy ]] && msg warn "使用代理: ${yellow}$proxy${none}"
     # create tmpdir
     mkdir -p $tmpdir
