@@ -66,6 +66,37 @@ EOF
         ;;
     
     *ws*)
+        # 检测配置冲突
+        [[ -f ${is_nginx_site_file} ]] && {
+            msg warn "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
+            msg warn "请选择:"
+            msg "1) 覆盖现有配置 (备份为 .bak)"
+            msg "2) 跳过，保留现有配置"
+            msg "3) 修改配置 (手动编辑)"
+            while :; do
+                echo -ne "请输入选择 [1-3] (默认:1): "
+                read nginx_conf_choice
+                [[ ! $nginx_conf_choice ]] && nginx_conf_choice=1
+                case $nginx_conf_choice in
+                1)
+                    cp -f ${is_nginx_site_file} ${is_nginx_site_file}.bak
+                    msg ok "已备份现有配置：${is_nginx_site_file}.bak"
+                    break
+                    ;;
+                2)
+                    msg warn "跳过配置，保留现有配置"
+                    return
+                    ;;
+                3)
+                    msg warn "请手动编辑：${is_nginx_site_file}"
+                    return
+                    ;;
+                *)
+                    msg "输入无效，请输入 1-3"
+                    ;;
+                esac
+            done
+        }
         # WebSocket 配置 (VMess/VLESS/Trojan)
         cat >${is_nginx_site_file} <<<"
 # ${host} - V2Ray WebSocket
@@ -138,6 +169,37 @@ server {
         ;;
     
     *h2*)
+        # 检测配置冲突
+        [[ -f ${is_nginx_site_file} ]] && {
+            msg warn "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
+            msg warn "请选择:"
+            msg "1) 覆盖现有配置 (备份为 .bak)"
+            msg "2) 跳过，保留现有配置"
+            msg "3) 修改配置 (手动编辑)"
+            while :; do
+                echo -ne "请输入选择 [1-3] (默认:1): "
+                read nginx_conf_choice
+                [[ ! $nginx_conf_choice ]] && nginx_conf_choice=1
+                case $nginx_conf_choice in
+                1)
+                    cp -f ${is_nginx_site_file} ${is_nginx_site_file}.bak
+                    msg ok "已备份现有配置：${is_nginx_site_file}.bak"
+                    break
+                    ;;
+                2)
+                    msg warn "跳过配置，保留现有配置"
+                    return
+                    ;;
+                3)
+                    msg warn "请手动编辑：${is_nginx_site_file}"
+                    return
+                    ;;
+                *)
+                    msg "输入无效，请输入 1-3"
+                    ;;
+                esac
+            done
+        }
         # HTTP/2 配置
         cat >${is_nginx_site_file} <<<"
 # ${host} - V2Ray HTTP/2
@@ -197,6 +259,37 @@ server {
         ;;
     
     *grpc*)
+        # 检测配置冲突
+        [[ -f ${is_nginx_site_file} ]] && {
+            msg warn "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
+            msg warn "请选择:"
+            msg "1) 覆盖现有配置 (备份为 .bak)"
+            msg "2) 跳过，保留现有配置"
+            msg "3) 修改配置 (手动编辑)"
+            while :; do
+                echo -ne "请输入选择 [1-3] (默认:1): "
+                read nginx_conf_choice
+                [[ ! $nginx_conf_choice ]] && nginx_conf_choice=1
+                case $nginx_conf_choice in
+                1)
+                    cp -f ${is_nginx_site_file} ${is_nginx_site_file}.bak
+                    msg ok "已备份现有配置：${is_nginx_site_file}.bak"
+                    break
+                    ;;
+                2)
+                    msg warn "跳过配置，保留现有配置"
+                    return
+                    ;;
+                3)
+                    msg warn "请手动编辑：${is_nginx_site_file}"
+                    return
+                    ;;
+                *)
+                    msg "输入无效，请输入 1-3"
+                    ;;
+                esac
+            done
+        }
         # gRPC 配置
         cat >${is_nginx_site_file} <<<"
 # ${host} - V2Ray gRPC
