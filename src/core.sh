@@ -1428,13 +1428,29 @@ get() {
         [[ $is_no_auto_tls || $is_gen ]] && return
         get_ip
         get ping
+        
+        # 第一次检测：使用 Cloudflare DNS API
         if [[ ! $(grep $ip <<<$is_host_dns) ]]; then
+            # 第二次检测：使用本地 DNS 解析（可能通过 /etc/hosts 或本地 DNS）
+            local_host_ip=$(getent hosts $host 2>/dev/null | awk '{print $1}' | head -1)
+            if [[ $local_host_ip && $local_host_ip == $ip ]]; then
+                msg ok "域名解析验证通过（本地 DNS）"
+                return
+            fi
+            
+            # 检测失败，提示用户
             msg "\n请将 ($(_red_bg $host)) 解析到 ($(_red_bg $ip))"
-            msg "\n如果使用 Cloudflare, 在 DNS 那; 关闭 (Proxy status / 代理状态), 即是 (DNS only / 仅限 DNS)"
+            msg "\n如果使用 Cloudflare, 在 DNS 那；关闭 (Proxy status / 代理状态), 即是 (DNS only / 仅限 DNS)"
             ask string y "我已经确定解析 [y]:"
             get ping
             if [[ ! $(grep $ip <<<$is_host_dns) ]]; then
-                _cyan "\n测试结果: $is_host_dns"
+                # 再次尝试本地 DNS
+                local_host_ip=$(getent hosts $host 2>/dev/null | awk '{print $1}' | head -1)
+                if [[ $local_host_ip && $local_host_ip == $ip ]]; then
+                    msg ok "域名解析验证通过（本地 DNS）"
+                    return
+                fi
+                _cyan "\n测试结果：$is_host_dns"
                 err "域名 ($host) 没有解析到 ($ip)"
             fi
         fi
