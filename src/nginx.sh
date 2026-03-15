@@ -417,12 +417,29 @@ nginx_certbot() {
             msg ok "Nginx 已启动"
         fi
 
-        # 测试 Nginx 配置
+        # 测试 Nginx 配置并重载（确保新配置生效）
         if ! nginx -t &>/dev/null; then
             msg err "Nginx 配置测试失败"
             nginx -t 2>&1 | tail -5
             return 1
         fi
+        # 重载 Nginx 使新配置生效
+        nginx -s reload &>/dev/null
+        sleep 1
+
+        # 验证挑战文件是否可访问
+        local test_file="/var/www/certbot/.well-known/acme-challenge/test"
+        mkdir -p "$(dirname $test_file)"
+        echo "test" > $test_file
+        sleep 1
+        if ! curl -s --connect-timeout 3 "http://localhost/.well-known/acme-challenge/test" | grep -q "test"; then
+            msg err "Nginx 配置验证失败：无法访问挑战文件"
+            msg warn "请检查 Nginx 配置是否包含 location /.well-known/acme-challenge/ 块"
+            rm -f $test_file
+            return 1
+        fi
+        rm -f $test_file
+        msg ok "Nginx 配置验证通过"
 
         # 使用 webroot 模式申请（不影响现有服务）
         certbot certonly --webroot \
