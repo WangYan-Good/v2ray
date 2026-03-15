@@ -464,7 +464,7 @@ main() {
                 exit 0
                 ;;
             *)
-                 msg "输入无效，请输入 1-3"
+                 echo "输入无效，请输入 1-3"
                 ;;
             esac
         done
@@ -647,15 +647,16 @@ main() {
         [[ -f /usr/local/bin/caddy || $(type -P caddy) ]] && is_caddy_installed=1
         [[ -f /usr/sbin/nginx || $(type -P nginx) ]] && is_nginx_installed=1
         
-        msg warn "选择 TLS 配置方案:"
+        echo
+        echo -e "${yellow}选择 TLS 配置方案:${none}"
         
         # 根据已安装的服务提供选项
         if [[ $is_caddy_installed && $is_nginx_installed ]]; then
-            msg "检测到 Caddy 和 Nginx 都已安装，请选择:"
-            msg "1) 使用 Caddy"
-            msg "2) 使用 Nginx"
-            msg "3) 停止 Caddy，使用 Nginx"
-            msg "4) 停止 Nginx，使用 Caddy"
+            echo "检测到 Caddy 和 Nginx 都已安装，请选择:"
+            echo "1) 使用 Caddy"
+            echo "2) 使用 Nginx"
+            echo "3) 停止 Caddy，使用 Nginx"
+            echo "4) 停止 Nginx，使用 Caddy"
             
             while :; do
                 echo -ne "请输入选择 [1-4] (默认:2): "
@@ -685,14 +686,14 @@ main() {
                     break
                     ;;
                 *)
-                     msg "输入无效，请输入 1-4"
+                     echo "输入无效，请输入 1-4"
                     ;;
                 esac
             done
         elif [[ $is_caddy_installed ]]; then
-            msg "检测到 Caddy 已安装，请选择:"
-            msg "1) 使用 Caddy (默认)"
-            msg "2) 停止 Caddy，改用 Nginx"
+            echo "检测到 Caddy 已安装，请选择:"
+            echo "1) 使用 Caddy (默认)"
+            echo "2) 停止 Caddy，改用 Nginx"
             
             while :; do
                 echo -ne "请输入选择 [1-2] (默认:1): "
@@ -711,14 +712,14 @@ main() {
                     break
                     ;;
                 *)
-                     msg "输入无效，请输入 1-2"
+                     echo "输入无效，请输入 1-2"
                     ;;
                 esac
             done
         elif [[ $is_nginx_installed ]]; then
-            msg "检测到 Nginx 已安装，请选择:"
-            msg "1) 使用 Nginx (默认)"
-            msg "2) 停止 Nginx，改用 Caddy"
+            echo "检测到 Nginx 已安装，请选择:"
+            echo "1) 使用 Nginx (默认)"
+            echo "2) 停止 Nginx，改用 Caddy"
             
             while :; do
                 echo -ne "请输入选择 [1-2] (默认:1): "
@@ -737,14 +738,14 @@ main() {
                     break
                     ;;
                 *)
-                     msg "输入无效，请输入 1-2"
+                     echo "输入无效，请输入 1-2"
                     ;;
                 esac
             done
         else
             # 都没有安装，提供标准选项
-            msg "1) Caddy (简洁，适合单站点)"
-            msg "2) Nginx + Certbot (灵活，适合多站点共存) (默认)"
+            echo "1) Caddy (简洁，适合单站点)"
+            echo "2) Nginx + Certbot (灵活，适合多站点共存) (默认)"
             
             while :; do
                 echo -ne "请输入选择 [1-2] (默认:2): "
@@ -760,7 +761,7 @@ main() {
                     break
                     ;;
                 *)
-                     msg "输入无效，请输入 1-2"
+                     echo "输入无效，请输入 1-2"
                     ;;
                 esac
             done
