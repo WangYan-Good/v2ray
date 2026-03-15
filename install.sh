@@ -124,12 +124,13 @@ msg() {
 
 # show help msg
 show_help() {
-    echo -e "Usage: $0 [-f xxx | -l | -p xxx | -v xxx | --tls xxx | -h]"
+    echo -e "Usage: $0 [-f xxx | -l | -p xxx | -v xxx | --tls xxx | --uninstall | -h]"
     echo -e "  -f, --core-file <path>          自定义 $is_core_name 文件路径, e.g., -f /root/${is_core}-linux-64.zip"
     echo -e "  -l, --local-install             本地获取安装脚本, 使用当前目录"
     echo -e "  -p, --proxy <addr>              使用代理下载, e.g., -p http://127.0.0.1:2333"
     echo -e "  -v, --core-version <ver>        自定义 $is_core_name 版本, e.g., -v v5.4.1"
     echo -e "  --tls <caddy|nginx>             选择 TLS 方案，e.g., --tls nginx"
+    echo -e "  --uninstall                     卸载 V2Ray 和相关组件"
     echo -e "  -h, --help                      显示此帮助界面\n"
 
     exit 0
@@ -291,6 +292,29 @@ pass_args() {
             ;;
         -h | --help)
             show_help
+            ;;
+        --uninstall)
+            # 执行卸载
+            if [[ -f /usr/local/bin/v2ray ]]; then
+                v2ray uninstall
+            else
+                # 直接删除文件
+                rm -rf /etc/v2ray /var/log/v2ray /usr/local/bin/v2ray
+                sed -i '/v2ray/d' /root/.bashrc
+                # 如果选择了卸载 caddy/nginx
+                if [[ -f /usr/local/bin/caddy ]]; then
+                    systemctl stop caddy &>/dev/null
+                    systemctl disable caddy &>/dev/null
+                    rm -rf /etc/caddy /usr/local/bin/caddy /lib/systemd/system/caddy.service
+                fi
+                if [[ -f /usr/sbin/nginx ]]; then
+                    systemctl stop nginx &>/dev/null
+                    systemctl disable nginx &>/dev/null
+                    rm -rf /etc/nginx /lib/systemd/system/nginx.service
+                fi
+                msg ok "卸载完成!"
+            fi
+            exit
             ;;
         *)
             echo -e "\n${is_err} ($@) 为未知参数...\n"
