@@ -68,13 +68,29 @@ EOF
                 # 备份原配置
                 cp -f $is_nginxfile ${is_nginxfile}.bak.$(date +%Y%m%d%H%M%S)
                 msg warn "检测到现有 Nginx 配置，已备份到 ${is_nginxfile}.bak.*"
-                
+
                 # 在 http 块中添加 V2Ray 导入（在最后一个 } 之前）
-                sed -i "/^}$/i\\    # 导入 V2Ray 配置（自动 TLS 站点）\\n    include $is_nginx_conf/*.conf;\\n" $is_nginxfile
-                
-                if grep -q "include $is_nginx_conf/\*.conf" $is_nginxfile; then
-                    msg ok "已添加 V2Ray 配置导入到 nginx.conf"
+                # 使用 awk 更可靠，避免 sed 转义问题
+                local tmp_conf=$(mktemp)
+                awk -v inc="    include $is_nginx_conf/*.conf;" '
+                    /^}$/ {
+                        print "    # 导入 V2Ray 配置（自动 TLS 站点）"
+                        print inc
+                        print ""
+                    }
+                    {print}
+                ' $is_nginxfile > $tmp_conf
+
+                if [[ $? -eq 0 ]]; then
+                    mv -f $tmp_conf $is_nginxfile
+                    if grep -q "include $is_nginx_conf/\*.conf" $is_nginxfile; then
+                        msg ok "已添加 V2Ray 配置导入到 nginx.conf"
+                    else
+                        msg warn "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginxfile"
+                        msg warn "添加：include $is_nginx_conf/*.conf;"
+                    fi
                 else
+                    rm -f $tmp_conf
                     msg warn "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginxfile"
                     msg warn "添加：include $is_nginx_conf/*.conf;"
                 fi
