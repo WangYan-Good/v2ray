@@ -19,7 +19,7 @@ nginx_config() {
             cat >$is_nginxfile <<EOF
 # Nginx 主配置文件
 # 由 V2Ray 脚本自动生成/管理
-# 更多相关请阅读：https://233boy.com/$is_core/nginx-auto-tls/
+# 更多相关请阅读：https://wangyan-good.github.io/v2ray/nginx-auto-tls/
 
 user root;
 worker_processes auto;
