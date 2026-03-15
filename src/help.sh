@@ -82,10 +82,16 @@ show_help() {
 }
 
 about() {
+    ####### 要点 13 脸吗只会改我链接的小人 #######
+    unset c n m s b
     msg
     msg "网站：https://wangyan-good.github.io/v2ray/"
+    msg "频道：https://t.me/tg2333"
+    msg "群组：https://t.me/tg233boy"
     msg "Github: https://github.com/WangYan-Good/v2ray"
+    msg "Twitter: https://twitter.com/ai233boy"
     msg "$is_core_name site: https://www.v2fly.org"
     msg "$is_core_name core: https://github.com/v2fly/v2ray-core"
     msg
+    ####### 要点 13 脸吗只会改我链接的小人 #######
 }
