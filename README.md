@@ -1,122 +1,921 @@
-# 介绍
+# V2Ray 脚本完整文档
 
-最好用的 V2Ray 一键安装脚本 &amp; 管理脚本
+> 一个支持多站点共存的 V2Ray 一键安装和管理脚本
 
-# 特点
+---
 
-- 快速安装
-- 超级好用
-- 零学习成本
-- 自动化 TLS
-- 简化所有流程
-- 屏蔽 BT
-- 屏蔽中国 IP
-- 使用 API 操作
-- 兼容 V2Ray 命令
-- 强大的快捷参数
-- 支持所有常用协议
-- 一键添加 Shadowsocks
-- 一键添加 VMess-(TCP/mKCP/QUIC)
-- 一键添加 VMess-(WS/H2/gRPC)-TLS
-- 一键添加 VLESS-(WS/H2/gRPC)-TLS
-- 一键添加 Trojan-(WS/H2/gRPC)-TLS
-- 一键添加 VMess-(TCP/mKCP/QUIC) 动态端口
-- 一键启用 BBR
-- 一键更改伪装网站
-- 一键更改 (端口/UUID/密码/域名/路径/加密方式/SNI/动态端口/等...)
-- 还有更多...
+## 目录
 
-# 设计理念
+1. [项目概述](#项目概述)
+2. [架构设计](#架构设计)
+3. [安装指南](#安装指南)
+4. [使用指南](#使用指南)
+5. [Nginx 多站点配置](#nginx-多站点配置)
+6. [配置参考](#配置参考)
+7. [故障排查](#故障排查)
+8. [常见问题](#常见问题)
 
-设计理念为：**高效率，超快速，极易用**
+---
 
-脚本基于作者的自身使用需求，以 **多配置同时运行** 为核心设计
+## 项目概述
 
-并且专门优化了，添加、更改、查看、删除、这四项常用功能
+### 简介
 
-你只需要一条命令即可完成 添加、更改、查看、删除、等操作
+这是一个 **V2Ray 一键安装脚本和管理脚本**，支持两种 TLS 方案：
+- **Caddy** - 简洁易用，适合单站点
+- **Nginx + Certbot** - 灵活强大，适合多站点共存
 
-例如，添加一个配置仅需不到 1 秒！瞬间完成添加！其他操作亦是如此！
+### 设计理念
 
-脚本的参数非常高效率并且超级易用，请掌握参数的使用
+- **高效率** - 添加配置仅需不到 1 秒
+- **超快速** - 自动化所有流程
+- **极易用** - 零学习成本
+- **多配置并发** - 支持同时运行多个协议配置
 
-# 脚本说明
+### 支持的协议
 
-[V2Ray 一键安装脚本](https://github.com/233boy/v2ray/wiki/V2Ray%E4%B8%80%E9%94%AE%E5%AE%89%E8%A3%85%E8%84%9A%E6%9C%AC)
+| 协议 | 传输方式 | TLS | 动态端口 |
+|------|----------|-----|----------|
+| VMess | TCP/mKCP/QUIC | ❌ | ✅ |
+| VMess | WS/H2/gRPC | ✅ | ❌ |
+| VLESS | WS/H2/gRPC | ✅ | ❌ |
+| Trojan | WS/H2/gRPC | ✅ | ❌ |
+| Shadowsocks | TCP | ❌ | ❌ |
+| Socks | TCP | ❌ | ❌ |
 
-# 搭建教程
+---
 
-[V2Ray搭建详细图文教程](https://github.com/233boy/v2ray/wiki/V2Ray%E6%90%AD%E5%BB%BA%E8%AF%A6%E7%BB%86%E5%9B%BE%E6%96%87%E6%95%99%E7%A8%8B)
+## 架构设计
 
-# 帮助
-
-使用: `v2ray help`
+### 目录结构
 
 ```
-V2Ray script v4.21 by 233boy
-Usage: v2ray [options]... [args]...
+/etc/v2ray/
+├── bin/                    # V2Ray 核心二进制
+│   ├── v2ray
+│   ├── geoip.dat
+│   └── geosite.dat
+├── sh/                     # 脚本源码
+│   ├── src/
+│   │   ├── init.sh         # 初始化
+│   │   ├── core.sh         # 核心逻辑
+│   │   ├── nginx.sh        # Nginx 配置
+│   │   ├── caddy.sh        # Caddy 配置
+│   │   ├── systemd.sh      # 服务管理
+│   │   ├── download.sh     # 下载工具
+│   │   ├── help.sh         # 帮助信息
+│   │   ├── log.sh          # 日志管理
+│   │   ├── dns.sh          # DNS 配置
+│   │   └── bbr.sh          # BBR 优化
+│   └── v2ray.sh            # 主入口
+├── conf/                   # V2Ray 配置文件
+│   ├── VMess-WS-8080.json
+│   └── VLESS-gRPC-443.json
+└── config.json             # 主配置文件
 
-基本:
-   v, version                                      显示当前版本
-   ip                                              返回当前主机的 IP
-   get-port                                        返回一个可用的端口
+/etc/nginx/                 # Nginx 方案目录
+├── nginx.conf              # 主配置
+├── ssl/                    # SSL 证书
+│   └── 域名/
+├── v2ray/                  # V2Ray 站点配置
+│   └── 域名.conf
+└── sites-enabled/          # 其他站点配置
 
-一般:
-   a, add [protocol] [args... | auto]              添加配置
-   c, change [name] [option] [args... | auto]      更改配置
-   d, del [name]                                   删除配置**
-   i, info [name]                                  查看配置
-   qr [name]                                       二维码信息
-   url [name]                                      URL 信息
-   log                                             查看日志
-   logerr                                          查看错误日志
-
-更改:
-   dp, dynamicport [name] [start | auto] [end]     更改动态端口
-   full [name] [...]                               更改多个参数
-   id [name] [uuid | auto]                         更改 UUID
-   host [name] [domain]                            更改域名
-   port [name] [port | auto]                       更改端口
-   path [name] [path | auto]                       更改路径
-   passwd [name] [password | auto]                 更改密码
-   type [name] [type | auto]                       更改伪装类型
-   method [name] [method | auto]                   更改加密方式
-   seed [name] [seed | auto]                       更改 mKCP seed
-   new [name] [...]                                更改协议
-   web [name] [domain]                             更改伪装网站
-
-进阶:
-   dns [...]                                       设置 DNS
-   dd, ddel [name...]                              删除多个配置**
-   fix [name]                                      修复一个配置
-   fix-all                                         修复全部配置
-   fix-caddyfile                                   修复 Caddyfile
-   fix-config.json                                 修复 config.json
-
-管理:
-   un, uninstall                                   卸载
-   u, update [core | sh | dat | caddy] [ver]       更新
-   U, update.sh                                    更新脚本
-   s, status                                       运行状态
-   start, stop, restart [caddy]                    启动, 停止, 重启
-   t, test                                         测试运行
-   reinstall                                       重装脚本
-
-测试:
-   client [name]                                   显示用于客户端 JSON, 仅供参考
-   debug [name]                                    显示一些 debug 信息, 仅供参考
-   gen [...]                                       同等于 add, 但只显示 JSON 内容, 不创建文件, 测试使用
-   genc [name]                                     显示用于客户端部分 JSON, 仅供参考
-   no-auto-tls [...]                               同等于 add, 但禁止自动配置 TLS, 可用于 *TLS 相关协议
-   xapi [...]                                      同等于 v2ray api, 但 API 后端使用当前运行的 V2Ray 服务
-
-其他:
-   bbr                                             启用 BBR, 如果支持
-   bin [...]                                       运行 V2Ray 命令, 例如: v2ray bin help
-   api, convert, tls, run, uuid  [...]             兼容 V2Ray 命令
-   h, help                                         显示此帮助界面
-
-谨慎使用 del, ddel, 此选项会直接删除配置; 无需确认
-反馈问题) https://github.com/233boy/v2ray/issues
-文档(doc) https://233boy.com/v2ray/v2ray-script/
+/etc/caddy/                 # Caddy 方案目录
+├── Caddyfile               # 主配置
+└── 233boy/                 # Caddy 配置
+    └── 域名.conf
 ```
+
+### 核心模块
+
+| 模块 | 文件 | 功能 |
+|------|------|------|
+| 初始化 | `init.sh` | 环境变量、状态检测、模块加载 |
+| 核心逻辑 | `core.sh` | 添加/更改/删除配置、API 操作 |
+| Nginx | `nginx.sh` | Nginx 配置生成、Certbot 证书管理 |
+| Caddy | `caddy.sh` | Caddy 配置生成、自动 TLS |
+| 服务管理 | `systemd.sh` | systemd 服务定义 |
+| 下载 | `download.sh` | 核心/脚本/Caddy/Nginx 下载安装 |
+
+### 数据流
+
+```
+用户命令 (v2ray xxx)
+    │
+    ▼
+v2ray.sh (入口)
+    │
+    ▼
+init.sh (初始化)
+    │
+    ├─► 检测 V2Ray 状态
+    ├─► 检测 Caddy 状态
+    ├─► 检测 Nginx 状态
+    │
+    ▼
+core.sh (核心逻辑)
+    │
+    ├─► add    ──► create() ──► nginx.sh / caddy.sh
+    ├─► change ──► modify() ──► nginx.sh / caddy.sh
+    ├─► del    ──► remove()  ──► nginx.sh / caddy.sh
+    └─► info   ──► read()
+```
+
+---
+
+## 安装指南
+
+### 系统要求
+
+- **操作系统**: Ubuntu 18.04+ / Debian 10+ / CentOS 7+
+- **架构**: x86_64 (64 位) 或 ARM64
+- **权限**: ROOT 用户
+- **端口**: 80 和 443 未被占用（TLS 方案需要）
+
+### 快速安装
+
+```bash
+# 下载安装脚本
+wget -O install.sh https://github.com/233boy/v2ray/releases/latest/download/install.sh
+chmod +x install.sh
+
+# 执行安装
+./install.sh
+```
+
+### 安装参数
+
+```bash
+# 自定义 V2Ray 版本
+./install.sh -v v5.10.0
+
+# 使用代理下载
+./install.sh -p http://127.0.0.1:2333
+
+# 本地安装（使用当前目录脚本）
+./install.sh -l
+
+# 自定义核心文件
+./install.sh -f /root/v2ray-linux-64.zip
+```
+
+### TLS 方案选择
+
+安装脚本会自动检测并询问 TLS 方案：
+
+```
+检测到您需要 TLS 配置，请选择:
+1) Caddy (简洁，适合单站点)
+2) Nginx + Certbot (灵活，适合多站点)
+请输入选择 [1-2]:
+```
+
+**推荐选择：**
+- 单 V2Ray 域名 → **Caddy**
+- 多域名或已有其他网站 → **Nginx**
+
+### 安装后验证
+
+```bash
+# 查看状态
+v2ray status
+
+# 预期输出:
+# V2Ray v5.x.x: running
+# Nginx v1.x.x: running (如果选择 Nginx)
+# 或 Caddy v2.x.x: running (如果选择 Caddy)
+```
+
+---
+
+## 使用指南
+
+### 命令帮助
+
+```bash
+v2ray help
+```
+
+### 基本命令
+
+#### 添加配置
+
+```bash
+# VMess-WS-TLS (推荐)
+v2ray add vmess-ws-tls example.com
+
+# VLESS-gRPC-TLS
+v2ray add vless-grpc-tls grpc.example.com
+
+# Trojan-WS-TLS
+v2ray add trojan-ws-tls trojan.example.com
+
+# VMess-TCP (无 TLS)
+v2ray add vmess-tcp
+
+# Shadowsocks
+v2ray add ss
+
+# 使用自动参数
+v2ray add vmess-ws-tls auto
+```
+
+#### 查看配置
+
+```bash
+# 列出所有配置
+v2ray info
+
+# 查看特定配置
+v2ray info VMess-WS-example.com.json
+
+# 查看二维码
+v2ray qr VMess-WS-example.com.json
+
+# 查看 URL 链接
+v2ray url VMess-WS-example.com.json
+```
+
+#### 更改配置
+
+```bash
+# 更改端口
+v2ray port VMess-WS-example.com.json 8443
+
+# 更改域名
+v2ray host VMess-WS-example.com.com newdomain.com
+
+# 更改路径
+v2ray path VMess-WS-example.com.json /newpath
+
+# 更改 UUID
+v2ray id VMess-WS-example.com.json $(v2ray uuid)
+
+# 更改密码 (Shadowsocks/Trojan)
+v2ray passwd VMess-WS-example.com.json newpassword
+
+# 更改伪装类型
+v2ray type VMess-TCP-8080.json http
+
+# 更改伪装网站
+v2ray web VMess-WS-example.com.json https://www.google.com
+
+# 更改协议
+v2ray new VMess-WS-example.com.json trojan-ws-tls
+
+# 一次性更改多个参数
+v2ray full VMess-WS-example.com.json trojan-ws-tls 443 newpassword
+```
+
+#### 删除配置
+
+```bash
+# 删除单个配置
+v2ray del VMess-WS-example.com.json
+
+# 删除多个配置
+v2ray ddel config1.json config2.json config3.json
+```
+
+### 管理命令
+
+```bash
+# 查看状态
+v2ray status
+
+# 启动/停止/重启 V2Ray
+v2ray start
+v2ray stop
+v2ray restart
+
+# 启动/停止/重启 Nginx
+v2ray restart nginx
+v2ray stop nginx
+
+# 启动/停止/重启 Caddy
+v2ray restart caddy
+v2ray stop caddy
+
+# 测试运行
+v2ray test
+
+# 查看日志
+v2ray log       # 访问日志
+v2ray logerr    # 错误日志
+
+# 设置日志级别
+v2ray log warning
+v2ray log error
+v2ray log none  # 禁用日志
+v2ray log del   # 删除日志文件
+```
+
+### 更新命令
+
+```bash
+# 更新 V2Ray 核心
+v2ray update core
+
+# 更新脚本
+v2ray update.sh
+
+# 更新 Nginx
+v2ray update nginx
+
+# 更新 Caddy
+v2ray update caddy
+
+# 更新 geo 数据库
+v2ray update dat
+
+# 更新到指定版本
+v2ray update core v5.10.0
+```
+
+### 其他命令
+
+```bash
+# 设置 DNS
+v2ray dns 1.1.1.1
+v2ray dns 8.8.8.8
+v2ray dns https://dns.google/dns-query
+
+# 启用 BBR
+v2ray bbr
+
+# 获取可用端口
+v2ray get-port
+
+# 获取 UUID
+v2ray uuid
+
+# 获取服务器 IP
+v2ray ip
+
+# 修复配置
+v2ray fix config.json
+v2ray fix-all
+v2ray fix-nginxfile
+v2ray fix-caddyfile
+
+# 卸载
+v2ray uninstall
+
+# 重装
+v2ray reinstall
+```
+
+### 高级命令
+
+```bash
+# 生成客户端配置
+v2ray client VMess-WS-example.com.json
+
+# 生成完整客户端配置（含路由）
+v2ray client VMess-WS-example.com.json --full
+
+# 测试生成配置（不保存）
+v2ray gen vmess-ws-tls example.com
+
+# 禁止自动 TLS
+v2ray no-auto-tls add vmess-ws-tls example.com
+
+# 使用 V2Ray 原生命令
+v2ray bin version
+v2ray api stats
+v2ray tls --cert /path/to/cert
+```
+
+---
+
+## Nginx 多站点配置
+
+### 为什么选择 Nginx？
+
+| 场景 | Caddy | Nginx |
+|------|-------|-------|
+| 单 V2Ray 域名 | ✅ 推荐 | ⚠️ 可用 |
+| 多 V2Ray 域名 | ❌ 不推荐 | ✅ 推荐 |
+| 与其他网站共存 | ❌ 困难 | ✅ 完美 |
+| 共享 80/443 端口 | ❌ 不支持 | ✅ 支持 |
+| 配置灵活性 | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| 性能 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+
+### 配置结构
+
+```
+/etc/nginx/
+├── nginx.conf              # 主配置（脚本管理）
+├── ssl/                    # SSL 证书目录
+│   ├── v2ray.example.com/
+│   │   ├── fullchain.pem
+│   │   └── privkey.pem
+│   ├── blog.example.com/
+│   └── api.example.com/
+├── v2ray/                  # V2Ray 站点配置
+│   ├── v2ray.example.com.conf
+│   └── v2ray.example.com.conf.add
+└── sites-enabled/          # 其他站点配置（用户管理）
+    ├── blog.example.com.conf
+    └── api.example.com.conf
+```
+
+### 添加 V2Ray 站点
+
+```bash
+# 添加第一个 V2Ray 配置
+v2ray add vmess-ws-tls v2ray.example.com
+
+# 添加第二个 V2Ray 配置
+v2ray add vless-grpc-tls grpc.example.com
+
+# 脚本会自动:
+# 1. 生成 V2Ray 配置文件
+# 2. 生成 Nginx 配置文件
+# 3. 申请 Let's Encrypt 证书
+# 4. 重载 Nginx
+```
+
+### 添加其他网站
+
+#### 示例：WordPress 博客
+
+1. **创建 Nginx 配置**
+
+```bash
+cat > /etc/nginx/sites-enabled/blog.example.com.conf << 'EOF'
+# HTTP 服务器
+server {
+    listen 80;
+    server_name blog.example.com;
+    
+    # ACME 验证
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+# HTTPS 服务器
+server {
+    listen 443 ssl http2;
+    server_name blog.example.com;
+    
+    # SSL 证书
+    ssl_certificate /etc/nginx/ssl/blog.example.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/blog.example.com/privkey.pem;
+    
+    # SSL 优化
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:50m;
+    
+    # WordPress 配置
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+```
+
+2. **申请证书**
+
+```bash
+certbot certonly --webroot \
+    -w /var/www/certbot \
+    -d blog.example.com \
+    --email admin@blog.example.com \
+    --agree-tos \
+    --non-interactive
+```
+
+3. **测试并重载**
+
+```bash
+nginx -t
+systemctl reload nginx
+```
+
+#### 示例：自定义 API 服务
+
+```bash
+cat > /etc/nginx/sites-enabled/api.example.com.conf << 'EOF'
+server {
+    listen 80;
+    server_name api.example.com;
+    
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api.example.com;
+    
+    ssl_certificate /etc/nginx/ssl/api.example.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/api.example.com/privkey.pem;
+    
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+EOF
+```
+
+### 伪装网站配置
+
+如果要配置伪装网站，修改 `.conf.add` 文件：
+
+```bash
+# 编辑伪装配置
+vim /etc/nginx/v2ray/v2ray.example.com.conf.add
+```
+
+内容示例：
+
+```nginx
+# 伪装成 Google
+location / {
+    proxy_pass https://www.google.com;
+    proxy_ssl_server_name on;
+    proxy_set_header Host www.google.com;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_buffering off;
+}
+```
+
+然后重载 Nginx：
+
+```bash
+nginx -t && systemctl reload nginx
+```
+
+### 证书管理
+
+#### 自动续期
+
+脚本安装时会自动添加定时任务：
+
+```bash
+# 查看定时任务
+crontab -l | grep certbot
+
+# 输出:
+# 0 3 * * * certbot renew --quiet --deploy-hook 'systemctl reload nginx'
+```
+
+#### 手动续期
+
+```bash
+# 续期所有证书
+certbot renew
+
+# 强制续期特定域名
+certbot renew --force-renewal -d example.com
+
+# 测试续期
+certbot renew --dry-run
+```
+
+#### 查看证书
+
+```bash
+# 查看所有证书
+certbot certificates
+
+# 查看证书详情
+certbot certificates --name example.com
+```
+
+---
+
+## 配置参考
+
+### V2Ray 配置文件示例
+
+#### VMess-WS-TLS
+
+```json
+{
+  "inbounds": [
+    {
+      "tag": "VMess-WS-example.com.json",
+      "port": 10000,
+      "listen": "127.0.0.1",
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          {
+            "id": "uuid-here",
+            "alterId": 0
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "wsSettings": {
+          "path": "/path",
+          "headers": {
+            "Host": "example.com"
+          }
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
+      }
+    }
+  ]
+}
+```
+
+#### Nginx 配置示例 (VMess-WS-TLS)
+
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+    
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name example.com;
+    
+    ssl_certificate /etc/nginx/ssl/example.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/example.com/privkey.pem;
+    
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:50m;
+    
+    location /path {
+        proxy_pass http://127.0.0.1:10000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 86400;
+    }
+}
+```
+
+### Caddy 配置示例
+
+```caddy
+example.com:443 {
+    reverse_proxy /path 127.0.0.1:10000
+}
+```
+
+### 防火墙配置
+
+#### UFW (Ubuntu/Debian)
+
+```bash
+# 允许 SSH
+ufw allow 22/tcp
+
+# 允许 HTTP/HTTPS
+ufw allow 80/tcp
+ufw allow 443/tcp
+
+# 启用防火墙
+ufw enable
+
+# 查看状态
+ufw status
+```
+
+#### Firewalld (CentOS)
+
+```bash
+# 允许服务
+firewall-cmd --permanent --add-service=ssh
+firewall-cmd --permanent --add-service=http
+firewall-cmd --permanent --add-service=https
+
+# 重载
+firewall-cmd --reload
+
+# 查看状态
+firewall-cmd --list-all
+```
+
+---
+
+## 故障排查
+
+### V2Ray 无法启动
+
+```bash
+# 查看状态
+systemctl status v2ray
+
+# 查看日志
+journalctl -u v2ray -f
+
+# 测试配置
+v2ray bin run -config /etc/v2ray/config.json -confdir /etc/v2ray/conf
+
+# 检查端口占用
+netstat -tlnp | grep :端口号
+```
+
+### Nginx 无法启动
+
+```bash
+# 测试配置
+nginx -t
+
+# 查看错误日志
+tail -f /var/log/nginx/error.log
+
+# 查看状态
+journalctl -u nginx -f
+
+# 检查端口占用
+netstat -tlnp | grep :80
+netstat -tlnp | grep :443
+```
+
+### 证书申请失败
+
+```bash
+# 检查 80 端口是否开放
+netstat -tlnp | grep :80
+
+# 检查防火墙
+ufw status  # 或 firewall-cmd --list-all
+
+# 检查 DNS 解析
+dig example.com
+ping example.com
+
+# 手动申请测试
+certbot certonly --webroot -w /var/www/certbot -d example.com --dry-run
+
+# 查看详细错误
+tail -f /var/log/letsencrypt/letsencrypt.log
+```
+
+### WebSocket 连接失败
+
+```bash
+# 检查 V2Ray 是否运行
+systemctl status v2ray
+
+# 检查 Nginx 配置
+cat /etc/nginx/v2ray/example.com.conf
+
+# 测试本地连接
+curl -i -H "Upgrade: websocket" -H "Connection: Upgrade" -H "Sec-WebSocket-Key: test" -H "Sec-WebSocket-Version: 13" http://127.0.0.1:端口/path
+
+# 查看 Nginx 访问日志
+tail -f /var/log/nginx/access.log
+```
+
+### 客户端无法连接
+
+1. **检查服务器状态**
+   ```bash
+   v2ray status
+   ```
+
+2. **检查防火墙**
+   ```bash
+   ufw status
+   ```
+
+3. **检查端口**
+   ```bash
+   netstat -tlnp | grep v2ray
+   ```
+
+4. **检查证书**
+   ```bash
+   certbot certificates
+   ```
+
+5. **重新生成配置**
+   ```bash
+   v2ray fix 配置名.json
+   ```
+
+---
+
+## 常见问题
+
+### Q: 可以同時使用 Caddy 和 Nginx 吗？
+
+**A:** 不建议。两者都会监听 80/443 端口，会产生冲突。选择其中一个即可。
+
+### Q: 如何切换 TLS 方案（Caddy ↔ Nginx）？
+
+**A:** 
+```bash
+# 卸载当前方案
+v2ray uninstall
+# 选择卸载 V2Ray + Caddy/Nginx
+
+# 重新安装
+./install.sh
+# 选择另一个方案
+```
+
+### Q: 域名解析后多久能申请证书？
+
+**A:** 通常几分钟内生效。可以使用 `dig example.com` 检查是否已解析到服务器 IP。
+
+### Q: 证书多久续期一次？
+
+**A:** Let's Encrypt 证书有效期 90 天，脚本会在到期前自动续期。
+
+### Q: 如何备份配置？
+
+**A:**
+```bash
+# 备份 V2Ray 配置
+tar czf v2ray-backup.tar.gz /etc/v2ray/
+
+# 备份 Nginx 配置
+tar czf nginx-backup.tar.gz /etc/nginx/
+
+# 备份 Caddy 配置
+tar czf caddy-backup.tar.gz /etc/caddy/
+```
+
+### Q: 如何迁移到另一台服务器？
+
+**A:**
+1. 在新服务器安装脚本
+2. 恢复备份的配置
+3. 重新申请证书（或复制证书）
+4. 更新域名 DNS 解析
+
+### Q: 支持 IPv6 吗？
+
+**A:** 支持。脚本会自动检测 IPv6 地址并配置。
+
+### Q: 如何禁用日志？
+
+**A:**
+```bash
+v2ray log none
+```
+
+### Q: 如何查看客户端配置？
+
+**A:**
+```bash
+v2ray client 配置名.json
+```
+
+---
+
+## 附录
+
+### 相关链接
+
+- **GitHub**: https://github.com/233boy/v2ray
+- **文档**: https://233boy.com/v2ray/
+- **Telegram**: https://t.me/tg233boy
+- **V2Ray 官方**: https://www.v2fly.org
+- **Nginx 官方**: https://nginx.org
+- **Certbot 官方**: https://certbot.eff.org
+
+### 许可证
+
+MIT License
+
+### 致谢
+
+感谢所有贡献者和使用者！
+
+---
+
+*最后更新：2024 年*
