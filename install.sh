@@ -477,28 +477,130 @@ main() {
 
     # TLS 方案选择
     if [[ ! $is_install_caddy && ! $is_install_nginx ]]; then
-        msg warn "选择 TLS 配置方案:"
-        msg "1) Caddy (简洁，适合单站点)"
-        msg "2) Nginx + Certbot (灵活，适合多站点共存)"
+        # 检测已安装的服务
+        is_caddy_installed=
+        is_nginx_installed=
+        [[ -f /usr/local/bin/caddy || $(type -P caddy) ]] && is_caddy_installed=1
+        [[ -f /usr/sbin/nginx || $(type -P nginx) ]] && is_nginx_installed=1
         
-        while :; do
-            echo -ne "请输入选择 [1-2] (默认:2): "
-            read tls_choice
-            [[ ! $tls_choice ]] && tls_choice=2
-            case $tls_choice in
-            1)
-                is_install_caddy=1
-                break
-                ;;
-            2)
-                is_install_nginx=1
-                break
-                ;;
-            *)
-                msg "输入无效，请输入 1 或 2"
-                ;;
-            esac
-        done
+        msg warn "选择 TLS 配置方案:"
+        
+        # 根据已安装的服务提供选项
+        if [[ $is_caddy_installed && $is_nginx_installed ]]; then
+            msg "检测到 Caddy 和 Nginx 都已安装，请选择:"
+            msg "1) 使用 Caddy"
+            msg "2) 使用 Nginx"
+            msg "3) 停止 Caddy，使用 Nginx"
+            msg "4) 停止 Nginx，使用 Caddy"
+            
+            while :; do
+                echo -ne "请输入选择 [1-4] (默认:2): "
+                read tls_choice
+                [[ ! $tls_choice ]] && tls_choice=2
+                case $tls_choice in
+                1)
+                    is_install_caddy=1
+                    break
+                    ;;
+                2)
+                    is_install_nginx=1
+                    break
+                    ;;
+                3)
+                    msg warn "停止 Caddy..."
+                    systemctl stop caddy &>/dev/null
+                    systemctl disable caddy &>/dev/null
+                    is_install_nginx=1
+                    break
+                    ;;
+                4)
+                    msg warn "停止 Nginx..."
+                    systemctl stop nginx &>/dev/null
+                    systemctl disable nginx &>/dev/null
+                    is_install_caddy=1
+                    break
+                    ;;
+                *)
+                    msg "输入无效，请输入 1-4"
+                    ;;
+                esac
+            done
+        elif [[ $is_caddy_installed ]]; then
+            msg "检测到 Caddy 已安装，请选择:"
+            msg "1) 使用 Caddy (默认)"
+            msg "2) 停止 Caddy，改用 Nginx"
+            
+            while :; do
+                echo -ne "请输入选择 [1-2] (默认:1): "
+                read tls_choice
+                [[ ! $tls_choice ]] && tls_choice=1
+                case $tls_choice in
+                1)
+                    is_install_caddy=1
+                    break
+                    ;;
+                2)
+                    msg warn "停止 Caddy..."
+                    systemctl stop caddy &>/dev/null
+                    systemctl disable caddy &>/dev/null
+                    is_install_nginx=1
+                    break
+                    ;;
+                *)
+                    msg "输入无效，请输入 1-2"
+                    ;;
+                esac
+            done
+        elif [[ $is_nginx_installed ]]; then
+            msg "检测到 Nginx 已安装，请选择:"
+            msg "1) 使用 Nginx (默认)"
+            msg "2) 停止 Nginx，改用 Caddy"
+            
+            while :; do
+                echo -ne "请输入选择 [1-2] (默认:1): "
+                read tls_choice
+                [[ ! $tls_choice ]] && tls_choice=1
+                case $tls_choice in
+                1)
+                    is_install_nginx=1
+                    break
+                    ;;
+                2)
+                    msg warn "停止 Nginx..."
+                    systemctl stop nginx &>/dev/null
+                    systemctl disable nginx &>/dev/null
+                    is_install_caddy=1
+                    break
+                    ;;
+                *)
+                    msg "输入无效，请输入 1-2"
+                    ;;
+                esac
+            done
+        else
+            # 都没有安装，提供标准选项
+            msg "1) Caddy (简洁，适合单站点)"
+            msg "2) Nginx + Certbot (灵活，适合多站点共存) (默认)"
+            
+            while :; do
+                echo -ne "请输入选择 [1-2] (默认:2): "
+                read tls_choice
+                [[ ! $tls_choice ]] && tls_choice=2
+                case $tls_choice in
+                1)
+                    is_install_caddy=1
+                    break
+                    ;;
+                2)
+                    is_install_nginx=1
+                    break
+                    ;;
+                *)
+                    msg "输入无效，请输入 1-2"
+                    ;;
+                esac
+            done
+        fi
     fi
 
     load core.sh
