@@ -456,6 +456,25 @@ main() {
         msg warn "${yellow}\e[4m提醒!!! 无法设置自动同步时间, 可能会影响使用 VMess 协议.${none}"
     }
 
+    # [步骤 1/10] 准备安装环境
+    msg warn "[步骤 1/10] 准备安装环境..."
+    mkdir -p $tmpdir
+    [[ $is_core_file ]] && {
+        cp -f $is_core_file $is_core_ok
+        msg ok "  - 使用自定义核心文件"
+    }
+    [[ $local_install ]] && {
+        >$is_sh_ok
+        msg ok "  - 本地获取安装脚本"
+    }
+    msg ok "  - 安装环境准备完成"
+    
+    # [步骤 2/10] 同步系统时间
+    msg warn "[步骤 2/10] 同步系统时间..."
+    timedatectl set-ntp true &>/dev/null
+    [[ $? != 0 ]] && msg warn "  - 提醒：无法设置自动同步时间" || msg ok "  - 系统时间已同步"
+    
+
     # [步骤 3/10] 安装依赖包
     msg warn "[步骤 3/10] 安装依赖包..."
     install_pkg $is_pkg &
