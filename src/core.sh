@@ -694,8 +694,6 @@ change() {
         [[ $is_auto ]] && is_new_servername=$is_random_servername
         [[ ! $is_new_servername ]] && ask string is_new_servername "请输入新的 serverName:"
         is_servername=$is_new_servername
-            err "你干嘛～哎呦～"
-        }
         add $net
         ;;
     12)
