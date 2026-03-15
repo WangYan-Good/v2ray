@@ -2,6 +2,9 @@
 
 > 一个支持多站点共存的 V2Ray 一键安装和管理脚本
 
+> **本项目 Fork 自**: [233boy/v2ray](https://github.com/233boy/v2ray)  
+> **主要改进**: 添加 Nginx + Certbot 多站点共存支持
+
 ---
 
 ## 目录
