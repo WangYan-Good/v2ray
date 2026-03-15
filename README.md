@@ -226,6 +226,127 @@ chmod +x install.sh
 # 05:30:17) 检测到 Caddy 已安装，使用现有 Caddy
 ```
 
+#### Caddy 已安装但想使用 Nginx
+
+如果主机已安装 Caddy，但想改用 Nginx 部署 V2Ray：
+
+**方案 1：停止 Caddy 并安装 Nginx（推荐）**
+
+```bash
+# 1. 停止 Caddy
+systemctl stop caddy
+systemctl disable caddy
+
+# 2. 备份 Caddy 配置（可选）
+cp -rf /etc/caddy /etc/caddy.bak
+
+# 3. 安装 Nginx + Certbot
+./install.sh --tls nginx
+
+# 输出示例:
+# 05:30:17) 配置 Nginx + Certbot...
+# 05:30:20) 检测到 Nginx 已安装，使用现有 Nginx
+# 05:30:21) 检测到 Certbot 已安装，使用现有 Certbot
+```
+
+**方案 2：Caddy 和 Nginx 共存（不同域名）**
+
+如果 Caddy 和 Nginx 使用不同域名，可以共存：
+
+```bash
+# Caddy 继续服务 domain1.com
+# Nginx 服务 domain2.com
+
+# 1. 修改 Caddy 配置，只监听 domain1.com
+cat > /etc/caddy/Caddyfile << 'EOF'
+domain1.com {
+    reverse_proxy / 127.0.0.1:8080
+}
+EOF
+
+# 2. 安装 Nginx
+./install.sh --tls nginx
+
+# 3. Nginx 配置会自动处理 domain2.com
+# 两个服务共享 80/443 端口（通过 server_name 区分）
+```
+
+**方案 3：Caddy 使用非标准端口**
+
+```bash
+# 1. 修改 Caddy 使用非标准端口
+cat > /etc/caddy/Caddyfile << 'EOF'
+{
+    http_port 8080
+    https_port 8443
+}
+
+example.com {
+    reverse_proxy / 127.0.0.1:3000
+}
+EOF
+
+# 2. 重启 Caddy
+systemctl restart caddy
+
+# 3. 安装 Nginx（使用标准端口）
+./install.sh --tls nginx
+```
+
+**方案 4：完全迁移到 Nginx**
+
+```bash
+# 1. 备份 Caddy 配置
+cp -rf /etc/caddy /root/caddy_backup
+
+# 2. 停止并卸载 Caddy
+systemctl stop caddy
+systemctl disable caddy
+rm -rf /etc/caddy /usr/local/bin/caddy /lib/systemd/system/caddy.service
+
+# 3. 安装 Nginx + V2Ray
+./install.sh --tls nginx
+
+# 4. 将原有 Caddy 站点迁移到 Nginx
+# 例如：原有 Caddy 配置
+# example.com { reverse_proxy / 127.0.0.1:8080 }
+
+# 对应 Nginx 配置：
+cat > /etc/nginx/sites-enabled/example.com.conf << 'EOF'
+server {
+    listen 80;
+    server_name example.com;
+    
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name example.com;
+    
+    ssl_certificate /etc/nginx/ssl/example.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/example.com/privkey.pem;
+    
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+    }
+}
+EOF
+
+# 5. 申请证书
+certbot certonly --webroot -w /var/www/certbot -d example.com
+
+# 6. 测试并重载
+nginx -t
+systemctl reload nginx
+```
+
 #### 80/443 端口已被占用
 
 如果 80 或 443 端口被其他服务占用：
