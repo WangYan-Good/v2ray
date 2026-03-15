@@ -1662,7 +1662,7 @@ url_qr() {
             msg "\n\e[${is_color}m${is_url}\e[0m\n"
             footer_msg
         } || {
-            link="https://233boy.github.io/tools/qr.html#${is_url}"
+            link="https://WangYan-Good.github.io/tools/qr.html#${is_url}"
             msg "\n------------- $is_config_name & QR code 二维码 -------------"
             msg
             if [[ $(type -P qrencode) ]]; then

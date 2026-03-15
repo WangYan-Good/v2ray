@@ -1,6 +1,6 @@
 #!/bin/bash
 
-author=233boy
+author=WangYan-Good
 # github=https://github.com/WangYan-Good/v2ray
 
 # bash fonts colors
