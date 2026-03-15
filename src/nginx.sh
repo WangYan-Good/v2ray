@@ -13,7 +13,7 @@ nginx_config() {
         # 创建目录结构
         mkdir -p $is_nginx_dir $is_nginx_dir/ssl $is_nginx_conf
         mkdir -p /var/log/nginx /var/www/certbot
-        
+
         # 检查是否已有主配置
         if [[ ! -f $is_nginxfile ]]; then
             cat >$is_nginxfile <<EOF
@@ -37,31 +37,64 @@ http {
                     '"\$http_user_agent" "\$http_x_forwarded_for"';
 
     access_log /var/log/nginx/access.log main;
-    
+
     sendfile on;
     tcp_nopush on;
     tcp_nodelay on;
     keepalive_timeout 65;
     types_hash_max_size 2048;
     client_max_body_size 100M;
-    
+
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
-    
+
     # Gzip 压缩
     gzip on;
     gzip_vary on;
     gzip_proxied any;
     gzip_comp_level 6;
     gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/rss+xml font/truetype font/opentype application/vnd.ms-fontobject image/svg+xml;
-    
+
     # 导入 V2Ray 配置（自动 TLS 站点）
     include $is_nginx_conf/*.conf;
-    
+
     # 导入其他站点配置（用户自定义）
     include /etc/nginx/sites-enabled/*.conf;
 }
 EOF
+        else
+            # nginx.conf 已存在，检查是否需要添加 V2Ray 导入
+            if ! grep -q "include $is_nginx_conf/\*.conf" $is_nginxfile; then
+                # 备份原配置
+                cp -f $is_nginxfile ${is_nginxfile}.bak.$(date +%Y%m%d%H%M%S)
+                msg warn "检测到现有 Nginx 配置，已备份到 ${is_nginxfile}.bak.*"
+
+                # 在 http 块中添加 V2Ray 导入（在最后一个 } 之前）
+                # 使用 awk 更可靠，避免 sed 转义问题
+                local tmp_conf=$(mktemp)
+                awk -v inc="    include $is_nginx_conf/*.conf;" '
+                    /^}$/ {
+                        print "    # 导入 V2Ray 配置（自动 TLS 站点）"
+                        print inc
+                        print ""
+                    }
+                    {print}
+                ' $is_nginxfile > $tmp_conf
+
+                if [[ $? -eq 0 ]]; then
+                    mv -f $tmp_conf $is_nginxfile
+                    if grep -q "include $is_nginx_conf/\*.conf" $is_nginxfile; then
+                        msg ok "已添加 V2Ray 配置导入到 nginx.conf"
+                    else
+                        msg warn "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginxfile"
+                        msg warn "添加：include $is_nginx_conf/*.conf;"
+                    fi
+                else
+                    rm -f $tmp_conf
+                    msg warn "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginxfile"
+                    msg warn "添加：include $is_nginx_conf/*.conf;"
+                fi
+            fi
         fi
         ;;
     
