@@ -1233,28 +1233,29 @@ get() {
         get file $2
         if [[ $is_config_file ]]; then
             is_json_str=$(cat $is_conf_dir/"$is_config_file")
-            is_json_data_base=$(jq '.inbounds[0]|.protocol,.port,.settings.clients[0].id,.settings.clients[0].password,.settings.method,.settings.password,.settings.address,.settings.port,.settings.detour.to,.settings.accounts[0].user,.settings.accounts[0].pass' <<<$is_json_str)
+            is_json_data_base=$(jq -r '.inbounds[0]|.protocol//empty,.port//empty,.settings.clients[0].id//empty,.settings.clients[0].password//empty,.settings.method//empty,.settings.password//empty,.settings.address//empty,.settings.port//empty,.settings.detour.to//empty,.settings.accounts[0].user//empty,.settings.accounts[0].pass//empty' <<<$is_json_str)
             [[ $? != 0 ]] && err "无法读取此文件: $is_config_file"
-            is_json_data_more=$(jq '.inbounds[0]|.streamSettings|.network,.security,.tcpSettings.header.type,.kcpSettings.seed,.kcpSettings.header.type,.quicSettings.header.type,.wsSettings.path,.httpSettings.path,.grpcSettings.serviceName' <<<$is_json_str)
-            is_json_data_host=$(jq '.inbounds[0]|.streamSettings|.grpc_host,.wsSettings.headers.Host,.httpSettings.host[0]' <<<$is_json_str)
-            is_json_data_reality=$(jq '.inbounds[0]|.streamSettings|.realitySettings.serverNames[0],.realitySettings.publicKey,.realitySettings.privateKey' <<<$is_json_str)
+            is_json_data_more=$(jq -r '.inbounds[0].streamSettings | .network//empty,.security//empty,.tcpSettings.header.type//empty,.kcpSettings.seed//empty,.kcpSettings.header.type//empty,.quicSettings.header.type//empty,.wsSettings.path//empty,.httpSettings.path//empty,.grpcSettings.serviceName//empty' <<<$is_json_str)
+            is_json_data_host=$(jq -r '.inbounds[0].streamSettings | .grpc_host//empty,.wsSettings.headers.Host//empty,.httpSettings.host[0]//empty' <<<$is_json_str)
+            is_json_data_reality=$(jq -r '.inbounds[0].streamSettings | .realitySettings.serverNames[0]//empty,.realitySettings.publicKey//empty,.realitySettings.privateKey//empty' <<<$is_json_str)
             # 添加 host 和 is_https_port 到变量列表
-            is_up_var_set=(null is_protocol port uuid trojan_password ss_method ss_password door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_reality tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_path grpc_host ws_host h2_host is_servername is_public_key is_private_key host is_https_port)
+            is_up_var_set=(is_protocol port uuid trojan_password ss_method ss_password door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_reality tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_path grpc_host ws_host h2_host is_servername is_public_key is_private_key)
             [[ $is_debug ]] && msg "\n------------- debug: $is_config_file -------------"
             i=0
-            for v in $(sed 's/""/null/g;s/"//g' <<<"$is_json_data_base $is_json_data_more $is_json_data_host $is_json_data_reality"); do
+            local all_json_output="$is_json_data_base $is_json_data_more $is_json_data_host $is_json_data_reality"
+            for v in $all_json_output; do
                 ((i++))
                 [[ $is_debug ]] && msg "$i-${is_up_var_set[$i]}: $v"
                 export ${is_up_var_set[$i]}="${v}"
             done
             for v in ${is_up_var_set[@]}; do
-                [[ ${!v} == 'null' ]] && unset $v
+                [[ -z "${!v}" || "${!v}" == "null" ]] && unset $v
             done
 
             # 合并变量（如果从 JSON 读取失败，使用备用方式）
-            [[ ! $host ]] && host="${ws_host}${h2_host}${grpc_host}"
-            [[ ! $is_https_port ]] && is_https_port=443
-            header_type="${tcp_type}${kcp_type}${quic_type}"
+            [[ -z $host ]] && host="${grpc_host:-${ws_host:-${h2_host:-}}}"
+            [[ -z $is_https_port ]] && is_https_port=443
+            header_type="${tcp_type:-}${kcp_type:-}${quic_type:-}"
             if [[ $is_reality == 'reality' ]]; then
                 net=reality
             else
