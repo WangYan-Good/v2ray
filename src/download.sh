@@ -12,6 +12,11 @@ get_latest_version() {
         name="Caddy"
         url="https://api.github.com/repos/$is_caddy_repo/releases/latest?v=$RANDOM"
         ;;
+    nginx)
+        name="Nginx"
+        # Nginx 不需要从 GitHub 下载，使用包管理器安装
+        latest_ver=system
+        ;;
     esac
     latest_ver=$(_wget -qO- $url | grep tag_name | grep -E -o 'v([0-9.]+)')
     [[ ! $latest_ver ]] && {
@@ -69,6 +74,29 @@ download() {
         tar zxf $tmpfile -C $tmpdir
         cp -f $tmpdir/caddy $is_caddy_bin
         chmod +x $is_caddy_bin
+        ;;
+    nginx)
+        name="Nginx + Certbot"
+        msg warn "使用包管理器安装 Nginx 和 Certbot..."
+        if [[ $cmd =~ apt-get ]]; then
+            # Ubuntu/Debian
+            $cmd update -y &>/dev/null
+            $cmd install nginx certbot python3-certbot-nginx -y &>/dev/null
+        else
+            # CentOS
+            $cmd install epel-release -y &>/dev/null
+            $cmd update -y &>/dev/null
+            $cmd install nginx certbot python3-certbot-nginx -y &>/dev/null
+        fi
+        # 检查安装结果
+        if [[ ! $(type -P nginx) ]]; then
+            rm -rf $tmpdir
+            err "Nginx 安装失败"
+        fi
+        if [[ ! $(type -P certbot) ]]; then
+            rm -rf $tmpdir
+            err "Certbot 安装失败"
+        fi
         ;;
     esac
     rm -rf $tmpdir

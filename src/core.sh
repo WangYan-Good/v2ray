@@ -371,9 +371,13 @@ create() {
             # use api add config
             api add $is_json_file $is_dynamic_port_link_file &>/dev/null
         fi
-        # caddy auto tls
-        [[ $is_caddy && $host && ! $is_no_auto_tls ]] && {
-            create caddy $net
+        # auto tls (caddy or nginx)
+        [[ $host && ! $is_no_auto_tls ]] && {
+            if [[ $is_caddy ]]; then
+                create caddy $net
+            elif [[ $is_nginx ]]; then
+                create nginx $net
+            fi
         }
         # restart core
         [[ $is_api_fail ]] && manage restart &
@@ -404,6 +408,13 @@ create() {
         [[ ! -d $is_caddy_conf ]] && mkdir -p $is_caddy_conf
         caddy_config $2
         manage restart caddy &
+        ;;
+    nginx)
+        load nginx.sh
+        [[ $is_install_nginx ]] && nginx_config new
+        [[ ! -d $is_nginx_conf ]] && mkdir -p $is_nginx_conf
+        nginx_config $2
+        nginx_reload
         ;;
     config.json)
         get_port
@@ -525,19 +536,25 @@ change() {
     1)
         # new port
         is_new_port=$3
-        [[ $host && ! $is_caddy || $is_no_auto_tls ]] && err "($is_config_file) 不支持更改端口, 因为没啥意义."
+        [[ $host && ! $is_caddy && ! $is_nginx || $is_no_auto_tls ]] && err "($is_config_file) 不支持更改端口, 因为没啥意义."
         if [[ $is_new_port && ! $is_auto ]]; then
             [[ ! $(is_test port $is_new_port) ]] && err "请输入正确的端口, 可选(1-65535)"
             [[ $is_new_port != 443 && $(is_test port_used $is_new_port) ]] && err "无法使用 ($is_new_port) 端口"
         fi
         [[ $is_auto ]] && get_port && is_new_port=$tmp_port
         [[ ! $is_new_port ]] && ask string is_new_port "请输入新端口:"
-        if [[ $is_caddy && $host ]]; then
+        if [[ $host && ($is_caddy || $is_nginx) ]]; then
             net=$is_old_net
             is_https_port=$is_new_port
-            load caddy.sh
-            caddy_config $net
-            manage restart caddy &
+            if [[ $is_caddy ]]; then
+                load caddy.sh
+                caddy_config $net
+                manage restart caddy &
+            elif [[ $is_nginx ]]; then
+                load nginx.sh
+                nginx_config $net
+                nginx_reload
+            fi
             info
         else
             add $net $is_new_port
@@ -697,10 +714,10 @@ change() {
     13)
         # new proxy site
         is_new_proxy_site=$3
-        [[ ! $is_caddy && ! $host ]] && {
+        [[ ! $is_caddy && ! $is_nginx && ! $host ]] && {
             err "($is_config_file) 不支持更改伪装网站."
         }
-        [[ ! -f $is_caddy_conf/${host}.conf.add ]] && err "无法配置伪装网站."
+        [[ $is_caddy && ! -f $is_caddy_conf/${host}.conf.add ]] || [[ $is_nginx && ! -f $is_nginx_conf/${host}.conf.add ]] && err "无法配置伪装网站."
         [[ ! $is_new_proxy_site ]] && ask string is_new_proxy_site "请输入新的伪装网站 (例如 example.com):"
         proxy_site=$(sed 's#^.*//##;s#/$##' <<<$is_new_proxy_site)
         [[ $(grep -i "^233boy.com$" <<<$proxy_site) ]] && {
@@ -757,6 +774,11 @@ del() {
                 rm -rf $is_caddy_conf/$is_del_host.conf $is_caddy_conf/$is_del_host.conf.add
                 [[ ! $is_new_json ]] && manage restart caddy &
             }
+        }
+        [[ $is_nginx ]] && {
+            load nginx.sh
+            nginx_config del
+            nginx_reload
         }
     fi
     if [[ ! $(ls $is_conf_dir | grep .json) && ! $is_change ]]; then
@@ -1087,7 +1109,7 @@ add() {
     fi
 
     if [[ $is_use_tls ]]; then
-        if [[ ! $is_no_auto_tls && ! $is_caddy && ! $is_gen ]]; then
+        if [[ ! $is_no_auto_tls && ! $is_caddy && ! $is_nginx && ! $is_gen ]]; then
             # test auto tls
             [[ $(is_test port_used 80) || $(is_test port_used 443) ]] && {
                 get_port
@@ -1166,9 +1188,11 @@ add() {
 
     fi
 
-    # install caddy
+    # install caddy or nginx
     if [[ $is_install_caddy ]]; then
         get install-caddy
+    elif [[ $is_install_nginx ]]; then
+        get install-nginx
     fi
 
     # create json
@@ -1246,7 +1270,10 @@ get() {
             if [[ $is_caddy && $host && -f $is_caddy_conf/$host.conf ]]; then
                 is_tmp_https_port=$(grep -E -o "$host:[1-9][0-9]?+" $is_caddy_conf/$host.conf | sed s/.*://)
             fi
-            if [[ $host && ! -f $is_caddy_conf/$host.conf ]]; then
+            if [[ $is_nginx && $host && -f $is_nginx_conf/$host.conf ]]; then
+                is_tmp_https_port=$(grep -E -o "listen.*[1-9][0-9]?+" $is_nginx_conf/$host.conf | grep -o '[1-9][0-9]*' | head -1)
+            fi
+            if [[ $host && ! -f $is_caddy_conf/$host.conf && ! -f $is_nginx_conf/$host.conf ]]; then
                 is_no_auto_tls=1
             fi
             [[ $is_tmp_https_port ]] && is_https_port=$is_tmp_https_port
@@ -1440,6 +1467,15 @@ get() {
         is_caddy=1
         _green "安装 Caddy 成功.\n"
         ;;
+    install-nginx)
+        _green "\n安装 Nginx 实现自动配置 TLS.\n"
+        load download.sh
+        download nginx
+        load systemd.sh
+        install_service nginx &>/dev/null
+        is_nginx=1
+        _green "安装 Nginx 成功.\n"
+        ;;
     reinstall)
         is_install_sh=$(cat $is_sh_dir/install.sh)
         uninstall
@@ -1476,6 +1512,20 @@ get() {
                 fi
             else
                 _green "\nCaddy 正在运行, 跳过测试\n"
+            fi
+        fi
+        if [[ $is_nginx ]]; then
+            if [[ ! $(pgrep -f nginx) ]]; then
+                _yellow "\n测试运行 Nginx ..\n"
+                manage start nginx &>/dev/null
+                if [[ $is_run_fail == 'nginx' ]]; then
+                    _red "Nginx 运行失败信息:"
+                    nginx -t
+                else
+                    _green "\n测试通过，已启动 Nginx ..\n"
+                fi
+            else
+                _green "\nNginx 正在运行，跳过测试\n"
             fi
         fi
         ;;
@@ -1532,7 +1582,7 @@ info() {
             }
             is_url="$is_protocol://$uuid@$host:$is_https_port?encryption=none&security=tls&type=$net&host=$host&${is_url_path}=$(sed 's#/#%2F#g' <<<$path)#233boy-$net-$host"
         }
-        [[ $is_caddy ]] && is_can_change+=(13)
+        [[ $is_caddy || $is_nginx ]] && is_can_change+=(13)
         is_info_str=($is_protocol $is_addr $is_https_port $uuid $net $host $path 'tls')
         ;;
     reality)
@@ -1592,6 +1642,7 @@ info() {
 footer_msg() {
     [[ $is_core_stop && ! $is_new_json ]] && warn "$is_core_name 当前处于停止状态."
     [[ $is_caddy_stop && $host ]] && warn "Caddy 当前处于停止状态."
+    [[ $is_nginx_stop && $host ]] && warn "Nginx 当前处于停止状态."
     ####### 要点13脸吗只会改我链接的小人 #######
     unset c n m s b
     msg "------------- END -------------"
@@ -1655,8 +1706,15 @@ update() {
         is_run_ver=$is_caddy_ver
         is_update_repo=$is_caddy_repo
         ;;
+    4 | nginx)
+        [[ ! $is_nginx ]] && err "不支持更新 Nginx."
+        is_update_name=nginx
+        is_show_name="Nginx"
+        is_run_ver=$is_nginx_ver
+        is_update_repo=$is_nginx_repo
+        ;;
     *)
-        err "无法识别 ($1), 请使用: $is_core update [core | sh | caddy] [ver]"
+        err "无法识别 ($1), 请使用: $is_core update [core | sh | caddy | nginx] [ver]"
         ;;
     esac
     [[ $2 ]] && is_new_ver=v${2#v}
@@ -1821,7 +1879,7 @@ main() {
         esac
         is_dont_auto_exit=
         [[ $is_api_fail ]] && manage restart &
-        [[ $is_del_host ]] && manage restart caddy &
+        [[ $is_del_host ]] && { [[ $is_caddy ]] && manage restart caddy &; [[ $is_nginx ]] && manage restart nginx &; }
         ;;
     dns)
         load dns.sh
@@ -1840,6 +1898,16 @@ main() {
             load caddy.sh
             caddy_config new
             manage restart caddy &
+            _green "\nfix 完成.\n"
+        else
+            err "无法执行此操作"
+        fi
+        ;;
+    fix-nginxfile)
+        if [[ $is_nginx ]]; then
+            load nginx.sh
+            nginx_config new
+            nginx_reload
             _green "\nfix 完成.\n"
         else
             err "无法执行此操作"
@@ -1885,6 +1953,7 @@ main() {
     s | status)
         msg "\n$is_core_ver: $is_core_status\n"
         [[ $is_caddy ]] && msg "Caddy $is_caddy_ver: $is_caddy_status\n"
+        [[ $is_nginx ]] && msg "Nginx $is_nginx_ver: $is_nginx_status\n"
         ;;
     start | stop | r | restart)
         [[ $2 && $2 != 'caddy' ]] && err "无法识别 ($2), 请使用: $is_core $1 [caddy]"
