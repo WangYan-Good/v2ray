@@ -1673,6 +1673,63 @@ Cloudflare 自动支持 WebSocket，无需额外配置:
 
 ### 故障排查
 
+#### 证书申请失败：Connection refused
+
+**错误信息**:
+```
+Detail: 72.11.140.248: Fetching http://your-domain.com/.well-known/acme-challenge/...
+        Connection refused
+```
+
+**原因**: Nginx 未运行，80 端口无法访问
+
+**解决**（脚本已自动修复）:
+```bash
+# 脚本会自动执行以下操作：
+# 1. 检测 Nginx 状态
+# 2. 自动启动 Nginx
+# 3. 测试 Nginx 配置
+# 4. 重新申请证书
+
+# 如果仍然失败，手动执行：
+systemctl start nginx
+certbot certonly --webroot -w /var/www/certbot -d your-domain.com
+```
+
+**脚本自动处理流程**:
+```
+1. 检测 Nginx 是否运行 → 未运行
+2. 自动启动 Nginx → systemctl start nginx
+3. 测试 Nginx 配置 → nginx -t
+4. 申请证书 → certbot certonly --webroot
+5. 成功 → 重载 Nginx
+6. 失败 → 给出详细提示
+```
+
+**常见失败原因**:
+- ❌ 域名未解析到 VPS IP（Cloudflare 未关闭代理）
+- ❌ 防火墙未开放 80 端口
+- ❌ Nginx 配置错误
+- ❌ 端口被其他程序占用
+
+**检查命令**:
+```bash
+# 验证 DNS 解析
+dig your-domain.com +short
+
+# 检查防火墙
+ufw status
+
+# 检查 80 端口
+netstat -tlnp | grep :80
+
+# 测试 HTTP 访问
+curl -I http://your-domain.com/.well-known/acme-challenge/test
+
+# 查看 Certbot 日志
+tail -20 /var/log/letsencrypt/letsencrypt.log
+```
+
 #### Cloudflare 显示 521/522 错误
 
 **原因**: Cloudflare 无法连接到源站

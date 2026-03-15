@@ -413,7 +413,12 @@ create() {
         load nginx.sh
         [[ $is_install_nginx ]] && nginx_config new
         [[ ! -d $is_nginx_conf ]] && mkdir -p $is_nginx_conf
-        nginx_config $2
+        if ! nginx_config $2; then
+            msg err "Nginx 配置生成失败，证书申请未成功"
+            msg warn "V2Ray 配置已生成，但 TLS 尚未启用"
+            msg warn "你可以稍后手动申请证书并重载 Nginx"
+            is_api_fail=1
+        fi
         nginx_reload
         ;;
     config.json)
