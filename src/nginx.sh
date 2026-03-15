@@ -75,12 +75,12 @@ server {
     listen 80;
     listen [::]:80;
     server_name ${host};
-    
+
     # ACME challenge for Let's Encrypt
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
-    
+
     # HTTP 强制跳转 HTTPS
     location / {
         return 301 https://\$server_name\$request_uri;
@@ -91,30 +91,30 @@ server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
     server_name ${host};
-    
+
     # SSL 证书路径
     ssl_certificate ${is_ssl_cert};
     ssl_certificate_key ${is_ssl_key};
-    
+
     # SSL 会话优化
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:50m;
     ssl_session_tickets off;
-    
+
     # 现代 SSL 安全配置
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
     ssl_prefer_server_ciphers off;
-    
+
     # OCSP Stapling
     ssl_stapling on;
     ssl_stapling_verify on;
     resolver 1.1.1.1 8.8.8.8 valid=60s;
     resolver_timeout 2s;
-    
+
     # HSTS (可选，生产环境建议启用)
     # add_header Strict-Transport-Security "max-age=63072000" always;
-    
+
     # WebSocket 反向代理配置
     location ${path} {
         proxy_pass http://127.0.0.1:${port};
@@ -128,11 +128,13 @@ server {
         proxy_read_timeout 86400;
         proxy_buffering off;
     }
-    
+
     # 伪装网站配置 (可选)
     import ${is_nginx_site_file}.add
 }
 "
+        # 自动申请 Certbot 证书
+        nginx_certbot issue ${host}
         ;;
     
     *h2*)
@@ -145,11 +147,11 @@ server {
     listen 80;
     listen [::]:80;
     server_name ${host};
-    
+
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
-    
+
     location / {
         return 301 https://\$server_name\$request_uri;
     }
@@ -159,23 +161,23 @@ server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
     server_name ${host};
-    
+
     ssl_certificate ${is_ssl_cert};
     ssl_certificate_key ${is_ssl_key};
-    
+
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:50m;
     ssl_session_tickets off;
-    
+
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
     ssl_prefer_server_ciphers off;
-    
+
     ssl_stapling on;
     ssl_stapling_verify on;
     resolver 1.1.1.1 8.8.8.8 valid=60s;
     resolver_timeout 2s;
-    
+
     # H2 反向代理配置
     location ${path} {
         proxy_pass http://127.0.0.1:${port};
@@ -186,10 +188,12 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_read_timeout 300s;
     }
-    
+
     import ${is_nginx_site_file}.add
 }
 "
+        # 自动申请 Certbot 证书
+        nginx_certbot issue ${host}
         ;;
     
     *grpc*)
@@ -202,11 +206,11 @@ server {
     listen 80;
     listen [::]:80;
     server_name ${host};
-    
+
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
-    
+
     location / {
         return 301 https://\$server_name\$request_uri;
     }
@@ -216,23 +220,23 @@ server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
     server_name ${host};
-    
+
     ssl_certificate ${is_ssl_cert};
     ssl_certificate_key ${is_ssl_key};
-    
+
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:50m;
     ssl_session_tickets off;
-    
+
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
     ssl_prefer_server_ciphers off;
-    
+
     ssl_stapling on;
     ssl_stapling_verify on;
     resolver 1.1.1.1 8.8.8.8 valid=60s;
     resolver_timeout 2s;
-    
+
     # gRPC 反向代理配置
     location /${path}/ {
         grpc_pass grpc://127.0.0.1:${port};
@@ -241,10 +245,12 @@ server {
         grpc_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         grpc_read_timeout 300s;
     }
-    
+
     import ${is_nginx_site_file}.add
 }
 "
+        # 自动申请 Certbot 证书
+        nginx_certbot issue ${host}
         ;;
     
     proxy)
