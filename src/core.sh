@@ -1238,7 +1238,8 @@ get() {
             is_json_data_more=$(jq '.inbounds[0]|.streamSettings|.network,.security,.tcpSettings.header.type,.kcpSettings.seed,.kcpSettings.header.type,.quicSettings.header.type,.wsSettings.path,.httpSettings.path,.grpcSettings.serviceName' <<<$is_json_str)
             is_json_data_host=$(jq '.inbounds[0]|.streamSettings|.grpc_host,.wsSettings.headers.Host,.httpSettings.host[0]' <<<$is_json_str)
             is_json_data_reality=$(jq '.inbounds[0]|.streamSettings|.realitySettings.serverNames[0],.realitySettings.publicKey,.realitySettings.privateKey' <<<$is_json_str)
-            is_up_var_set=(null is_protocol port uuid trojan_password ss_method ss_password door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_reality tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_path grpc_host ws_host h2_host is_servername is_public_key is_private_key)
+            # 添加 host 和 is_https_port 到变量列表
+            is_up_var_set=(null is_protocol port uuid trojan_password ss_method ss_password door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_reality tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_path grpc_host ws_host h2_host is_servername is_public_key is_private_key host is_https_port)
             [[ $is_debug ]] && msg "\n------------- debug: $is_config_file -------------"
             i=0
             for v in $(sed 's/""/null/g;s/"//g' <<<"$is_json_data_base $is_json_data_more $is_json_data_host $is_json_data_reality"); do
@@ -1250,8 +1251,9 @@ get() {
                 [[ ${!v} == 'null' ]] && unset $v
             done
 
-            path="${ws_path}${h2_path}${grpc_path}"
-            host="${ws_host}${h2_host}${grpc_host}"
+            # 合并变量（如果从 JSON 读取失败，使用备用方式）
+            [[ ! $host ]] && host="${ws_host}${h2_host}${grpc_host}"
+            [[ ! $is_https_port ]] && is_https_port=443
             header_type="${tcp_type}${kcp_type}${quic_type}"
             if [[ $is_reality == 'reality' ]]; then
                 net=reality
