@@ -143,8 +143,12 @@ core.sh (核心逻辑)
 wget -O install.sh https://github.com/WangYan-Good/v2ray/releases/latest/download/install.sh
 chmod +x install.sh
 
-# 执行安装
+# 执行安装（交互式选择 TLS 方案）
 ./install.sh
+
+# 或指定 TLS 方案（非交互式）
+./install.sh --tls nginx   # 使用 Nginx（推荐多站点）
+./install.sh --tls caddy   # 使用 Caddy（适合单站点）
 ```
 
 ### 安装参数
@@ -161,17 +165,28 @@ chmod +x install.sh
 
 # 自定义核心文件
 ./install.sh -f /root/v2ray-linux-64.zip
+
+# 选择 TLS 方案
+./install.sh --tls nginx   # Nginx + Certbot（多站点共存）
+./install.sh --tls caddy   # Caddy（单站点简洁）
 ```
 
 ### TLS 方案选择
 
-安装脚本会自动检测并询问 TLS 方案：
+安装脚本支持两种 TLS 方案：
 
+**交互式选择**（默认）：
 ```
-检测到您需要 TLS 配置，请选择:
+选择 TLS 配置方案:
 1) Caddy (简洁，适合单站点)
-2) Nginx + Certbot (灵活，适合多站点)
-请输入选择 [1-2]:
+2) Nginx + Certbot (灵活，适合多站点共存)
+请输入选择 [1-2] (默认:2):
+```
+
+**命令行指定**：
+```bash
+./install.sh --tls nginx   # 使用 Nginx
+./install.sh --tls caddy   # 使用 Caddy
 ```
 
 **推荐选择：**
