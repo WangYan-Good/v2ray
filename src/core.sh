@@ -1239,7 +1239,8 @@ get() {
             is_json_data_host=$(jq -r '.inbounds[0].streamSettings | .grpc_host//empty,.wsSettings.headers.Host//empty,.httpSettings.host[0]//empty' <<<$is_json_str)
             is_json_data_reality=$(jq -r '.inbounds[0].streamSettings | .realitySettings.serverNames[0]//empty,.realitySettings.publicKey//empty,.realitySettings.privateKey//empty' <<<$is_json_str)
             # 添加 host 和 is_https_port 到变量列表
-            is_up_var_set=(is_protocol port uuid trojan_password ss_method ss_password door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_reality tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_path grpc_host ws_host h2_host is_servername is_public_key is_private_key)
+            # 注意：is_security 对应 .security (tls/reality)，is_reality 用于判断是否为 reality 协议
+            is_up_var_set=(is_protocol port uuid trojan_password ss_method ss_password door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_security tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_path grpc_host ws_host h2_host is_servername is_public_key is_private_key)
             [[ $is_debug ]] && msg "\n------------- debug: $is_config_file -------------"
             # 使用 readarray 保留空值（jq //empty 输出空行）
             local -a all_json_output=()
@@ -1261,8 +1262,10 @@ $is_json_data_reality"
             [[ -z $host ]] && host="${grpc_host:-${ws_host:-${h2_host:-}}}"
             [[ -z $is_https_port ]] && is_https_port=443
             header_type="${tcp_type:-}${kcp_type:-}${quic_type:-}"
-            if [[ $is_reality == 'reality' ]]; then
+            # 判断是否为 reality 协议
+            if [[ $is_security == 'reality' ]]; then
                 net=reality
+                is_reality=reality
             else
                 is_reality=
             fi
