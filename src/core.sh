@@ -1272,6 +1272,9 @@ $is_json_data_reality"
             [[ -z $host ]] && host="${grpc_host:-${ws_host:-${h2_host:-}}}"
             # grpc 的 serviceName 存储在 grpc_serviceName 变量中，需要赋值给 path
             [[ -z $path && $grpc_serviceName ]] && path="$grpc_serviceName"
+            # 备用：如果 net 为空，尝试从 JSON 直接提取
+            [[ -z $net ]] && net=$(jq -r '.inbounds[0].streamSettings.network // ""' <<<$is_json_str)
+            [[ $is_debug ]] && msg "DEBUG (backup): net='$net'"
             [[ -z $is_https_port ]] && is_https_port=443
             header_type="${tcp_type:-}${kcp_type:-}${quic_type:-}"
             # 判断是否为 reality 协议
