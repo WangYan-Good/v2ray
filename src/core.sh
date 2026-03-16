@@ -1233,18 +1233,18 @@ get() {
         get file $2
         if [[ $is_config_file ]]; then
             is_json_str=$(cat $is_conf_dir/"$is_config_file")
-            is_json_data_base=$(jq -r '.inbounds[0]|.protocol//empty,.port//empty,.settings.clients[0].id//empty,.settings.clients[0].password//empty,.settings.method//empty,.settings.password//empty,.settings.address//empty,.settings.port//empty,.settings.detour.to//empty,.settings.accounts[0].user//empty,.settings.accounts[0].pass//empty' <<<$is_json_str)
+            is_json_data_base=$(jq -r '.inbounds[0]|[(.protocol//""),(.port//""),(.settings.clients[0].id//""),(.settings.clients[0].password//""),(.settings.method//""),(.settings.address//""),(.settings.port//""),(.settings.detour.to//""),(.settings.accounts[0].user//""),(.settings.accounts[0].pass//"")]|.[]' <<<$is_json_str)
             [[ $? != 0 ]] && err "无法读取此文件: $is_config_file"
-            is_json_data_more=$(jq -r '.inbounds[0].streamSettings | .network//empty,.security//empty,.tcpSettings.header.type//empty,.kcpSettings.seed//empty,.kcpSettings.header.type//empty,.quicSettings.header.type//empty,.wsSettings.path//empty,.httpSettings.path//empty,.grpcSettings.serviceName//empty' <<<$is_json_str)
-            is_json_data_host=$(jq -r '.inbounds[0].streamSettings | .grpc_host//empty,.wsSettings.headers.Host//empty,.httpSettings.host[0]//empty' <<<$is_json_str)
-            is_json_data_reality=$(jq -r '.inbounds[0].streamSettings | .realitySettings.serverNames[0]//empty,.realitySettings.publicKey//empty,.realitySettings.privateKey//empty' <<<$is_json_str)
+            is_json_data_more=$(jq -r '.inbounds[0].streamSettings|[(.network//""),(.security//""),(.tcpSettings.header.type//""),(.kcpSettings.seed//""),(.kcpSettings.header.type//""),(.quicSettings.header.type//""),(.wsSettings.path//""),(.httpSettings.path//""),(.grpcSettings.serviceName//"")]|.[]' <<<$is_json_str)
+            is_json_data_host=$(jq -r '.inbounds[0].streamSettings|[(.grpc_host//""),(.wsSettings.headers.Host//""),(.httpSettings.host[0]//""")]|.[]' <<<$is_json_str)
+            is_json_data_reality=$(jq -r '.inbounds[0].streamSettings|[(.realitySettings.serverNames[0]//""),(.realitySettings.publicKey//""),(.realitySettings.privateKey//""")]|.[]' <<<$is_json_str)
             # 变量映射表 (按 jq 输出顺序): 0-9 base, 10-18 more, 19-21 host, 22-24 reality
             # base(10): protocol,port,uuid,password,method,address,port,detour,user,pass
             # more(9): network,security,tcp_type,kcp_seed,kcp_type,quic_type,ws_path,h2_path,grpc_serviceName
             # host(3): grpc_host,ws_host,h2_host
             # reality(3): serverName,publicKey,privateKey
             is_up_var_set=(is_protocol port uuid trojan_password ss_method door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_security tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host is_servername is_public_key is_private_key)
-            # 使用 readarray 保留空值（jq //empty 输出空行）
+            # 使用 readarray 读取 jq 输出（现在每个字段都输出一行，空值为空字符串）
             local -a all_json_output=()
             while IFS= read -r line; do
                 all_json_output+=("$line")
