@@ -475,8 +475,19 @@ nginx_certbot() {
                     msg ok "证书已存在且有效，剩余 ${days_left} 天"
                     msg info "证书路径：${cert_file}"
                     msg info "过期时间：${cert_expiry}"
-                    # 重新加载 Nginx
-                    systemctl reload nginx &>/dev/null
+                    # 检查软链接是否存在
+                    if [[ ! -L $is_nginx_dir/ssl/${domain} ]]; then
+                        msg warn "证书软链接不存在，正在创建..."
+                        mkdir -p $is_nginx_dir/ssl
+                        ln -sf /etc/letsencrypt/live/${domain} $is_nginx_dir/ssl/${domain}
+                        msg ok "软链接创建成功"
+                    fi
+                    # 启动或重载 Nginx
+                    if pgrep -f "nginx: master" &>/dev/null; then
+                        systemctl reload nginx &>/dev/null
+                    else
+                        systemctl start nginx &>/dev/null
+                    fi
                     return 0
                 else
                     msg warn "证书即将过期（剩余 ${days_left} 天），正在续期..."
@@ -533,6 +544,13 @@ nginx_certbot() {
                     [[ $line ]] && msg info "  $line"
                 done; then
                 msg ok "证书续期成功"
+                # 检查软链接是否存在
+                if [[ ! -L $is_nginx_dir/ssl/${domain} ]]; then
+                    msg warn "创建证书软链接..."
+                    mkdir -p $is_nginx_dir/ssl
+                    ln -sf /etc/letsencrypt/live/${domain} $is_nginx_dir/ssl/${domain}
+                    msg ok "软链接创建成功"
+                fi
                 systemctl reload nginx &>/dev/null
                 return 0
             else
@@ -566,6 +584,11 @@ nginx_certbot() {
                     [[ $line ]] && msg info "  $line"
                 done; then
                 msg ok "证书申请成功"
+                # 创建软链接到 Nginx 配置目录
+                msg warn "创建证书软链接到 /etc/nginx/ssl/${domain}/..."
+                mkdir -p $is_nginx_dir/ssl
+                ln -sf /etc/letsencrypt/live/${domain} $is_nginx_dir/ssl/${domain}
+                msg ok "软链接创建成功"
                 # 启动 Nginx
                 systemctl start nginx
                 return 0
@@ -661,11 +684,20 @@ nginx_reload() {
     if [[ -f $is_nginx_bin ]]; then
         # 检查 Nginx 是否正在运行
         if pgrep -f "nginx: master" &>/dev/null; then
+            # 运行中则重载
             $is_nginx_bin -s reload &>/dev/null
             return $?
         else
-            # Nginx 未运行，跳过重载
-            return 0
+            # 未运行则启动
+            msg warn "Nginx 未运行，正在启动..."
+            systemctl start nginx &>/dev/null
+            if pgrep -f "nginx: master" &>/dev/null; then
+                msg ok "Nginx 启动成功"
+                return 0
+            else
+                msg err "Nginx 启动失败，请检查配置"
+                return 1
+            fi
         fi
     fi
     return 1
