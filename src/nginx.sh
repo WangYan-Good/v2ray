@@ -209,6 +209,9 @@ server {
     include ${is_nginx_site_file}.add;
 }
 "
+        # 创建空的 .add 文件（避免 Nginx 启动失败）
+        [[ ! -f ${is_nginx_site_file}.add ]] && echo "# 伪装网站配置" >${is_nginx_site_file}.add
+        
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${host}; then
             msg err "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
@@ -217,7 +220,7 @@ server {
         fi
         return 0
         ;;
-    
+
     *h2*)
         # 检测配置冲突
         [[ -f ${is_nginx_site_file} ]] && {
@@ -304,6 +307,9 @@ server {
     include ${is_nginx_site_file}.add;
 }
 "
+        # 创建空的 .add 文件（避免 Nginx 启动失败）
+        [[ ! -f ${is_nginx_site_file}.add ]] && echo "# 伪装网站配置" >${is_nginx_site_file}.add
+        
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${host}; then
             msg err "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
@@ -397,6 +403,9 @@ server {
     include ${is_nginx_site_file}.add;
 }
 "
+        # 创建空的 .add 文件（避免 Nginx 启动失败）
+        [[ ! -f ${is_nginx_site_file}.add ]] && echo "# 伪装网站配置" >${is_nginx_site_file}.add
+        
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${host}; then
             msg err "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
