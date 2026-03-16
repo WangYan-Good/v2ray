@@ -489,7 +489,30 @@ nginx_certbot() {
 
         # 申请证书（带进度条）
         msg warn "正在申请 SSL 证书..."
-        
+
+        # 检查是否已有有效证书
+        local cert_file="/etc/letsencrypt/live/${domain}/fullchain.pem"
+        if [[ -f $cert_file ]]; then
+            # 检查证书有效期
+            local cert_expiry=$(openssl x509 -noout -enddate -in $cert_file 2>/dev/null | cut -d= -f2)
+            if [[ $cert_expiry ]]; then
+                local expiry_epoch=$(date -d "$cert_expiry" +%s 2>/dev/null)
+                local now_epoch=$(date +%s)
+                local days_left=$(( (expiry_epoch - now_epoch) / 86400 ))
+                
+                if [[ $days_left -gt 30 ]]; then
+                    msg ok "证书已存在且有效，剩余 ${days_left} 天"
+                    msg info "证书路径：${cert_file}"
+                    msg info "过期时间：${cert_expiry}"
+                    # 重新加载 Nginx
+                    systemctl reload nginx &>/dev/null
+                    return 0
+                else
+                    msg warn "证书即将过期（剩余 ${days_left} 天），正在续期..."
+                fi
+            fi
+        fi
+
         # 使用管道显示 certbot 进度
         if certbot certonly --webroot \
             -w /var/www/certbot \
