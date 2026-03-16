@@ -1238,23 +1238,30 @@ get() {
             is_json_data_more=$(jq -r '(.inbounds[0].streamSettings.network//""),(.inbounds[0].streamSettings.security//""),(.inbounds[0].streamSettings.tcpSettings.header.type//""),(.inbounds[0].streamSettings.kcpSettings.seed//""),(.inbounds[0].streamSettings.kcpSettings.header.type//""),(.inbounds[0].streamSettings.quicSettings.header.type//""),(.inbounds[0].streamSettings.wsSettings.path//""),(.inbounds[0].streamSettings.httpSettings.path//""),(.inbounds[0].streamSettings.grpcSettings.serviceName//"")' <<<$is_json_str)
             is_json_data_host=$(jq -r '(.inbounds[0].streamSettings.grpc_host//""),(.inbounds[0].streamSettings.wsSettings.headers.Host//""),(.inbounds[0].streamSettings.httpSettings.host[0]//"")' <<<$is_json_str)
             is_json_data_reality=$(jq -r '(.inbounds[0].streamSettings.realitySettings.serverNames[0]//""),(.inbounds[0].streamSettings.realitySettings.publicKey//""),(.inbounds[0].streamSettings.realitySettings.privateKey//"")' <<<$is_json_str)
+            [[ $is_debug ]] && {
+                msg "DEBUG: is_json_data_base=[$is_json_data_base]"
+                msg "DEBUG: is_json_data_more=[$is_json_data_more]"
+                msg "DEBUG: is_json_data_host=[$is_json_data_host]"
+                msg "DEBUG: is_json_data_reality=[$is_json_data_reality]"
+            }
             # 变量映射表 (按 jq 输出顺序): 0-9 base, 10-18 more, 19-21 host, 22-24 reality
             # base(10): protocol,port,uuid,password,method,address,port,detour,user,pass
             # more(9): network,security,tcp_type,kcp_seed,kcp_type,quic_type,ws_path,h2_path,grpc_serviceName
             # host(3): grpc_host,ws_host,h2_host
             # reality(3): serverName,publicKey,privateKey
             is_up_var_set=(is_protocol port uuid trojan_password ss_method door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_security tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host is_servername is_public_key is_private_key)
-            # 使用 readarray 读取 jq 输出（现在每个字段都输出一行，空值为空字符串）
-            local -a all_json_output=()
-            while IFS= read -r line; do
-                all_json_output+=("$line")
-            done <<< "$is_json_data_base
-$is_json_data_more
-$is_json_data_host
-$is_json_data_reality"
+            # 使用 readarray 分别读取每个 jq 输出，确保空行不丢失
+            readarray -t base_arr <<< "$is_json_data_base"
+            readarray -t more_arr <<< "$is_json_data_more"
+            readarray -t host_arr <<< "$is_json_data_host"
+            readarray -t reality_arr <<< "$is_json_data_reality"
+            local -a all_json_output=("${base_arr[@]}" "${more_arr[@]}" "${host_arr[@]}" "${reality_arr[@]}")
+            [[ $is_debug ]] && msg "DEBUG: all_json_output count=${#all_json_output[@]} (base:${#base_arr[@]} more:${#more_arr[@]} host:${#host_arr[@]} reality:${#reality_arr[@]})"
             for i in "${!all_json_output[@]}"; do
+                [[ $is_debug ]] && msg "$i-${is_up_var_set[$i]}: ${all_json_output[$i]}"
                 export ${is_up_var_set[$i]}="${all_json_output[$i]}"
             done
+            [[ $is_debug ]] && msg "DEBUG: net='$net', host='$host', grpc_host='$grpc_host'"
             for v in ${is_up_var_set[@]}; do
                 [[ -z "${!v}" || "${!v}" == "null" ]] && unset $v
             done
@@ -1265,6 +1272,7 @@ $is_json_data_reality"
             [[ -z $path && $grpc_serviceName ]] && path="$grpc_serviceName"
             # 备用：如果 net 为空，尝试从 JSON 直接提取
             [[ -z $net ]] && net=$(jq -r '.inbounds[0].streamSettings.network // ""' <<<$is_json_str)
+            [[ $is_debug ]] && msg "DEBUG (backup): net='$net'"
             [[ -z $is_https_port ]] && is_https_port=443
             header_type="${tcp_type:-}${kcp_type:-}${quic_type:-}"
             # 判断是否为 reality 协议
@@ -1573,6 +1581,8 @@ info() {
     get info $1
     # is_color=$(shuf -i 41-45 -n1)
     is_color=44
+    # 调试：检查 net 变量
+    [[ $is_debug ]] && msg "DEBUG: net='$net', host='$host', is_protocol='$is_protocol'"
     case $net in
     tcp | kcp | quic)
         is_can_change=(0 1 5 7)
