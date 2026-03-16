@@ -1238,9 +1238,12 @@ get() {
             is_json_data_more=$(jq -r '.inbounds[0].streamSettings | .network//empty,.security//empty,.tcpSettings.header.type//empty,.kcpSettings.seed//empty,.kcpSettings.header.type//empty,.quicSettings.header.type//empty,.wsSettings.path//empty,.httpSettings.path//empty,.grpcSettings.serviceName//empty' <<<$is_json_str)
             is_json_data_host=$(jq -r '.inbounds[0].streamSettings | .grpc_host//empty,.wsSettings.headers.Host//empty,.httpSettings.host[0]//empty' <<<$is_json_str)
             is_json_data_reality=$(jq -r '.inbounds[0].streamSettings | .realitySettings.serverNames[0]//empty,.realitySettings.publicKey//empty,.realitySettings.privateKey//empty' <<<$is_json_str)
-            # 添加 host 和 is_https_port 到变量列表
-            # 注意：is_security 对应 .security (tls/reality)，is_reality 用于判断是否为 reality 协议
-            is_up_var_set=(is_protocol port uuid trojan_password ss_method ss_password door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_security tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_path grpc_host ws_host h2_host is_servername is_public_key is_private_key)
+            # 变量映射表 (按 jq 输出顺序): 0-9 base, 10-18 more, 19-21 host, 22-24 reality
+            # base(10): protocol,port,uuid,password,method,address,port,detour,user,pass
+            # more(9): network,security,tcp_type,kcp_seed,kcp_type,quic_type,ws_path,h2_path,grpc_serviceName
+            # host(3): grpc_host,ws_host,h2_host
+            # reality(3): serverName,publicKey,privateKey
+            is_up_var_set=(is_protocol port uuid trojan_password ss_method door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_security tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host is_servername is_public_key is_private_key)
             [[ $is_debug ]] && msg "\n------------- debug: $is_config_file -------------"
             # 使用 readarray 保留空值（jq //empty 输出空行）
             local -a all_json_output=()
@@ -1260,6 +1263,8 @@ $is_json_data_reality"
 
             # 合并变量（如果从 JSON 读取失败，使用备用方式）
             [[ -z $host ]] && host="${grpc_host:-${ws_host:-${h2_host:-}}}"
+            # grpc 的 serviceName 存储在 grpc_serviceName 变量中，需要赋值给 path
+            [[ -z $path && $grpc_serviceName ]] && path="$grpc_serviceName"
             [[ -z $is_https_port ]] && is_https_port=443
             header_type="${tcp_type:-}${kcp_type:-}${quic_type:-}"
             # 判断是否为 reality 协议
