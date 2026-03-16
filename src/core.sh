@@ -1272,7 +1272,9 @@ get() {
                 is_tmp_https_port=$(grep -E -o "$host:[1-9][0-9]?+" $is_caddy_conf/$host.conf | sed s/.*://)
             fi
             if [[ $is_nginx && $host && -f $is_nginx_conf/$host.conf ]]; then
-                is_tmp_https_port=$(grep -E -o "listen.*[1-9][0-9]?+" $is_nginx_conf/$host.conf | grep -o '[1-9][0-9]*' | head -1)
+                # 优先匹配带 ssl 的 listen 行（HTTPS 端口），否则默认为 443
+                is_tmp_https_port=$(grep -E "listen.*ssl" $is_nginx_conf/$host.conf | grep -oE '[0-9]+' | head -1)
+                [[ ! $is_tmp_https_port ]] && is_tmp_https_port=443
             fi
             if [[ $host && ! -f $is_caddy_conf/$host.conf && ! -f $is_nginx_conf/$host.conf ]]; then
                 is_no_auto_tls=1
