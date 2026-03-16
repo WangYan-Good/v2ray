@@ -1,31 +1,34 @@
 name: Main
 
-on: push
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: checkout
+      - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: get ver
+      - name: Get version
         run: |
-          echo "$(cat v2ray.sh | grep ver=)" >> $GITHUB_ENV
+          echo "is_sh_ver=$(cat v2ray.sh | grep -oP 'is_sh_ver=\K.*')" >> $GITHUB_ENV
           echo "old=$(git tag | tail -n1)" >> $GITHUB_ENV
-      # - name: test
-      #   if: env.is_sh_ver == env.old 
-      #   run: |
-      #     echo not found new version.
-      #     exit 1
-      - name: zip
-        run: zip -9vr code.zip . -x .\*
-      - name: release
+      - name: Create zip archive
+        run: zip -9vr code.zip . -x .\* .git\*
+      - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: code.zip
           tag_name: ${{ env.is_sh_ver }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
