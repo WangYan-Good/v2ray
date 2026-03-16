@@ -1282,7 +1282,8 @@ $is_json_data_reality"
                 [[ ! $is_tmp_https_port ]] && is_tmp_https_port=443
             fi
             if [[ $host && ! -f $is_caddy_conf/$host.conf && ! -f $is_nginx_conf/$host.conf ]]; then
-                is_no_auto_tls=1
+                # 新配置默认使用 443 端口
+                is_tmp_https_port=443
             fi
             [[ $is_tmp_https_port ]] && is_https_port=$is_tmp_https_port
             [[ $is_client && $host ]] && port=$is_https_port
@@ -1589,10 +1590,9 @@ info() {
     ws | h2 | grpc)
         is_color=45
         is_can_change=(0 1 2 3 5)
-        is_info_show=(0 1 2 3 4 6 7 8)
+        is_info_show=(0 1 2 3 4 5 6 7)
         is_url_path=path
         [[ $net == 'grpc' ]] && {
-            path=$(sed 's#/##g' <<<$path)
             is_url_path=serviceName
         }
         [[ $is_protocol == 'vmess' ]] && {
@@ -1602,7 +1602,7 @@ info() {
             [[ $is_trojan ]] && {
                 uuid=$trojan_password
                 is_can_change=(0 1 2 3 4)
-                is_info_show=(0 1 2 10 4 6 7 8)
+                is_info_show=(0 1 2 10 4 5 6 7)
             }
             is_url="$is_protocol://$uuid@$host:$is_https_port?encryption=none&security=tls&type=$net&host=$host&${is_url_path}=$(sed 's#/#%2F#g' <<<$path)#$net-$host"
         }
