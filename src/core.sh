@@ -1245,6 +1245,11 @@ get() {
             # reality(3): serverName,publicKey,privateKey
             is_up_var_set=(is_protocol port uuid trojan_password ss_method door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_security tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host is_servername is_public_key is_private_key)
             [[ $is_debug ]] && msg "\n------------- debug: $is_config_file -------------"
+            [[ $is_debug ]] && msg "JSON 内容:" && jq '.' <<<$is_json_str
+            [[ $is_debug ]] && msg "is_json_data_base 输出:" && msg "$is_json_data_base"
+            [[ $is_debug ]] && msg "is_json_data_more 输出:" && msg "$is_json_data_more"
+            [[ $is_debug ]] && msg "is_json_data_host 输出:" && msg "$is_json_data_host"
+            [[ $is_debug ]] && msg "is_json_data_reality 输出:" && msg "$is_json_data_reality"
             # 使用 readarray 保留空值（jq //empty 输出空行）
             local -a all_json_output=()
             while IFS= read -r line; do
@@ -1389,8 +1394,10 @@ $is_json_data_reality"
             ;;
         *grpc* | *gun)
             net=grpc
-            [[ ! $path ]] && path="$uuid"
-            [[ $path ]] && path=$(sed 's#/##g' <<<$path)
+            # gRPC 默认 serviceName 为 "grpc"，而不是 UUID
+            [[ ! $path ]] && path="grpc"
+            # 移除路径中的斜杠 (gRPC serviceName 不支持斜杠)
+            [[ $path == */* ]] && path=$(sed 's#/##g' <<<$path)
             is_stream='streamSettings:{network:"grpc",grpc_host:'\"$host\"',security:'\"$is_tls\"',grpcSettings:{serviceName:'\"$path\"'}}'
             json_str=''"$is_server_id_json"','"$is_stream"''
             ;;
@@ -1567,9 +1574,8 @@ $is_json_data_reality"
 
 # show info
 info() {
-    if [[ ! $is_protocol ]]; then
-        get info $1
-    fi
+    # 总是从 JSON 文件读取配置信息，确保变量正确设置
+    get info $1
     # is_color=$(shuf -i 41-45 -n1)
     is_color=44
     case $net in
