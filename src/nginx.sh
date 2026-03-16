@@ -482,8 +482,12 @@ nginx_certbot() {
                         ln -sf /etc/letsencrypt/live/${domain} $is_nginx_dir/ssl/${domain}
                         msg ok "软链接创建成功"
                     fi
-                    # 重新加载 Nginx
-                    systemctl reload nginx &>/dev/null
+                    # 启动或重载 Nginx
+                    if pgrep -f "nginx: master" &>/dev/null; then
+                        systemctl reload nginx &>/dev/null
+                    else
+                        systemctl start nginx &>/dev/null
+                    fi
                     return 0
                 else
                     msg warn "证书即将过期（剩余 ${days_left} 天），正在续期..."
@@ -680,11 +684,20 @@ nginx_reload() {
     if [[ -f $is_nginx_bin ]]; then
         # 检查 Nginx 是否正在运行
         if pgrep -f "nginx: master" &>/dev/null; then
+            # 运行中则重载
             $is_nginx_bin -s reload &>/dev/null
             return $?
         else
-            # Nginx 未运行，跳过重载
-            return 0
+            # 未运行则启动
+            msg warn "Nginx 未运行，正在启动..."
+            systemctl start nginx &>/dev/null
+            if pgrep -f "nginx: master" &>/dev/null; then
+                msg ok "Nginx 启动成功"
+                return 0
+            else
+                msg err "Nginx 启动失败，请检查配置"
+                return 1
+            fi
         fi
     fi
     return 1
