@@ -1244,12 +1244,6 @@ get() {
             # host(3): grpc_host,ws_host,h2_host
             # reality(3): serverName,publicKey,privateKey
             is_up_var_set=(is_protocol port uuid trojan_password ss_method door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_security tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host is_servername is_public_key is_private_key)
-            [[ $is_debug ]] && msg "\n------------- debug: $is_config_file -------------"
-            [[ $is_debug ]] && msg "JSON 内容:" && jq '.' <<<$is_json_str
-            [[ $is_debug ]] && msg "is_json_data_base 输出:" && msg "$is_json_data_base"
-            [[ $is_debug ]] && msg "is_json_data_more 输出:" && msg "$is_json_data_more"
-            [[ $is_debug ]] && msg "is_json_data_host 输出:" && msg "$is_json_data_host"
-            [[ $is_debug ]] && msg "is_json_data_reality 输出:" && msg "$is_json_data_reality"
             # 使用 readarray 保留空值（jq //empty 输出空行）
             local -a all_json_output=()
             while IFS= read -r line; do
@@ -1300,7 +1294,7 @@ $is_json_data_reality"
             fi
             [[ $is_tmp_https_port ]] && is_https_port=$is_tmp_https_port
             [[ $is_client && $host ]] && port=$is_https_port
-            get protocol $is_protocol-$net
+            # 注意：不再调用 get protocol，因为 info() 不需要构建 JSON，只需要显示信息
         fi
         ;;
     protocol)
