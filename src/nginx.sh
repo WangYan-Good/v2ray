@@ -451,6 +451,20 @@ nginx_certbot() {
     local action=$1
     local domain=$2
 
+    # 检测 Certbot 版本，决定是否使用 --key-type ecdsa 参数
+    # ECDSA 支持需要 Certbot >= 1.14.0 (2021 年发布)
+    local certbot_version=$(certbot --version 2>&1 | grep -oP '\d+\.\d+\.\d+' | head -1)
+    local certbot_major=$(echo $certbot_version | cut -d. -f1)
+    local certbot_minor=$(echo $certbot_version | cut -d. -f2)
+    local is_ecdsa_supported=0
+    
+    if [[ $certbot_major -gt 1 ]] || [[ $certbot_major -eq 1 && $certbot_minor -ge 14 ]]; then
+        is_ecdsa_supported=1
+        msg info "Certbot 版本：$certbot_version (支持 ECDSA)"
+    else
+        msg info "Certbot 版本：$certbot_version (使用 RSA 证书)"
+    fi
+
     case $action in
     issue)
         # 申请证书
@@ -532,7 +546,10 @@ nginx_certbot() {
             rm -f $test_file
             msg ok "Nginx 配置验证通过"
 
-            # 续期证书
+            # 续期证书（根据版本决定是否使用 ECDSA）
+            local ecdsa_opt=""
+            [[ $is_ecdsa_supported -eq 1 ]] && ecdsa_opt="--key-type ecdsa"
+            
             if certbot certonly --webroot \
                 -w /var/www/certbot \
                 -d ${domain} \
@@ -540,7 +557,7 @@ nginx_certbot() {
                 --agree-tos \
                 --non-interactive \
                 --force-renewal \
-                --key-type ecdsa 2>&1 | while IFS= read -r line; do
+                $ecdsa_opt 2>&1 | while IFS= read -r line; do
                     [[ $line ]] && msg info "  $line"
                 done; then
                 msg ok "证书续期成功"
@@ -573,14 +590,17 @@ nginx_certbot() {
                 return 1
             fi
 
-            # 申请证书
+            # 申请证书（根据版本决定是否使用 ECDSA）
+            local ecdsa_opt=""
+            [[ $is_ecdsa_supported -eq 1 ]] && ecdsa_opt="--key-type ecdsa"
+            
             if certbot certonly --standalone \
                 -d ${domain} \
                 --email admin@${domain} \
                 --agree-tos \
                 --non-interactive \
                 --force-renewal \
-                --key-type ecdsa 2>&1 | while IFS= read -r line; do
+                $ecdsa_opt 2>&1 | while IFS= read -r line; do
                     [[ $line ]] && msg info "  $line"
                 done; then
                 msg ok "证书申请成功"
@@ -597,7 +617,8 @@ nginx_certbot() {
                 msg warn "请检查:"
                 msg "  1. 域名是否正确解析到服务器 IP"
                 msg "  2. 防火墙是否开放 80 端口"
-                msg "  3. 查看详细日志：tail -20 /var/log/letsencrypt/letsencrypt.log"
+                msg "  3. Certbot 版本是否过旧 (certbot --version)"
+                msg "  4. 查看详细日志：tail -20 /var/log/letsencrypt/letsencrypt.log"
                 return 1
             fi
         fi
