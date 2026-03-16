@@ -459,48 +459,10 @@ nginx_certbot() {
         # 确保 webroot 目录存在
         mkdir -p /var/www/certbot
 
-        # 确保 Nginx 已启动（Certbot webroot 模式需要）
-        if ! pgrep -f "nginx: master" &>/dev/null; then
-            msg warn "Nginx 未运行，正在启动..."
-            systemctl start nginx &>/dev/null
-            sleep 2
-            if ! pgrep -f "nginx: master" &>/dev/null; then
-                msg err "Nginx 启动失败，无法申请证书"
-                return 1
-            fi
-            msg ok "Nginx 已启动"
-        fi
-
-        # 测试 Nginx 配置并重载（确保新配置生效）
-        if ! nginx -t &>/dev/null; then
-            msg err "Nginx 配置测试失败"
-            nginx -t 2>&1 | tail -5
-            return 1
-        fi
-        # 重载 Nginx 使新配置生效
-        nginx -s reload &>/dev/null
-        sleep 1
-
-        # 验证挑战文件是否可访问（带进度条）
-        msg warn "验证 Nginx 配置..."
-        local test_file="/var/www/certbot/.well-known/acme-challenge/test"
-        mkdir -p "$(dirname $test_file)"
-        echo "test" > $test_file
-        sleep 1
-        if ! curl -s --connect-timeout 3 "http://localhost/.well-known/acme-challenge/test" | grep -q "test"; then
-            msg err "Nginx 配置验证失败：无法访问挑战文件"
-            msg warn "请检查 Nginx 配置是否包含 location /.well-known/acme-challenge/ 块"
-            rm -f $test_file
-            return 1
-        fi
-        rm -f $test_file
-        msg ok "Nginx 配置验证通过"
-
-        # 申请证书（带进度条）
-        msg warn "正在申请 SSL 证书..."
-
         # 检查是否已有有效证书
         local cert_file="/etc/letsencrypt/live/${domain}/fullchain.pem"
+        local has_valid_cert=false
+        
         if [[ -f $cert_file ]]; then
             # 检查证书有效期
             local cert_expiry=$(openssl x509 -noout -enddate -in $cert_file 2>/dev/null | cut -d= -f2)
@@ -508,7 +470,7 @@ nginx_certbot() {
                 local expiry_epoch=$(date -d "$cert_expiry" +%s 2>/dev/null)
                 local now_epoch=$(date +%s)
                 local days_left=$(( (expiry_epoch - now_epoch) / 86400 ))
-                
+
                 if [[ $days_left -gt 30 ]]; then
                     msg ok "证书已存在且有效，剩余 ${days_left} 天"
                     msg info "证书路径：${cert_file}"
@@ -518,34 +480,103 @@ nginx_certbot() {
                     return 0
                 else
                     msg warn "证书即将过期（剩余 ${days_left} 天），正在续期..."
+                    has_valid_cert=true
                 fi
             fi
         fi
 
-        # 使用管道显示 certbot 进度
-        if certbot certonly --webroot \
-            -w /var/www/certbot \
-            -d ${domain} \
-            --email admin@${domain} \
-            --agree-tos \
-            --non-interactive \
-            --force-renewal \
-            --key-type ecdsa 2>&1 | while IFS= read -r line; do
-                # 显示 Certbot 输出
-                [[ $line ]] && msg info "  $line"
-            done; then
-            msg ok "证书申请成功"
-            # 重新加载 Nginx
-            systemctl reload nginx &>/dev/null
-            return 0
+        # 首次申请证书：使用 standalone 模式（不需要 Nginx 运行）
+        # 续期证书：使用 webroot 模式（需要 Nginx 运行）
+        if [[ $has_valid_cert == true ]]; then
+            # 续期：使用 webroot 模式
+            msg warn "Nginx 未运行，正在启动..."
+            systemctl start nginx &>/dev/null
+            sleep 2
+            if ! pgrep -f "nginx: master" &>/dev/null; then
+                msg err "Nginx 启动失败，无法申请证书"
+                return 1
+            fi
+            msg ok "Nginx 已启动"
+
+            # 测试 Nginx 配置并重载
+            if ! nginx -t &>/dev/null; then
+                msg err "Nginx 配置测试失败"
+                nginx -t 2>&1 | tail -5
+                return 1
+            fi
+            nginx -s reload &>/dev/null
+            sleep 1
+
+            # 验证挑战文件
+            msg warn "验证 Nginx 配置..."
+            local test_file="/var/www/certbot/.well-known/acme-challenge/test"
+            mkdir -p "$(dirname $test_file)"
+            echo "test" > $test_file
+            sleep 1
+            if ! curl -s --connect-timeout 3 "http://localhost/.well-known/acme-challenge/test" | grep -q "test"; then
+                msg err "Nginx 配置验证失败：无法访问挑战文件"
+                rm -f $test_file
+                return 1
+            fi
+            rm -f $test_file
+            msg ok "Nginx 配置验证通过"
+
+            # 续期证书
+            if certbot certonly --webroot \
+                -w /var/www/certbot \
+                -d ${domain} \
+                --email admin@${domain} \
+                --agree-tos \
+                --non-interactive \
+                --force-renewal \
+                --key-type ecdsa 2>&1 | while IFS= read -r line; do
+                    [[ $line ]] && msg info "  $line"
+                done; then
+                msg ok "证书续期成功"
+                systemctl reload nginx &>/dev/null
+                return 0
+            else
+                msg err "证书续期失败"
+                return 1
+            fi
         else
-            msg err "证书申请失败"
-            msg warn "请检查:"
-            msg "  1. 域名是否正确解析到服务器 IP"
-            msg "  2. 防火墙是否开放 80 端口"
-            msg "  3. Nginx 是否正常运行"
-            msg "  4. 查看详细日志：tail -20 /var/log/letsencrypt/letsencrypt.log"
-            return 1
+            # 首次申请：使用 standalone 模式
+            msg warn "正在申请 SSL 证书（standalone 模式）..."
+            
+            # 确保 80 端口空闲
+            systemctl stop nginx &>/dev/null
+            sleep 1
+            
+            # 检查 80 端口是否被占用
+            if ss -tlnp | grep -q ':80 '; then
+                msg err "80 端口被占用，无法申请证书"
+                ss -tlnp | grep ':80'
+                msg warn "请关闭占用 80 端口的服务后重试"
+                return 1
+            fi
+
+            # 申请证书
+            if certbot certonly --standalone \
+                -d ${domain} \
+                --email admin@${domain} \
+                --agree-tos \
+                --non-interactive \
+                --force-renewal \
+                --key-type ecdsa 2>&1 | while IFS= read -r line; do
+                    [[ $line ]] && msg info "  $line"
+                done; then
+                msg ok "证书申请成功"
+                # 启动 Nginx
+                systemctl start nginx
+                return 0
+            else
+                msg err "证书申请失败"
+                msg warn "请检查:"
+                msg "  1. 域名是否正确解析到服务器 IP"
+                msg "  2. 防火墙是否开放 80 端口"
+                msg "  3. 查看详细日志：tail -20 /var/log/letsencrypt/letsencrypt.log"
+                return 1
+            fi
         fi
         ;;
 
