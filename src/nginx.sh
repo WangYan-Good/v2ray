@@ -475,6 +475,13 @@ nginx_certbot() {
                     msg ok "证书已存在且有效，剩余 ${days_left} 天"
                     msg info "证书路径：${cert_file}"
                     msg info "过期时间：${cert_expiry}"
+                    # 检查软链接是否存在
+                    if [[ ! -L $is_nginx_dir/ssl/${domain} ]]; then
+                        msg warn "证书软链接不存在，正在创建..."
+                        mkdir -p $is_nginx_dir/ssl
+                        ln -sf /etc/letsencrypt/live/${domain} $is_nginx_dir/ssl/${domain}
+                        msg ok "软链接创建成功"
+                    fi
                     # 重新加载 Nginx
                     systemctl reload nginx &>/dev/null
                     return 0
@@ -533,6 +540,13 @@ nginx_certbot() {
                     [[ $line ]] && msg info "  $line"
                 done; then
                 msg ok "证书续期成功"
+                # 检查软链接是否存在
+                if [[ ! -L $is_nginx_dir/ssl/${domain} ]]; then
+                    msg warn "创建证书软链接..."
+                    mkdir -p $is_nginx_dir/ssl
+                    ln -sf /etc/letsencrypt/live/${domain} $is_nginx_dir/ssl/${domain}
+                    msg ok "软链接创建成功"
+                fi
                 systemctl reload nginx &>/dev/null
                 return 0
             else
@@ -566,6 +580,11 @@ nginx_certbot() {
                     [[ $line ]] && msg info "  $line"
                 done; then
                 msg ok "证书申请成功"
+                # 创建软链接到 Nginx 配置目录
+                msg warn "创建证书软链接到 /etc/nginx/ssl/${domain}/..."
+                mkdir -p $is_nginx_dir/ssl
+                ln -sf /etc/letsencrypt/live/${domain} $is_nginx_dir/ssl/${domain}
+                msg ok "软链接创建成功"
                 # 启动 Nginx
                 systemctl start nginx
                 return 0
