@@ -1238,6 +1238,12 @@ get() {
             is_json_data_more=$(jq -r '.inbounds[0].streamSettings|[(.network//""),(.security//""),(.tcpSettings.header.type//""),(.kcpSettings.seed//""),(.kcpSettings.header.type//""),(.quicSettings.header.type//""),(.wsSettings.path//""),(.httpSettings.path//""),(.grpcSettings.serviceName//"")]|.[]' <<<$is_json_str)
             is_json_data_host=$(jq -r '.inbounds[0].streamSettings|[(.grpc_host//""),(.wsSettings.headers.Host//""),(.httpSettings.host[0]//"")]|.[]' <<<$is_json_str)
             is_json_data_reality=$(jq -r '.inbounds[0].streamSettings|[(.realitySettings.serverNames[0]//""),(.realitySettings.publicKey//""),(.realitySettings.privateKey//"")]|.[]' <<<$is_json_str)
+            [[ $is_debug ]] && {
+                msg "DEBUG: is_json_data_base=[$is_json_data_base]"
+                msg "DEBUG: is_json_data_more=[$is_json_data_more]"
+                msg "DEBUG: is_json_data_host=[$is_json_data_host]"
+                msg "DEBUG: is_json_data_reality=[$is_json_data_reality]"
+            }
             # 变量映射表 (按 jq 输出顺序): 0-9 base, 10-18 more, 19-21 host, 22-24 reality
             # base(10): protocol,port,uuid,password,method,address,port,detour,user,pass
             # more(9): network,security,tcp_type,kcp_seed,kcp_type,quic_type,ws_path,h2_path,grpc_serviceName
@@ -1252,10 +1258,12 @@ get() {
 $is_json_data_more
 $is_json_data_host
 $is_json_data_reality"
+            [[ $is_debug ]] && msg "DEBUG: all_json_output count=${#all_json_output[@]}"
             for i in "${!all_json_output[@]}"; do
                 [[ $is_debug ]] && msg "$i-${is_up_var_set[$i]}: ${all_json_output[$i]}"
                 export ${is_up_var_set[$i]}="${all_json_output[$i]}"
             done
+            [[ $is_debug ]] && msg "DEBUG: net='$net', host='$host', grpc_host='$grpc_host'"
             for v in ${is_up_var_set[@]}; do
                 [[ -z "${!v}" || "${!v}" == "null" ]] && unset $v
             done
@@ -1572,6 +1580,8 @@ info() {
     get info $1
     # is_color=$(shuf -i 41-45 -n1)
     is_color=44
+    # 调试：检查 net 变量
+    [[ $is_debug ]] && msg "DEBUG: net='$net', host='$host', is_protocol='$is_protocol'"
     case $net in
     tcp | kcp | quic)
         is_can_change=(0 1 5 7)
