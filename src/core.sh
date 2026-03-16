@@ -1595,8 +1595,9 @@ info() {
         is_can_change=(0 1 2 3 5)
         is_info_show=(0 1 2 3 4 6 7 8)
         is_url_path=path
+        is_display_path=$path
         [[ $net == 'grpc' ]] && {
-            path=$(sed 's#/##g' <<<$path)
+            is_display_path=$(sed 's#/##g' <<<$path)
             is_url_path=serviceName
         }
         [[ $is_protocol == 'vmess' ]] && {
@@ -1608,10 +1609,10 @@ info() {
                 is_can_change=(0 1 2 3 4)
                 is_info_show=(0 1 2 10 4 6 7 8)
             }
-            is_url="$is_protocol://$uuid@$host:$is_https_port?encryption=none&security=tls&type=$net&host=$host&${is_url_path}=$(sed 's#/#%2F#g' <<<$path)#$net-$host"
+            is_url="$is_protocol://$uuid@$host:$is_https_port?encryption=none&security=tls&type=$net&host=$host&${is_url_path}=$(sed 's#/#%2F#g' <<<$is_display_path)#$net-$host"
         }
         [[ $is_caddy || $is_nginx ]] && is_can_change+=(13)
-        is_info_str=($is_protocol $is_addr $is_https_port $uuid $net $host $path 'tls')
+        is_info_str=($is_protocol $is_addr $is_https_port $uuid $net $host $is_display_path 'tls')
         ;;
     reality)
         is_color=41
