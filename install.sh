@@ -479,6 +479,8 @@ main() {
             esac
         done
     }
+
+    # check parameters
     [[ $# -gt 0 ]] && pass_args $@
 
     # show welcome msg
