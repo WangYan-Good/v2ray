@@ -1233,11 +1233,11 @@ get() {
         get file $2
         if [[ $is_config_file ]]; then
             is_json_str=$(cat $is_conf_dir/"$is_config_file")
-            is_json_data_base=$(jq -r '.inbounds[0]|[(.protocol//""),(.port//""),(.settings.clients[0].id//""),(.settings.clients[0].password//""),(.settings.method//""),(.settings.address//""),(.settings.port//""),(.settings.detour.to//""),(.settings.accounts[0].user//""),(.settings.accounts[0].pass//"")]|.[]' <<<$is_json_str)
+            is_json_data_base=$(jq -r '(.inbounds[0].protocol//""),(.inbounds[0].port//""),(.inbounds[0].settings.clients[0].id//""),(.inbounds[0].settings.clients[0].password//""),(.inbounds[0].settings.method//""),(.inbounds[0].settings.address//""),(.inbounds[0].settings.port//""),(.inbounds[0].settings.detour.to//""),(.inbounds[0].settings.accounts[0].user//""),(.inbounds[0].settings.accounts[0].pass//"")' <<<$is_json_str)
             [[ $? != 0 ]] && err "无法读取此文件: $is_config_file"
-            is_json_data_more=$(jq -r '.inbounds[0].streamSettings|[(.network//""),(.security//""),(.tcpSettings.header.type//""),(.kcpSettings.seed//""),(.kcpSettings.header.type//""),(.quicSettings.header.type//""),(.wsSettings.path//""),(.httpSettings.path//""),(.grpcSettings.serviceName//"")]|.[]' <<<$is_json_str)
-            is_json_data_host=$(jq -r '.inbounds[0].streamSettings|[(.grpc_host//""),(.wsSettings.headers.Host//""),(.httpSettings.host[0]//"")]|.[]' <<<$is_json_str)
-            is_json_data_reality=$(jq -r '.inbounds[0].streamSettings|[(.realitySettings.serverNames[0]//""),(.realitySettings.publicKey//""),(.realitySettings.privateKey//"")]|.[]' <<<$is_json_str)
+            is_json_data_more=$(jq -r '(.inbounds[0].streamSettings.network//""),(.inbounds[0].streamSettings.security//""),(.inbounds[0].streamSettings.tcpSettings.header.type//""),(.inbounds[0].streamSettings.kcpSettings.seed//""),(.inbounds[0].streamSettings.kcpSettings.header.type//""),(.inbounds[0].streamSettings.quicSettings.header.type//""),(.inbounds[0].streamSettings.wsSettings.path//""),(.inbounds[0].streamSettings.httpSettings.path//""),(.inbounds[0].streamSettings.grpcSettings.serviceName//"")' <<<$is_json_str)
+            is_json_data_host=$(jq -r '(.inbounds[0].streamSettings.grpc_host//""),(.inbounds[0].streamSettings.wsSettings.headers.Host//""),(.inbounds[0].streamSettings.httpSettings.host[0]//"")' <<<$is_json_str)
+            is_json_data_reality=$(jq -r '(.inbounds[0].streamSettings.realitySettings.serverNames[0]//""),(.inbounds[0].streamSettings.realitySettings.publicKey//""),(.inbounds[0].streamSettings.realitySettings.privateKey//"")' <<<$is_json_str)
             [[ $is_debug ]] && {
                 msg "DEBUG: is_json_data_base=[$is_json_data_base]"
                 msg "DEBUG: is_json_data_more=[$is_json_data_more]"
