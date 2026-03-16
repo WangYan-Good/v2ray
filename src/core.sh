@@ -1241,7 +1241,7 @@ get() {
             # 添加 host 和 is_https_port 到变量列表
             is_up_var_set=(is_protocol port uuid trojan_password ss_method ss_password door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_reality tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_path grpc_host ws_host h2_host is_servername is_public_key is_private_key)
             [[ $is_debug ]] && msg "\n------------- debug: $is_config_file -------------"
-            i=0
+            i=-1
             local all_json_output="$is_json_data_base $is_json_data_more $is_json_data_host $is_json_data_reality"
             for v in $all_json_output; do
                 ((i++))
