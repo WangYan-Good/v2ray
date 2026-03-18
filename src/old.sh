@@ -1,4 +1,4 @@
-is_old_list=(
+IS_OLD_LIST=(
 	TCP
 	TCP_HTTP
 	WebSocket
@@ -37,45 +37,45 @@ is_old_list=(
 # del old file
 del_old_file() {
 	# old sh bin
-	_v2ray_sh="/usr/local/sbin/v2ray"
-	rm -rf $_v2ray_sh $is_old_conf $is_old_dir $is_core_dir/233blog_v2ray_config.json /usr/bin/v2ray
+	_V2RAY_SH="/usr/local/sbin/v2ray"
+	rm -rf $_V2RAY_SH $IS_OLD_CONF $IS_OLD_DIR $IS_CORE_DIR/233blog_v2ray_config.json /usr/bin/v2ray
 	# del alias
-	sed -i "#$_v2ray_sh#d" /root/.bashrc
+	sed -i "#$_V2RAY_SH#d" /root/.bashrc
 	exit
 }
 
 # read old config
-. $is_old_conf
-is_old=${is_old_list[$v2ray_transport - 1]}
-case $v2ray_transport in
+. $IS_OLD_CONF
+IS_OLD=${IS_OLD_LIST[$V2RAY_TRANSPORT - 1]}
+case $V2RAY_TRANSPORT in
 3 | 20)
-	is_old_use=
+	IS_OLD_USE=
 	;;
 4)
-	is_old_use=ws
+	IS_OLD_USE=ws
 	;;
 5)
-	is_old_use=h2
+	IS_OLD_USE=h2
 	;;
 33)
-	is_old_use=vws
+	IS_OLD_USE=vws
 	;;
 *)
-	is_test_old_use=($(sed 's/_dynamicPort//;s/_/ /' <<<$is_old))
-	is_old_use=${is_test_old_use[0]#m}
-	is_old_header_type=${is_test_old_use[1]}
-	[[ ! $is_old_header_type ]] && is_old_header_type=none
+	IS_TEST_OLD_USE=($(sed 's/_dynamicPort//;s/_/ /' <<<$IS_OLD))
+	IS_OLD_USE=${IS_TEST_OLD_USE[0]#m}
+	IS_OLD_HEADER_TYPE=${IS_TEST_OLD_USE[1]}
+	[[ ! $IS_OLD_HEADER_TYPE ]] && IS_OLD_HEADER_TYPE=none
 	;;
 esac
 
-if [[ $is_old_use && ! $is_old_header_type ]]; then
+if [[ $IS_OLD_USE && ! $IS_OLD_HEADER_TYPE ]]; then
 	# not use caddy auto tls
-	[[ ! $caddy ]] && is_old_use=
+	[[ ! $CADDY ]] && IS_OLD_USE=
 fi
 
 # add old config
-if [[ $is_old_use ]]; then
-	is_tmp_list=("删除旧配置" "恢复: $is_old")
+if [[ $IS_OLD_USE ]]; then
+	IS_TMP_LIST=("删除旧配置" "恢复: $IS_OLD")
 
 	ask list is_do_upgrade null "\n是否恢复旧配置:\n"
 
@@ -87,51 +87,51 @@ if [[ $is_old_use ]]; then
 	_green "\n开始恢复...\n"
 
 	# upgrade caddy
-	if [[ $caddy ]]; then
+	if [[ $CADDY ]]; then
 		get install-caddy
 		# bak caddy files
-		mv -f $is_caddyfile $is_caddyfile.233.bak
-		mv -f $is_caddy_dir/sites $is_caddy_dir/sites.233.bak
+		mv -f $IS_CADDYFILE $IS_CADDYFILE.233.bak
+		mv -f $IS_CADDY_DIR/sites $IS_CADDY_DIR/sites.233.bak
 		load caddy.sh
 		caddy_config new
 	fi
-	is_change=1
-	is_dont_auto_exit=1
-	is_dont_show_info=1
-	if [[ $shadowsocks ]]; then
-		for v in ${ss_method_list[@]}; do
-			[[ $(grep -E -i "^${ssciphers}$" <<<$v) ]] && ss_method=$v && break
+	IS_CHANGE=1
+	IS_DONT_AUTO_EXIT=1
+	IS_DONT_SHOW_INFO=1
+	if [[ $SHADOWSOCKS ]]; then
+		for v in ${SS_METHOD_LIST[@]}; do
+			[[ $(grep -E -i "^${SSCIPHERS}$" <<<$v) ]] && SS_METHOD=$v && break
 		done
-		if [[ $ss_method ]]; then
-			add ss $ssport $sspass $ss_method
+		if [[ $SS_METHOD ]]; then
+			add ss $SS_PORT $SS_PASS $SS_METHOD
 		fi
 	fi
-	if [[ $socks ]]; then
-		add socks $socks_port $socks_username $socks_userpass
+	if [[ $SOCKS ]]; then
+		add socks $SOCKS_PORT $SOCKS_USERNAME $SOCKS_USERPASS
 	fi
-	port=$v2ray_port
-	uuid=$v2ray_id
-	is_no_kcp_seed=1
-	header_type=$is_old_header_type
-	[[ $caddy ]] && host=$domain
-	path=/$path
-	[[ ! $path_status ]] && path=
-	if [[ $(grep dynamic <<<$is_old) ]]; then
-		is_dynamic_port=1
-		is_dynamic_port_range="$v2ray_dynamicPort_start-$v2ray_dynamicPort_end"
-		add ${is_old_use}d
+	PORT=$V2RAY_PORT
+	UUID=$V2RAY_ID
+	IS_NO_KCP_SEED=1
+	HEADER_TYPE=$IS_OLD_HEADER_TYPE
+	[[ $CADDY ]] && HOST=$DOMAIN
+	PATH=/$PATH
+	[[ ! $PATH_STATUS ]] && PATH=
+	if [[ $(grep dynamic <<<$IS_OLD) ]]; then
+		IS_DYNAMIC_PORT=1
+		IS_DYNAMIC_PORT_RANGE="$V2RAY_DYNAMICPORT_START-$V2RAY_DYNAMICPORT_END"
+		add ${IS_OLD_USE}d
 	else
-		add $is_old_use
+		add $IS_OLD_USE
 	fi
 
 	if [[ $path_status ]]; then
-		change $is_config_name web $proxy_site
+		change $IS_CONFIG_NAME web $PROXY_SITE
 	fi
-	is_dont_auto_exit=
-	is_dont_show_info=
-	[[ $is_api_fail ]] && manage restart &
-	[[ $caddy ]] && manage restart caddy
-	info $is_config_name
+	IS_DONT_AUTO_EXIT=
+	IS_DONT_SHOW_INFO=
+	[[ $IS_API_FAIL ]] && manage restart &
+	[[ $CADDY ]] && manage restart caddy
+	info $IS_CONFIG_NAME
 else
 	ask string y "是否删除旧配置? [y]:"
 	_green "\n删除完成!\n"

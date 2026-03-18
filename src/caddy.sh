@@ -1,9 +1,9 @@
 caddy_config() {
-    is_caddy_site_file=$is_caddy_conf/${host}.conf
+    IS_CADDY_SITE_FILE=$IS_CADDY_CONF/${HOST}.conf
     case $1 in
     new)
-        mkdir -p $is_caddy_dir $is_caddy_dir/sites $is_caddy_conf
-        cat >$is_caddyfile <<-EOF
+        mkdir -p $IS_CADDY_DIR $IS_CADDY_DIR/sites $IS_CADDY_CONF
+        cat >$IS_CADDYFILE <<-EOF
 # don't edit this file #
 # for more info, see https://wangyan-good.github.io/v2ray/caddy-auto-tls/
 # 不要编辑这个文件 #
@@ -11,29 +11,29 @@ caddy_config() {
 # https://caddyserver.com/docs/caddyfile/options
 {
   admin off
-  http_port $is_http_port
-  https_port $is_https_port
+  http_port $IS_HTTP_PORT
+  https_port $IS_HTTPS_PORT
 }
-import $is_caddy_conf/*.conf
-import $is_caddy_dir/sites/*.conf
+import $IS_CADDY_CONF/*.conf
+import $IS_CADDY_DIR/sites/*.conf
 EOF
         ;;
     *ws*)
         # 检测配置冲突
-        [[ -f ${is_caddy_site_file} ]] && {
-            msg warn "检测到已存在的 Caddy 配置：${is_caddy_site_file}"
+        [[ -f ${IS_CADDY_SITE_FILE} ]] && {
+            msg warn "检测到已存在的 Caddy 配置：${IS_CADDY_SITE_FILE}"
             msg warn "请选择:"
             msg "1) 覆盖现有配置 (备份为 .bak)"
             msg "2) 跳过，保留现有配置"
             msg "3) 修改配置 (手动编辑)"
             while :; do
                 echo -ne "请输入选择 [1-3] (默认:1): "
-                read caddy_conf_choice
-                [[ ! $caddy_conf_choice ]] && caddy_conf_choice=1
-                case $caddy_conf_choice in
+                read CADDY_CONF_CHOICE
+                [[ ! $CADDY_CONF_CHOICE ]] && CADDY_CONF_CHOICE=1
+                case $CADDY_CONF_CHOICE in
                 1)
-                    cp -f ${is_caddy_site_file} ${is_caddy_site_file}.bak
-                    msg ok "已备份现有配置：${is_caddy_site_file}.bak"
+                    cp -f ${IS_CADDY_SITE_FILE} ${IS_CADDY_SITE_FILE}.bak
+                    msg ok "已备份现有配置：${IS_CADDY_SITE_FILE}.bak"
                     break
                     ;;
                 2)
@@ -41,7 +41,7 @@ EOF
                     return
                     ;;
                 3)
-                    msg warn "请手动编辑：${is_caddy_site_file}"
+                    msg warn "请手动编辑：${IS_CADDY_SITE_FILE}"
                     return
                     ;;
                 *)
@@ -50,28 +50,28 @@ EOF
                 esac
             done
         }
-        cat >${is_caddy_site_file} <<<"
-${host}:${is_https_port} {
-    reverse_proxy ${path} 127.0.0.1:${port}
-    import ${is_caddy_site_file}.add
+        cat >${IS_CADDY_SITE_FILE} <<<"
+${HOST}:${IS_HTTPS_PORT} {
+    reverse_proxy ${PATH} 127.0.0.1:${PORT}
+    import ${IS_CADDY_SITE_FILE}.add
 }"
         ;;
     *h2*)
         # 检测配置冲突
-        [[ -f ${is_caddy_site_file} ]] && {
-            msg warn "检测到已存在的 Caddy 配置：${is_caddy_site_file}"
+        [[ -f ${IS_CADDY_SITE_FILE} ]] && {
+            msg warn "检测到已存在的 Caddy 配置：${IS_CADDY_SITE_FILE}"
             msg warn "请选择:"
             msg "1) 覆盖现有配置 (备份为 .bak)"
             msg "2) 跳过，保留现有配置"
             msg "3) 修改配置 (手动编辑)"
             while :; do
                 echo -ne "请输入选择 [1-3] (默认:1): "
-                read caddy_conf_choice
-                [[ ! $caddy_conf_choice ]] && caddy_conf_choice=1
-                case $caddy_conf_choice in
+                read CADDY_CONF_CHOICE
+                [[ ! $CADDY_CONF_CHOICE ]] && CADDY_CONF_CHOICE=1
+                case $CADDY_CONF_CHOICE in
                 1)
-                    cp -f ${is_caddy_site_file} ${is_caddy_site_file}.bak
-                    msg ok "已备份现有配置：${is_caddy_site_file}.bak"
+                    cp -f ${IS_CADDY_SITE_FILE} ${IS_CADDY_SITE_FILE}.bak
+                    msg ok "已备份现有配置：${IS_CADDY_SITE_FILE}.bak"
                     break
                     ;;
                 2)
@@ -79,7 +79,7 @@ ${host}:${is_https_port} {
                     return
                     ;;
                 3)
-                    msg warn "请手动编辑：${is_caddy_site_file}"
+                    msg warn "请手动编辑：${IS_CADDY_SITE_FILE}"
                     return
                     ;;
                 *)
@@ -88,28 +88,28 @@ ${host}:${is_https_port} {
                 esac
             done
         }
-        cat >${is_caddy_site_file} <<<"
-${host}:${is_https_port} {
-    reverse_proxy ${path} h2c://127.0.0.1:${port}
-    import ${is_caddy_site_file}.add
+        cat >${IS_CADDY_SITE_FILE} <<<"
+${HOST}:${IS_HTTPS_PORT} {
+    reverse_proxy ${PATH} h2c://127.0.0.1:${PORT}
+    import ${IS_CADDY_SITE_FILE}.add
 }"
         ;;
     *grpc*)
         # 检测配置冲突
-        [[ -f ${is_caddy_site_file} ]] && {
-            msg warn "检测到已存在的 Caddy 配置：${is_caddy_site_file}"
+        [[ -f ${IS_CADDY_SITE_FILE} ]] && {
+            msg warn "检测到已存在的 Caddy 配置：${IS_CADDY_SITE_FILE}"
             msg warn "请选择:"
             msg "1) 覆盖现有配置 (备份为 .bak)"
             msg "2) 跳过，保留现有配置"
             msg "3) 修改配置 (手动编辑)"
             while :; do
                 echo -ne "请输入选择 [1-3] (默认:1): "
-                read caddy_conf_choice
-                [[ ! $caddy_conf_choice ]] && caddy_conf_choice=1
-                case $caddy_conf_choice in
+                read CADDY_CONF_CHOICE
+                [[ ! $CADDY_CONF_CHOICE ]] && CADDY_CONF_CHOICE=1
+                case $CADDY_CONF_CHOICE in
                 1)
-                    cp -f ${is_caddy_site_file} ${is_caddy_site_file}.bak
-                    msg ok "已备份现有配置：${is_caddy_site_file}.bak"
+                    cp -f ${IS_CADDY_SITE_FILE} ${IS_CADDY_SITE_FILE}.bak
+                    msg ok "已备份现有配置：${IS_CADDY_SITE_FILE}.bak"
                     break
                     ;;
                 2)
@@ -117,7 +117,7 @@ ${host}:${is_https_port} {
                     return
                     ;;
                 3)
-                    msg warn "请手动编辑：${is_caddy_site_file}"
+                    msg warn "请手动编辑：${IS_CADDY_SITE_FILE}"
                     return
                     ;;
                 *)
@@ -126,21 +126,21 @@ ${host}:${is_https_port} {
                 esac
             done
         }
-        cat >${is_caddy_site_file} <<<"
-${host}:${is_https_port} {
-    reverse_proxy /${path}/* h2c://127.0.0.1:${port}
-    import ${is_caddy_site_file}.add
+        cat >${IS_CADDY_SITE_FILE} <<<"
+${HOST}:${IS_HTTPS_PORT} {
+    reverse_proxy /${PATH}/* h2c://127.0.0.1:${PORT}
+    import ${IS_CADDY_SITE_FILE}.add
 }"
         ;;
     proxy)
         
-        cat >${is_caddy_site_file}.add <<<"
-reverse_proxy https://$proxy_site {
+        cat >${IS_CADDY_SITE_FILE}.add <<<"
+reverse_proxy https://$PROXY_SITE {
         header_up Host {upstream_hostport}
 }"
         ;;
     esac
     [[ $1 != "new" && $1 != 'proxy' ]] && {
-        [[ ! -f ${is_caddy_site_file}.add ]] && echo "# see https://wangyan-good.github.io/v2ray/caddy-auto-tls/" >${is_caddy_site_file}.add
+        [[ ! -f ${IS_CADDY_SITE_FILE}.add ]] && echo "# see https://wangyan-good.github.io/v2ray/caddy-auto-tls/" >${IS_CADDY_SITE_FILE}.add
     }
 }

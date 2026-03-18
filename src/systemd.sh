@@ -1,19 +1,19 @@
 install_service() {
     case $1 in
     xray | v2ray)
-        is_doc_site=https://xtls.github.io/
-        [[ $1 == 'v2ray' ]] && is_doc_site=https://www.v2fly.org/
-        cat >/lib/systemd/system/$is_core.service <<<"
+        IS_DOC_SITE=https://xtls.github.io/
+        [[ $1 == 'v2ray' ]] && IS_DOC_SITE=https://www.v2fly.org/
+        cat >/lib/systemd/system/$IS_CORE.service <<<"
 [Unit]
-Description=$is_core_name Service
-Documentation=$is_doc_site
+Description=$IS_CORE_NAME Service
+Documentation=$IS_DOC_SITE
 After=network.target nss-lookup.target
 
 [Service]
 #User=nobody
 User=root
 NoNewPrivileges=true
-ExecStart=$is_core_bin run -config $is_config_json -confdir $is_conf_dir
+ExecStart=$IS_CORE_BIN run -config $IS_CONFIG_JSON -confdir $IS_CONF_DIR
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000
@@ -39,8 +39,8 @@ Requires=network-online.target
 Type=notify
 User=root
 Group=root
-ExecStart=$is_caddy_bin run --environ --config $is_caddyfile --adapter caddyfile
-ExecReload=$is_caddy_bin reload --config $is_caddyfile --adapter caddyfile
+ExecStart=$IS_CADDY_BIN run --environ --config $IS_CADDYFILE --adapter caddyfile
+ExecReload=$IS_CADDY_BIN reload --config $IS_CADDYFILE --adapter caddyfile
 TimeoutStopSec=5s
 LimitNPROC=10000
 LimitNOFILE=1048576
