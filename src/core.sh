@@ -414,9 +414,9 @@ create() {
         [[ $is_install_nginx ]] && nginx_config new
         [[ ! -d $is_nginx_conf ]] && mkdir -p $is_nginx_conf
         if ! nginx_config $2; then
-            msg err "Nginx 配置生成失败，证书申请未成功"
-            msg warn "V2Ray 配置已生成，但 TLS 尚未启用"
-            msg warn "你可以稍后手动申请证书并重载 Nginx"
+            msg ERROR "Nginx 配置生成失败，证书申请未成功"
+            msg WARNING "V2Ray 配置已生成，但 TLS 尚未启用"
+            msg WARNING "你可以稍后手动申请证书并重载 Nginx"
             is_api_fail=1
         fi
         nginx_reload
@@ -1463,7 +1463,7 @@ get() {
             # 第二次检测：使用本地 DNS 解析（可能通过 /etc/hosts 或本地 DNS）
             local_host_ip=$(getent hosts $host 2>/dev/null | awk '{print $1}' | head -1)
             if [[ $local_host_ip && $local_host_ip == $ip ]]; then
-                msg ok "域名解析验证通过（本地 DNS）"
+                msg OK "域名解析验证通过（本地 DNS）"
                 return
             fi
             
@@ -1476,7 +1476,7 @@ get() {
                 # 再次尝试本地 DNS
                 local_host_ip=$(getent hosts $host 2>/dev/null | awk '{print $1}' | head -1)
                 if [[ $local_host_ip && $local_host_ip == $ip ]]; then
-                    msg ok "域名解析验证通过（本地 DNS）"
+                    msg OK "域名解析验证通过（本地 DNS）"
                     return
                 fi
                 _cyan "\n测试结果：$is_host_dns"

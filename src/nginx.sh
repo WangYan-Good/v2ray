@@ -67,7 +67,7 @@ EOF
             if ! grep -q "include $is_nginx_conf/\*.conf" $is_nginxfile; then
                 # 备份原配置
                 cp -f $is_nginxfile ${is_nginxfile}.bak.$(date +%Y%m%d%H%M%S)
-                msg warn "检测到现有 Nginx 配置，已备份到 ${is_nginxfile}.bak.*"
+                msg WARNING "检测到现有 Nginx 配置，已备份到 ${is_nginxfile}.bak.*"
 
                 # 在 http 块中添加 V2Ray 导入（在 http 块的最后一个 } 之前）
                 # 使用 awk 更可靠，避免 sed 转义问题
@@ -96,15 +96,15 @@ EOF
                 if [[ $? -eq 0 ]]; then
                     mv -f $tmp_conf $is_nginxfile
                     if grep -q "include $is_nginx_conf/\*.conf" $is_nginxfile; then
-                        msg ok "已添加 V2Ray 配置导入到 nginx.conf"
+                        msg OK "已添加 V2Ray 配置导入到 nginx.conf"
                     else
-                        msg warn "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginxfile"
-                        msg warn "添加：include $is_nginx_conf/*.conf;"
+                        msg WARNING "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginxfile"
+                        msg WARNING "添加：include $is_nginx_conf/*.conf;"
                     fi
                 else
                     rm -f $tmp_conf
-                    msg warn "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginxfile"
-                    msg warn "添加：include $is_nginx_conf/*.conf;"
+                    msg WARNING "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginxfile"
+                    msg WARNING "添加：include $is_nginx_conf/*.conf;"
                 fi
             fi
         fi
@@ -113,8 +113,8 @@ EOF
     *ws*)
         # 检测配置冲突
         [[ -f ${is_nginx_site_file} ]] && {
-            msg warn "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
-            msg warn "请选择:"
+            msg WARNING "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
+            msg WARNING "请选择:"
             msg "1) 覆盖现有配置 (备份为 .bak)"
             msg "2) 跳过，保留现有配置"
             msg "3) 修改配置 (手动编辑)"
@@ -125,15 +125,15 @@ EOF
                 case $nginx_conf_choice in
                 1)
                     cp -f ${is_nginx_site_file} ${is_nginx_site_file}.bak
-                    msg ok "已备份现有配置：${is_nginx_site_file}.bak"
+                    msg OK "已备份现有配置：${is_nginx_site_file}.bak"
                     break
                     ;;
                 2)
-                    msg warn "跳过配置，保留现有配置"
+                    msg WARNING "跳过配置，保留现有配置"
                     return 0
                     ;;
                 3)
-                    msg warn "请手动编辑：${is_nginx_site_file}"
+                    msg WARNING "请手动编辑：${is_nginx_site_file}"
                     return 0
                     ;;
                 *)
@@ -214,8 +214,8 @@ server {
         
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${host}; then
-            msg err "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
-            msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
+            msg ERROR "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
+            msg WARNING "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
             return 1
         fi
         return 0
@@ -224,8 +224,8 @@ server {
     *h2*)
         # 检测配置冲突
         [[ -f ${is_nginx_site_file} ]] && {
-            msg warn "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
-            msg warn "请选择:"
+            msg WARNING "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
+            msg WARNING "请选择:"
             msg "1) 覆盖现有配置 (备份为 .bak)"
             msg "2) 跳过，保留现有配置"
             msg "3) 修改配置 (手动编辑)"
@@ -236,15 +236,15 @@ server {
                 case $nginx_conf_choice in
                 1)
                     cp -f ${is_nginx_site_file} ${is_nginx_site_file}.bak
-                    msg ok "已备份现有配置：${is_nginx_site_file}.bak"
+                    msg OK "已备份现有配置：${is_nginx_site_file}.bak"
                     break
                     ;;
                 2)
-                    msg warn "跳过配置，保留现有配置"
+                    msg WARNING "跳过配置，保留现有配置"
                     return
                     ;;
                 3)
-                    msg warn "请手动编辑：${is_nginx_site_file}"
+                    msg WARNING "请手动编辑：${is_nginx_site_file}"
                     return
                     ;;
                 *)
@@ -312,8 +312,8 @@ server {
         
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${host}; then
-            msg err "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
-            msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
+            msg ERROR "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
+            msg WARNING "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
             return 1
         fi
         return 0
@@ -322,8 +322,8 @@ server {
     *grpc*)
         # 检测配置冲突
         [[ -f ${is_nginx_site_file} ]] && {
-            msg warn "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
-            msg warn "请选择:"
+            msg WARNING "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
+            msg WARNING "请选择:"
             msg "1) 覆盖现有配置 (备份为 .bak)"
             msg "2) 跳过，保留现有配置"
             msg "3) 修改配置 (手动编辑)"
@@ -334,15 +334,15 @@ server {
                 case $nginx_conf_choice in
                 1)
                     cp -f ${is_nginx_site_file} ${is_nginx_site_file}.bak
-                    msg ok "已备份现有配置：${is_nginx_site_file}.bak"
+                    msg OK "已备份现有配置：${is_nginx_site_file}.bak"
                     break
                     ;;
                 2)
-                    msg warn "跳过配置，保留现有配置"
+                    msg WARNING "跳过配置，保留现有配置"
                     return 0
                     ;;
                 3)
-                    msg warn "请手动编辑：${is_nginx_site_file}"
+                    msg WARNING "请手动编辑：${is_nginx_site_file}"
                     return 0
                     ;;
                 *)
@@ -408,8 +408,8 @@ server {
         
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${host}; then
-            msg err "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
-            msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
+            msg ERROR "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
+            msg WARNING "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
             return 1
         fi
         return 0
@@ -468,7 +468,7 @@ nginx_certbot() {
     case $action in
     issue)
         # 申请证书
-        msg warn "使用 Certbot 申请证书：${domain}"
+        msg WARNING "使用 Certbot 申请证书：${domain}"
 
         # 确保 webroot 目录存在
         mkdir -p /var/www/certbot
@@ -486,15 +486,15 @@ nginx_certbot() {
                 local days_left=$(( (expiry_epoch - now_epoch) / 86400 ))
 
                 if [[ $days_left -gt 30 ]]; then
-                    msg ok "证书已存在且有效，剩余 ${days_left} 天"
+                    msg OK "证书已存在且有效，剩余 ${days_left} 天"
                     msg info "证书路径：${cert_file}"
                     msg info "过期时间：${cert_expiry}"
                     # 检查软链接是否存在
                     if [[ ! -L $is_nginx_dir/ssl/${domain} ]]; then
-                        msg warn "证书软链接不存在，正在创建..."
+                        msg WARNING "证书软链接不存在，正在创建..."
                         mkdir -p $is_nginx_dir/ssl
                         ln -sf /etc/letsencrypt/live/${domain} $is_nginx_dir/ssl/${domain}
-                        msg ok "软链接创建成功"
+                        msg OK "软链接创建成功"
                     fi
                     # 启动或重载 Nginx
                     if pgrep -f "nginx: master" &>/dev/null; then
@@ -504,7 +504,7 @@ nginx_certbot() {
                     fi
                     return 0
                 else
-                    msg warn "证书即将过期（剩余 ${days_left} 天），正在续期..."
+                    msg WARNING "证书即将过期（剩余 ${days_left} 天），正在续期..."
                     has_valid_cert=true
                 fi
             fi
@@ -514,18 +514,18 @@ nginx_certbot() {
         # 续期证书：使用 webroot 模式（需要 Nginx 运行）
         if [[ $has_valid_cert == true ]]; then
             # 续期：使用 webroot 模式
-            msg warn "Nginx 未运行，正在启动..."
+            msg WARNING "Nginx 未运行，正在启动..."
             systemctl start nginx &>/dev/null
             sleep 2
             if ! pgrep -f "nginx: master" &>/dev/null; then
-                msg err "Nginx 启动失败，无法申请证书"
+                msg ERROR "Nginx 启动失败，无法申请证书"
                 return 1
             fi
-            msg ok "Nginx 已启动"
+            msg OK "Nginx 已启动"
 
             # 测试 Nginx 配置并重载
             if ! nginx -t &>/dev/null; then
-                msg err "Nginx 配置测试失败"
+                msg ERROR "Nginx 配置测试失败"
                 nginx -t 2>&1 | tail -5
                 return 1
             fi
@@ -533,18 +533,18 @@ nginx_certbot() {
             sleep 1
 
             # 验证挑战文件
-            msg warn "验证 Nginx 配置..."
+            msg WARNING "验证 Nginx 配置..."
             local test_file="/var/www/certbot/.well-known/acme-challenge/test"
             mkdir -p "$(dirname $test_file)"
             echo "test" > $test_file
             sleep 1
             if ! curl -s --connect-timeout 3 "http://localhost/.well-known/acme-challenge/test" | grep -q "test"; then
-                msg err "Nginx 配置验证失败：无法访问挑战文件"
+                msg ERROR "Nginx 配置验证失败：无法访问挑战文件"
                 rm -f $test_file
                 return 1
             fi
             rm -f $test_file
-            msg ok "Nginx 配置验证通过"
+            msg OK "Nginx 配置验证通过"
 
             # 续期证书（根据版本决定是否使用 ECDSA）
             local ecdsa_opt=""
@@ -560,23 +560,23 @@ nginx_certbot() {
                 $ecdsa_opt 2>&1 | while IFS= read -r line; do
                     [[ $line ]] && msg info "  $line"
                 done; then
-                msg ok "证书续期成功"
+                msg OK "证书续期成功"
                 # 检查软链接是否存在
                 if [[ ! -L $is_nginx_dir/ssl/${domain} ]]; then
-                    msg warn "创建证书软链接..."
+                    msg WARNING "创建证书软链接..."
                     mkdir -p $is_nginx_dir/ssl
                     ln -sf /etc/letsencrypt/live/${domain} $is_nginx_dir/ssl/${domain}
-                    msg ok "软链接创建成功"
+                    msg OK "软链接创建成功"
                 fi
                 systemctl reload nginx &>/dev/null
                 return 0
             else
-                msg err "证书续期失败"
+                msg ERROR "证书续期失败"
                 return 1
             fi
         else
             # 首次申请：使用 standalone 模式
-            msg warn "正在申请 SSL 证书（standalone 模式）..."
+            msg WARNING "正在申请 SSL 证书（standalone 模式）..."
             
             # 确保 80 端口空闲
             systemctl stop nginx &>/dev/null
@@ -584,9 +584,9 @@ nginx_certbot() {
             
             # 检查 80 端口是否被占用
             if ss -tlnp | grep -q ':80 '; then
-                msg err "80 端口被占用，无法申请证书"
+                msg ERROR "80 端口被占用，无法申请证书"
                 ss -tlnp | grep ':80'
-                msg warn "请关闭占用 80 端口的服务后重试"
+                msg WARNING "请关闭占用 80 端口的服务后重试"
                 return 1
             fi
 
@@ -603,18 +603,18 @@ nginx_certbot() {
                 $ecdsa_opt 2>&1 | while IFS= read -r line; do
                     [[ $line ]] && msg info "  $line"
                 done; then
-                msg ok "证书申请成功"
+                msg OK "证书申请成功"
                 # 创建软链接到 Nginx 配置目录
-                msg warn "创建证书软链接到 /etc/nginx/ssl/${domain}/..."
+                msg WARNING "创建证书软链接到 /etc/nginx/ssl/${domain}/..."
                 mkdir -p $is_nginx_dir/ssl
                 ln -sf /etc/letsencrypt/live/${domain} $is_nginx_dir/ssl/${domain}
-                msg ok "软链接创建成功"
+                msg OK "软链接创建成功"
                 # 启动 Nginx
                 systemctl start nginx
                 return 0
             else
-                msg err "证书申请失败"
-                msg warn "请检查:"
+                msg ERROR "证书申请失败"
+                msg WARNING "请检查:"
                 msg "  1. 域名是否正确解析到服务器 IP"
                 msg "  2. 防火墙是否开放 80 端口"
                 msg "  3. Certbot 版本是否过旧 (certbot --version)"
@@ -626,7 +626,7 @@ nginx_certbot() {
 
     renew)
         # 续期证书
-        msg warn "续期证书..."
+        msg WARNING "续期证书..."
         certbot renew --quiet --deploy-hook "systemctl reload nginx"
         ;;
 
@@ -639,12 +639,12 @@ install_nginx_certbot() {
     
     # 检查是否已安装
     if [[ -f $is_nginx_bin ]]; then
-        msg warn "Nginx 已安装，跳过安装"
+        msg WARNING "Nginx 已安装，跳过安装"
         is_nginx=1
         return 0
     fi
     
-    msg warn "安装 Nginx 和 Certbot..."
+    msg WARNING "安装 Nginx 和 Certbot..."
     
     if [[ $cmd =~ apt-get ]]; then
         # Ubuntu/Debian
@@ -659,12 +659,12 @@ install_nginx_certbot() {
     
     # 检查安装
     if [[ ! $(type -P nginx) ]]; then
-        msg err "Nginx 安装失败"
+        msg ERROR "Nginx 安装失败"
         return 1
     fi
     
     if [[ ! $(type -P certbot) ]]; then
-        msg err "Certbot 安装失败"
+        msg ERROR "Certbot 安装失败"
         return 1
     fi
     
@@ -674,7 +674,7 @@ install_nginx_certbot() {
     # 备份现有 nginx.conf（如果存在）
     if [[ -f $is_nginxfile && ! -f ${is_nginxfile}.bak ]]; then
         cp -f $is_nginxfile ${is_nginxfile}.bak
-        msg warn "已备份现有 nginx.conf 到 ${is_nginxfile}.bak"
+        msg WARNING "已备份现有 nginx.conf 到 ${is_nginxfile}.bak"
     fi
     
     # 设置开机自启
@@ -684,7 +684,7 @@ install_nginx_certbot() {
     # 添加证书续期定时任务
     if [[ ! $(crontab -l 2>/dev/null | grep -q 'certbot renew') ]]; then
         (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'systemctl reload nginx'") | crontab -
-        msg warn "已添加证书自动续期定时任务"
+        msg WARNING "已添加证书自动续期定时任务"
     fi
     
     is_nginx=1
@@ -710,13 +710,13 @@ nginx_reload() {
             return $?
         else
             # 未运行则启动
-            msg warn "Nginx 未运行，正在启动..."
+            msg WARNING "Nginx 未运行，正在启动..."
             systemctl start nginx &>/dev/null
             if pgrep -f "nginx: master" &>/dev/null; then
-                msg ok "Nginx 启动成功"
+                msg OK "Nginx 启动成功"
                 return 0
             else
-                msg err "Nginx 启动失败，请检查配置"
+                msg ERROR "Nginx 启动失败，请检查配置"
                 return 1
             fi
         fi

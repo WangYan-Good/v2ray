@@ -21,8 +21,8 @@ EOF
     *ws*)
         # 检测配置冲突
         [[ -f ${IS_CADDY_SITE_FILE} ]] && {
-            msg warn "检测到已存在的 Caddy 配置：${IS_CADDY_SITE_FILE}"
-            msg warn "请选择:"
+            msg WARNING "检测到已存在的 Caddy 配置：${IS_CADDY_SITE_FILE}"
+            msg WARNING "请选择:"
             msg "1) 覆盖现有配置 (备份为 .bak)"
             msg "2) 跳过，保留现有配置"
             msg "3) 修改配置 (手动编辑)"
@@ -33,15 +33,15 @@ EOF
                 case $CADDY_CONF_CHOICE in
                 1)
                     cp -f ${IS_CADDY_SITE_FILE} ${IS_CADDY_SITE_FILE}.bak
-                    msg ok "已备份现有配置：${IS_CADDY_SITE_FILE}.bak"
+                    msg OK "已备份现有配置：${IS_CADDY_SITE_FILE}.bak"
                     break
                     ;;
                 2)
-                    msg warn "跳过配置，保留现有配置"
+                    msg WARNING "跳过配置，保留现有配置"
                     return
                     ;;
                 3)
-                    msg warn "请手动编辑：${IS_CADDY_SITE_FILE}"
+                    msg WARNING "请手动编辑：${IS_CADDY_SITE_FILE}"
                     return
                     ;;
                 *)
@@ -59,8 +59,8 @@ ${HOST}:${IS_HTTPS_PORT} {
     *h2*)
         # 检测配置冲突
         [[ -f ${IS_CADDY_SITE_FILE} ]] && {
-            msg warn "检测到已存在的 Caddy 配置：${IS_CADDY_SITE_FILE}"
-            msg warn "请选择:"
+            msg WARNING "检测到已存在的 Caddy 配置：${IS_CADDY_SITE_FILE}"
+            msg WARNING "请选择:"
             msg "1) 覆盖现有配置 (备份为 .bak)"
             msg "2) 跳过，保留现有配置"
             msg "3) 修改配置 (手动编辑)"
@@ -71,15 +71,15 @@ ${HOST}:${IS_HTTPS_PORT} {
                 case $CADDY_CONF_CHOICE in
                 1)
                     cp -f ${IS_CADDY_SITE_FILE} ${IS_CADDY_SITE_FILE}.bak
-                    msg ok "已备份现有配置：${IS_CADDY_SITE_FILE}.bak"
+                    msg OK "已备份现有配置：${IS_CADDY_SITE_FILE}.bak"
                     break
                     ;;
                 2)
-                    msg warn "跳过配置，保留现有配置"
+                    msg WARNING "跳过配置，保留现有配置"
                     return
                     ;;
                 3)
-                    msg warn "请手动编辑：${IS_CADDY_SITE_FILE}"
+                    msg WARNING "请手动编辑：${IS_CADDY_SITE_FILE}"
                     return
                     ;;
                 *)
@@ -97,8 +97,8 @@ ${HOST}:${IS_HTTPS_PORT} {
     *grpc*)
         # 检测配置冲突
         [[ -f ${IS_CADDY_SITE_FILE} ]] && {
-            msg warn "检测到已存在的 Caddy 配置：${IS_CADDY_SITE_FILE}"
-            msg warn "请选择:"
+            msg WARNING "检测到已存在的 Caddy 配置：${IS_CADDY_SITE_FILE}"
+            msg WARNING "请选择:"
             msg "1) 覆盖现有配置 (备份为 .bak)"
             msg "2) 跳过，保留现有配置"
             msg "3) 修改配置 (手动编辑)"
@@ -109,15 +109,15 @@ ${HOST}:${IS_HTTPS_PORT} {
                 case $CADDY_CONF_CHOICE in
                 1)
                     cp -f ${IS_CADDY_SITE_FILE} ${IS_CADDY_SITE_FILE}.bak
-                    msg ok "已备份现有配置：${IS_CADDY_SITE_FILE}.bak"
+                    msg OK "已备份现有配置：${IS_CADDY_SITE_FILE}.bak"
                     break
                     ;;
                 2)
-                    msg warn "跳过配置，保留现有配置"
+                    msg WARNING "跳过配置，保留现有配置"
                     return
                     ;;
                 3)
-                    msg warn "请手动编辑：${IS_CADDY_SITE_FILE}"
+                    msg WARNING "请手动编辑：${IS_CADDY_SITE_FILE}"
                     return
                     ;;
                 *)

@@ -67,7 +67,7 @@ download() {
         NAME="Caddy"
         # 检测是否已安装 Caddy
         if [[ -f $IS_CADDY_BIN ]]; then
-            msg warn "检测到 Caddy 已安装，使用现有 Caddy"
+            msg WARNING "检测到 Caddy 已安装，使用现有 Caddy"
             rm -rf $TMPDIR
         else
             TMPFILE=$TMPDIR/caddy.tar.gz
@@ -84,11 +84,11 @@ download() {
         ;;
     nginx)
         NAME="Nginx + Certbot"
-        msg warn "配置 Nginx + Certbot..."
+        msg WARNING "配置 Nginx + Certbot..."
         
         # 检测是否已安装 Nginx
         if [[ $(type -P nginx) ]]; then
-            msg warn "检测到 Nginx 已安装，使用现有 Nginx"
+            msg WARNING "检测到 Nginx 已安装，使用现有 Nginx"
         else
             # 安装 Nginx
             if [[ $CMD =~ apt-get ]]; then
@@ -107,7 +107,7 @@ download() {
         
         # 检测是否已安装 Certbot
         if [[ $(type -P certbot) ]]; then
-            msg warn "检测到 Certbot 已安装，使用现有 Certbot"
+            msg WARNING "检测到 Certbot 已安装，使用现有 Certbot"
         else
             # 安装 Certbot
             if [[ $CMD =~ apt-get ]]; then
@@ -124,7 +124,7 @@ download() {
         # 备份现有 Nginx 配置（如果有）
         if [[ -f $IS_NGINXFILE && ! -f ${IS_NGINXFILE}.bak ]]; then
             cp -f $IS_NGINXFILE ${IS_NGINXFILE}.bak
-            msg warn "已备份现有 nginx.conf 到 ${IS_NGINXFILE}.bak"
+            msg WARNING "已备份现有 nginx.conf 到 ${IS_NGINXFILE}.bak"
         fi
         
         # 设置开机自启

@@ -118,13 +118,13 @@ _wget() {
 # print a mesage
 msg() {
     case $1 in
-    warn)
+    WARNING)
         local COLOR=$YELLOW
         ;;
-    err)
+    ERROR)
         local COLOR=$RED
         ;;
-    ok)
+    OK)
         local COLOR=$GREEN
         ;;
     esac
@@ -154,7 +154,7 @@ install_pkg() {
     done
     if [[ $CMD_NOT_FOUND ]]; then
         PKG=$(echo $CMD_NOT_FOUND | sed 's/,/ /g')
-        msg warn "安装依赖包 >${PKG}"
+        msg WARNING "安装依赖包 >${PKG}"
         $CMD install -y $PKG &>/dev/null
         if [[ $? != 0 ]]; then
             [[ $CMD =~ yum ]] && yum install epel-release -y &>/dev/null
@@ -193,39 +193,43 @@ download() {
         ;;
     esac
 
-    msg warn "下载 ${NAME} > ${LINK}"
+    msg WARNING "下载 ${NAME} > ${LINK}"
     if _wget -t 3 -q -c $LINK -O $TMPFILE; then
         mv -f $TMPFILE $IS_OK
     fi
 }
 
-# get server ip
+##
+## get server ip
+##
 get_ip() {
     export "$(_wget -4 -qO- https://one.one.one.one/cdn-cgi/trace | grep IP=)" &>/dev/null
     [[ -z $IP ]] && export "$(_wget -6 -qO- https://one.one.one.one/cdn-cgi/trace | grep IP=)" &>/dev/null
 }
 
-# check background tasks status
+##
+## check background tasks status
+##
 check_status() {
     # dependent pkg install fail
     [[ ! -f $IS_PKG_OK ]] && {
-        msg err "安装依赖包失败"
-        msg err "请尝试手动安装依赖包: $CMD update -y; $CMD install -y $IS_PKG"
+        msg ERROR "安装依赖包失败"
+        msg ERROR "请尝试手动安装依赖包: $CMD update -y; $CMD install -y $IS_PKG"
         IS_FAIL=1
     }
 
     # download file status
     if [[ $IS_WGET ]]; then
         [[ ! -f $IS_CORE_OK ]] && {
-            msg err "下载 ${IS_CORE_NAME} 失败"
+            msg ERROR "下载 ${IS_CORE_NAME} 失败"
             IS_FAIL=1
         }
         [[ ! -f $IS_SH_OK ]] && {
-            msg err "下载 ${IS_CORE_NAME} 脚本失败"
+            msg ERROR "下载 ${IS_CORE_NAME} 脚本失败"
             IS_FAIL=1
         }
         [[ ! -f $IS_JQ_OK ]] && {
-            msg err "下载 jq 失败"
+            msg ERROR "下载 jq 失败"
             IS_FAIL=1
         }
     else
@@ -246,7 +250,9 @@ check_status() {
     }
 }
 
-# parameters check
+##
+## parameters check
+##
 pass_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -322,7 +328,7 @@ pass_args() {
                     systemctl disable nginx &>/dev/null
                     rm -rf /etc/nginx /lib/systemd/system/nginx.service
                 fi
-                msg ok "卸载完成!"
+                msg OK "卸载完成!"
             fi
             exit
             ;;
@@ -341,8 +347,8 @@ pass_args() {
 exit_and_del_tmpdir() {
     rm -rf $TMPDIR
     [[ ! $1 ]] && {
-        msg err "哦豁.."
-        msg err "安装过程出现错误..."
+        msg ERROR "哦豁.."
+        msg ERROR "安装过程出现错误..."
         echo -e "反馈问题) https://github.com/${IS_SH_REPO}/issues"
         echo
         exit 1
@@ -352,86 +358,18 @@ exit_and_del_tmpdir() {
 
 # main
 main() {
-
-    # 先检查是否有 --uninstall 参数（需要在检查已安装之前处理）
-    for arg in "$@"; do
-        if [[ $arg == '--uninstall' ]]; then
-            msg warn "开始卸载 V2Ray 和相关组件..."
-            
-            # 步骤 1: 检查并卸载 V2Ray
-            if [[ -f /usr/local/bin/v2ray ]]; then
-                msg warn "[步骤 1/6] 检测到 v2ray 命令，使用交互式卸载..."
-                v2ray uninstall
-                exit
-            fi
-            
-            # 步骤 1: 删除 V2Ray 文件
-            msg warn "[步骤 1/6] 删除 V2Ray 文件..."
-            if [[ -d /etc/v2ray ]]; then
-                rm -rf /etc/v2ray
-                msg ok "  - 已删除 /etc/v2ray"
-            fi
-            if [[ -d /var/log/v2ray ]]; then
-                rm -rf /var/log/v2ray
-                msg ok "  - 已删除 /var/log/v2ray"
-            fi
-            if [[ -f /usr/local/bin/v2ray ]]; then
-                rm -f /usr/local/bin/v2ray
-                msg ok "  - 已删除 /usr/local/bin/v2ray"
-            fi
-            
-            # 步骤 2: 清理 bashrc
-            msg warn "[步骤 2/6] 清理 bashrc 配置..."
-            sed -i '/v2ray/d' /root/.bashrc
-            msg ok "  - 已清理 /root/.bashrc"
-            
-            # 步骤 3: 停止并卸载 Caddy（如果存在）
-            if [[ -f /usr/local/bin/caddy ]]; then
-                msg warn "[步骤 3/6] 检测到 Caddy，停止并卸载..."
-                systemctl stop caddy &>/dev/null && msg ok "  - 已停止 Caddy 服务"
-                systemctl disable caddy &>/dev/null && msg ok "  - 已禁用 Caddy 服务"
-                rm -rf /etc/caddy /usr/local/bin/caddy /lib/systemd/system/caddy.service
-                msg ok "  - 已删除 Caddy 文件"
-            else
-                msg warn "[步骤 3/6] 未检测到 Caddy，跳过"
-            fi
-            
-            # 步骤 4: 停止并卸载 Nginx（如果存在）
-            if [[ -f /usr/sbin/nginx ]]; then
-                msg warn "[步骤 4/6] 检测到 Nginx，停止并卸载..."
-                systemctl stop nginx &>/dev/null && msg ok "  - 已停止 Nginx 服务"
-                systemctl disable nginx &>/dev/null && msg ok "  - 已禁用 Nginx 服务"
-                rm -rf /etc/nginx /lib/systemd/system/nginx.service
-                msg ok "  - 已删除 Nginx 文件"
-            else
-                msg warn "[步骤 4/6] 未检测到 Nginx，跳过"
-            fi
-            
-            # 步骤 5: 清理 systemd
-            msg warn "[步骤 5/6] 清理 systemd 配置..."
-            systemctl daemon-reload &>/dev/null
-            msg ok "  - 已重载 systemd 配置"
-            
-            # 步骤 6: 完成
-            msg warn "[步骤 6/6] 卸载完成!"
-            msg ok "\n卸载完成！"
-            msg "已删除:"
-            msg "  - V2Ray 核心和脚本"
-            [[ -f /usr/local/bin/caddy ]] || msg "  - Caddy (如果已安装)"
-            [[ -f /usr/sbin/nginx ]] || msg "  - Nginx (如果已安装)"
-            msg "\n如需重新安装，请运行：./install.sh"
-            exit
-        fi
-    done
-
-    # 自动检测本地安装模式
+    ##
+    ## 1.自动检测本地安装模式
+    ##
     if [[ -f ${PWD}/src/core.sh && -f ${PWD}/v2ray.sh ]]; then
-        msg warn "检测到本地脚本，使用本地安装模式"
+        msg WARNING "检测到本地脚本，使用本地安装模式"
         LOCAL_INSTALL=1
     fi
 
-    # check old version
-    # 检查旧版本（提供交互式选项）
+    ##
+    ## 2.check old version
+    ## 检查旧版本（提供交互式选项）
+    ##
     [[ -f $IS_SH_BIN && -d $IS_CORE_DIR/bin && -d $IS_SH_DIR && -d $IS_CONF_DIR ]] && {
         echo
         echo -e "${YELLOW}检测到脚本已安装!${NONE}"
@@ -453,19 +391,19 @@ main() {
             [[ ! $REINSTALL_CHOICE ]] && REINSTALL_CHOICE=3
             case $REINSTALL_CHOICE in
             1)
-                msg warn "执行重新安装..."
+                msg WARNING "执行重新安装..."
                 break
                 ;;
             2)
-                msg warn "执行卸载..."
+                msg WARNING "执行卸载..."
                 if [[ -f /usr/local/bin/v2ray ]]; then
                     v2ray uninstall
                 else
                     rm -rf $IS_SH_DIR $IS_CORE_DIR $IS_CONF_DIR $IS_LOG_DIR
                     sed -i "/$IS_CORE/d" /root/.bashrc
-                    msg ok "卸载完成!"
+                    msg OK "卸载完成!"
                 fi
-                msg warn "继续安装..."
+                msg WARNING "继续安装..."
                 break
                 ;;
             3)
@@ -480,168 +418,183 @@ main() {
         done
     }
 
-    # check parameters
+    ##
+    ## check parameters
+    ##
     [[ $# -gt 0 ]] && pass_args $@
 
-    # show welcome msg
+    ##
+    ## show welcome msg
+    ##
     clear
     echo
     echo "........... $IS_CORE_NAME script by $AUTHOR .........."
     echo
 
-    # start installing...
-    msg warn "开始安装..."
-    [[ $IS_CORE_VER ]] && msg warn "${IS_CORE_NAME} 版本: ${YELLOW}$IS_CORE_VER${NONE}"
-    [[ $PROXY ]] && msg warn "使用代理: ${YELLOW}$PROXY${NONE}"
-    # create TMPDIR
+    ##
+    ## start installing...
+    ##
+    msg WARNING "开始安装..."
+    [[ $IS_CORE_VER ]] && msg WARNING "${IS_CORE_NAME} 版本: ${YELLOW}$IS_CORE_VER${NONE}"
+    [[ $PROXY ]] && msg WARNING "使用代理: ${YELLOW}$PROXY${NONE}"
+
+    ##
+    ## create temp directory and set up file path
+    ##
     mkdir -p $TMPDIR
-    # if IS_CORE_FILE, copy file
+    
+    ##
+    ## if IS_CORE_FILE, copy file
+    ##
     [[ $IS_CORE_FILE ]] && {
         cp -f $IS_CORE_FILE $IS_CORE_OK
-        msg warn "${YELLOW}${IS_CORE_NAME} 文件使用 > $IS_CORE_FILE${NONE}"
+        msg WARNING "${YELLOW}${IS_CORE_NAME} 文件使用 > $IS_CORE_FILE${NONE}"
     }
-    # local dir install sh script
+
+    ##
+    ## local dir install sh script
+    ##
     [[ $LOCAL_INSTALL ]] && {
         >$IS_SH_OK
-        msg warn "${YELLOW}本地获取安装脚本 > $PWD ${NONE}"
+        msg WARNING "${YELLOW}本地获取安装脚本 > $PWD ${NONE}"
     }
 
     timedatectl set-ntp true &>/dev/null
     [[ $? != 0 ]] && {
-        msg warn "${YELLOW}\e[4m提醒!!! 无法设置自动同步时间, 可能会影响使用 VMess 协议.${NONE}"
+        msg WARNING "${YELLOW}\e[4m提醒!!! 无法设置自动同步时间, 可能会影响使用 VMess 协议.${NONE}"
     }
 
     # [步骤 1/10] 准备安装环境
-    msg warn "[步骤 1/10] 准备安装环境..."
+    msg WARNING "[步骤 1/10] 准备安装环境..."
     mkdir -p $TMPDIR
     [[ $IS_CORE_FILE ]] && {
         cp -f $IS_CORE_FILE $IS_CORE_OK
-        msg ok "  - 使用自定义核心文件"
+        msg OK "  - 使用自定义核心文件"
     }
     [[ $LOCAL_INSTALL ]] && {
         >$IS_SH_OK
-        msg ok "  - 本地获取安装脚本"
+        msg OK "  - 本地获取安装脚本"
     }
-    msg ok "  - 安装环境准备完成"
+    msg OK "  - 安装环境准备完成"
     
     # [步骤 2/10] 同步系统时间
-    msg warn "[步骤 2/10] 同步系统时间..."
+    msg WARNING "[步骤 2/10] 同步系统时间..."
     timedatectl set-ntp true &>/dev/null
-    [[ $? != 0 ]] && msg warn "  - 提醒：无法设置自动同步时间" || msg ok "  - 系统时间已同步"
+    [[ $? != 0 ]] && msg WARNING "  - 提醒：无法设置自动同步时间" || msg OK "  - 系统时间已同步"
     
 
     # [步骤 3/10] 安装依赖包
-    msg warn "[步骤 3/10] 安装依赖包..."
+    msg WARNING "[步骤 3/10] 安装依赖包..."
     install_pkg $IS_PKG &
-    msg ok "  - 依赖包安装进行中 (后台)"
+    msg OK "  - 依赖包安装进行中 (后台)"
 
     # [步骤 4/10] 检查 jq
-    msg warn "[步骤 4/10] 检查 jq..."
+    msg WARNING "[步骤 4/10] 检查 jq..."
     if [[ $(type -P jq) ]]; then
         >$IS_JQ_OK
-        msg ok "  - jq 已安装"
+        msg OK "  - jq 已安装"
     else
         JQ_NOT_FOUND=1
-        msg warn "  - jq 未安装，将自动下载"
+        msg WARNING "  - jq 未安装，将自动下载"
     fi
     # [步骤 5/10] 下载必要文件
-    msg warn "[步骤 5/10] 下载必要文件..."
+    msg WARNING "[步骤 5/10] 下载必要文件..."
     [[ $IS_WGET ]] && {
-        [[ ! $IS_CORE_FILE ]] && { download core & msg ok "  - 开始下载 V2Ray 核心"; }
-        [[ ! $LOCAL_INSTALL ]] && { download sh & msg ok "  - 开始下载脚本"; }
-        [[ $JQ_NOT_FOUND ]] && { download jq & msg ok "  - 开始下载 jq"; }
+        [[ ! $IS_CORE_FILE ]] && { download core & msg OK "  - 开始下载 V2Ray 核心"; }
+        [[ ! $LOCAL_INSTALL ]] && { download sh & msg OK "  - 开始下载脚本"; }
+        [[ $JQ_NOT_FOUND ]] && { download jq & msg OK "  - 开始下载 jq"; }
         get_ip
-        msg ok "  - 已获取服务器 IP"
+        msg OK "  - 已获取服务器 IP"
     }
 
     # [步骤 6/10] 等待下载完成
-    msg warn "[步骤 6/10] 等待下载完成..."
+    msg WARNING "[步骤 6/10] 等待下载完成..."
     wait
-    msg ok "  - 所有文件下载完成"
+    msg OK "  - 所有文件下载完成"
 
     # [步骤 7/10] 检查下载状态
-    msg warn "[步骤 7/10] 检查下载状态..."
+    msg WARNING "[步骤 7/10] 检查下载状态..."
     check_status
-    msg ok "  - 所有文件检查通过"
+    msg OK "  - 所有文件检查通过"
 
     # [步骤 8/10] 测试核心文件
-    msg warn "[步骤 8/10] 测试核心文件..."
+    msg WARNING "[步骤 8/10] 测试核心文件..."
     if [[ $IS_CORE_FILE ]]; then
         unzip -qo $IS_CORE_OK -d $TMPDIR/testzip &>/dev/null
         [[ $? != 0 ]] && {
-            msg err "  - 核心文件解压失败"
+            msg ERROR "  - 核心文件解压失败"
             exit_and_del_tmpdir
         }
         for i in ${IS_CORE} geoip.dat geosite.dat; do
             [[ ! -f $TMPDIR/testzip/$i ]] && IS_FILE_ERR=1 && break
         done
         [[ $IS_FILE_ERR ]] && {
-            msg err "  - 核心文件不完整"
+            msg ERROR "  - 核心文件不完整"
             exit_and_del_tmpdir
         }
-        msg ok "  - 核心文件测试通过"
+        msg OK "  - 核心文件测试通过"
     else
-        msg ok "  - 使用官方核心文件"
+        msg OK "  - 使用官方核心文件"
     fi
 
     # [步骤 9/10] 获取服务器 IP
-    msg warn "[步骤 9/10] 获取服务器 IP..."
+    msg WARNING "[步骤 9/10] 获取服务器 IP..."
     [[ ! $IP ]] && {
-        msg err "  - 获取服务器 IP 失败"
+        msg ERROR "  - 获取服务器 IP 失败"
         exit_and_del_tmpdir
     }
-    msg ok "  - 服务器 IP: $IP"
+    msg OK "  - 服务器 IP: $IP"
 
     # [步骤 10/10] 安装文件到系统
-    msg warn "[步骤 10/10] 安装文件到系统..."
+    msg WARNING "[步骤 10/10] 安装文件到系统..."
     
     # create sh dir
     mkdir -p $IS_SH_DIR
-    msg ok "  - 已创建脚本目录"
+    msg OK "  - 已创建脚本目录"
 
     # copy sh file
     if [[ $LOCAL_INSTALL ]]; then
         cp -rf $PWD/* $IS_SH_DIR
-        msg ok "  - 已复制本地脚本"
+        msg OK "  - 已复制本地脚本"
     else
         unzip -qo $IS_SH_OK -d $IS_SH_DIR
-        msg ok "  - 已解压脚本文件"
+        msg OK "  - 已解压脚本文件"
     fi
 
     # create core bin dir
     mkdir -p $IS_CORE_DIR/bin
-    msg ok "  - 已创建核心目录"
+    msg OK "  - 已创建核心目录"
     
     # copy core file
     if [[ $IS_CORE_FILE ]]; then
         cp -rf $TMPDIR/testzip/* $IS_CORE_DIR/bin
-        msg ok "  - 已复制核心文件"
+        msg OK "  - 已复制核心文件"
     else
         unzip -qo $IS_CORE_OK -d $IS_CORE_DIR/bin
-        msg ok "  - 已解压核心文件"
+        msg OK "  - 已解压核心文件"
     fi
 
     # add alias
     echo "alias $IS_CORE=$IS_SH_BIN" >>/root/.bashrc
-    msg ok "  - 已添加别名"
+    msg OK "  - 已添加别名"
 
     # core command
     ln -sf $IS_SH_DIR/$IS_CORE.sh $IS_SH_BIN
-    msg ok "  - 已创建命令链接"
+    msg OK "  - 已创建命令链接"
 
     # jq
-    [[ $JQ_NOT_FOUND ]] && mv -f $IS_JQ_OK /usr/bin/jq && msg ok "  - 已安装 jq"
+    [[ $JQ_NOT_FOUND ]] && mv -f $IS_JQ_OK /usr/bin/jq && msg OK "  - 已安装 jq"
 
     # chmod
     chmod +x $IS_CORE_BIN $IS_SH_BIN /usr/bin/jq
-    msg ok "  - 已设置执行权限：$IS_CORE_BIN, $IS_SH_BIN, /usr/bin/jq (+x)"
+    msg OK "  - 已设置执行权限：$IS_CORE_BIN, $IS_SH_BIN, /usr/bin/jq (+x)"
 
     # create log dir
     mkdir -p $IS_LOG_DIR
-    msg ok "  - 已创建日志目录：$IS_LOG_DIR (access.log, error.log)"
+    msg OK "  - 已创建日志目录：$IS_LOG_DIR (access.log, error.log)"
 
     # show a tips msg
-    msg ok "生成配置文件..."
+    msg OK "生成配置文件..."
 
     # create systemd service
     load systemd.sh
@@ -684,14 +637,14 @@ main() {
                     break
                     ;;
                 3)
-                    msg warn "停止 Caddy..."
+                    msg WARNING "停止 Caddy..."
                     systemctl stop caddy &>/dev/null
                     systemctl disable caddy &>/dev/null
                     IS_INSTALL_NGINX=1
                     break
                     ;;
                 4)
-                    msg warn "停止 Nginx..."
+                    msg WARNING "停止 Nginx..."
                     systemctl stop nginx &>/dev/null
                     systemctl disable nginx &>/dev/null
                     IS_INSTALL_CADDY=1
@@ -717,7 +670,7 @@ main() {
                     break
                     ;;
                 2)
-                    msg warn "停止 Caddy..."
+                    msg WARNING "停止 Caddy..."
                     systemctl stop caddy &>/dev/null
                     systemctl disable caddy &>/dev/null
                     IS_INSTALL_NGINX=1
@@ -743,7 +696,7 @@ main() {
                     break
                     ;;
                 2)
-                    msg warn "停止 Nginx..."
+                    msg WARNING "停止 Nginx..."
                     systemctl stop nginx &>/dev/null
                     systemctl disable nginx &>/dev/null
                     IS_INSTALL_CADDY=1
@@ -784,12 +737,12 @@ main() {
     
     # 初始化 TLS 配置（Nginx 或 Caddy）
     if [[ $IS_INSTALL_NGINX ]]; then
-        msg warn "初始化 Nginx 配置..."
+        msg WARNING "初始化 Nginx 配置..."
         create nginx new
         # 设置 is_nginx 标志，避免端口占用警告
         IS_NGINX=1
     elif [[ $IS_INSTALL_CADDY ]]; then
-        msg warn "初始化 Caddy 配置..."
+        msg WARNING "初始化 Caddy 配置..."
         create caddy new
         # 设置 is_caddy 标志
         IS_CADDY=1
@@ -820,7 +773,7 @@ main() {
             PROTOCOL_TYPE=${PROTOCOL_LIST[$((PROTOCOL_CHOICE - 1))]}
             break
         elif [[ $PROTOCOL_CHOICE -eq $((${#PROTOCOL_LIST[@]} + 1)) ]]; then
-            msg ok "已跳过，安装后可以使用 'v2ray add' 命令添加配置"
+            msg OK "已跳过，安装后可以使用 'v2ray add' 命令添加配置"
             exit_and_del_tmpdir ok
         else
             echo "输入无效，请输入 1-$((${#PROTOCOL_LIST[@]} + 1))"
@@ -833,12 +786,12 @@ main() {
 
     if [[ $DOMAIN_INPUT ]]; then
         echo
-        msg warn "正在配置 ${YELLOW}$PROTOCOL_TYPE${NONE} > ${YELLOW}$DOMAIN_INPUT${NONE}..."
+        msg WARNING "正在配置 ${YELLOW}$PROTOCOL_TYPE${NONE} > ${YELLOW}$DOMAIN_INPUT${NONE}..."
         add $PROTOCOL_TYPE $DOMAIN_INPUT
         echo
-        msg ok "配置完成！使用 'v2ray info' 查看配置信息"
+        msg OK "配置完成！使用 'v2ray info' 查看配置信息"
     else
-        msg warn "未输入域名，已跳过配置"
+        msg WARNING "未输入域名，已跳过配置"
     fi
 
     # remove tmp dir and exit.
