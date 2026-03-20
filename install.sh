@@ -3,7 +3,9 @@
 AUTHOR=WangYan-Good
 # github=https://github.com/WangYan-Good/v2ray
 
-# bash fonts colors
+##
+## bash 字体颜色
+##
 RED='\e[31m'
 YELLOW='\e[33m'
 GRAY='\e[90m'
@@ -31,22 +33,32 @@ warn() {
     echo -e "\n$IS_WARN $@\n"
 }
 
-# root
+##
+## root 权限检查
+##
 [[ $EUID != 0 ]] && err "当前非 ${YELLOW}ROOT用户.${NONE}"
 
-# yum or apt-get, ubuntu/debian/centos
+##
+## yum 或 apt-get, ubuntu/debian/centos
+##
 CMD=$(type -P apt-get || type -P yum)
 [[ ! $CMD ]] && err "此脚本仅支持 ${YELLOW}(Ubuntu or Debian or CentOS)${NONE}."
 
-# systemd
+##
+## systemd 检查
+##
 [[ ! $(type -P systemctl) ]] && {
     err "此系统缺少 ${YELLOW}(systemctl)${NONE}, 请尝试执行:${YELLOW} ${CMD} update -y;${CMD} install systemd -y ${NONE}来修复此错误."
 }
 
-# wget installed or none
+##
+## wget 是否已安装
+##
 IS_WGET=$(type -P wget)
 
-# x64
+##
+## 系统架构检查 x64
+##
 case $(uname -m) in
 amd64 | x86_64)
     IS_JQ_ARCH=amd64
@@ -74,12 +86,16 @@ IS_SH_REPO=$AUTHOR/$IS_CORE
 IS_PKG="wget unzip"
 IS_CONFIG_JSON=$IS_CORE_DIR/config.json
 
-# Nginx 变量
+##
+## Nginx 变量
+##
 IS_NGINX_DIR=/etc/nginx
 IS_NGINXFILE=$IS_NGINX_DIR/nginx.conf
 IS_NGINX_CONF=$IS_NGINX_DIR/v2ray
 
-# Caddy 变量
+##
+## Caddy 变量
+##
 IS_CADDY_DIR=/etc/caddy
 IS_CADDYFILE=$IS_CADDY_DIR/Caddyfile
 IS_CADDY_CONF=$IS_CADDY_DIR/$AUTHOR
@@ -93,29 +109,42 @@ TMP_VAR_LISTS=(
     IS_PKG_OK
 )
 
-# tmp dir
+##
+## 定义临时目录路径
+##
 TMPDIR=$(mktemp -u)
 [[ ! $TMPDIR ]] && {
+    ##
+    ## 如果 mktemp -u 不支持，使用备用方案
+    ##
     TMPDIR=/tmp/tmp-$RANDOM
 }
 
-# set up var
+##
+## 设置变量
+##
 for i in ${TMP_VAR_LISTS[*]}; do
     export $i=$TMPDIR/$i
 done
 
-# load bash script.
+##
+## 加载 bash 脚本
+##
 load() {
     . $IS_SH_DIR/src/$1
 }
 
-# wget add --no-check-certificate
+##
+## wget 添加 --no-check-certificate 参数
+##
 _wget() {
     [[ $PROXY ]] && export HTTPS_PROXY=$PROXY
     wget --no-check-certificate $*
 }
 
-# print a mesage
+##
+## 打印消息
+##
 msg() {
     case $1 in
     WARNING)
@@ -132,7 +161,9 @@ msg() {
     echo -e "${COLOR}$(date +'%T')${NONE}) ${2}"
 }
 
-# show help msg
+##
+## 显示帮助信息
+##
 show_help() {
     echo -e "Usage: $0 [-f xxx | -l | -p xxx | -v xxx | --tls xxx | --uninstall | -h]"
     echo -e "  -f, --core-file <path>          自定义 $IS_CORE_NAME 文件路径, e.g., -f /root/${IS_CORE}-linux-64.zip"
@@ -146,22 +177,51 @@ show_help() {
     exit 0
 }
 
-# install dependent pkg
+##
+## install dependent pkg
+## 安装依赖包（如 wget, unzip 等）
+## 参数：$* - 需要检查安装的包名列表
+##
 install_pkg() {
+    ##
+    ## 1. 检查哪些包未安装
+    ## 遍历所有传入的包名，将未找到的包名记录到 CMD_NOT_FOUND
+    ##
     CMD_NOT_FOUND=
     for i in $*; do
         [[ ! $(type -P $i) ]] && CMD_NOT_FOUND="$CMD_NOT_FOUND,$i"
     done
+    
+    ##
+    ## 2. 如果有未安装的包，执行安装
+    ##
     if [[ $CMD_NOT_FOUND ]]; then
+        
+        ##
+        ## 将逗号分隔的列表转换为空格分隔的包名列表
+        ##
         PKG=$(echo $CMD_NOT_FOUND | sed 's/,/ /g')
         msg WARNING "安装依赖包 >${PKG}"
+        
+        ##
+        ## 3. 第一次尝试安装
+        ##
         $CMD install -y $PKG &>/dev/null
+        
+        ##
+        ## 4. 如果第一次安装失败，尝试修复后再次安装
+        ## 针对 CentOS 系统：先安装 epel-release 源，然后更新系统
+        ##
         if [[ $? != 0 ]]; then
             [[ $CMD =~ yum ]] && yum install epel-release -y &>/dev/null
             $CMD update -y &>/dev/null
             $CMD install -y $PKG &>/dev/null
             [[ $? == 0 ]] && >$IS_PKG_OK
         else
+            ##
+            ## 第一次安装成功，创建标记文件
+            ## 如果第一次安装成功，创建标记文件 $IS_PKG_OK，表示依赖包安装成功
+            ##
             >$IS_PKG_OK
         fi
     else
@@ -169,7 +229,7 @@ install_pkg() {
     fi
 }
 
-# download file
+# 下载文件
 download() {
     case $1 in
     core)
@@ -193,14 +253,25 @@ download() {
         ;;
     esac
 
-    msg WARNING "下载 ${NAME} > ${LINK}"
-    if _wget -t 3 -q -c $LINK -O $TMPFILE; then
+    msg WARNING "下载 ${NAME}"
+    ##
+    ## 使用 wget 下载并显示进度
+    ## 显示文件名、百分比、速度、剩余时间
+    ##
+    if _wget -t 3 -c $LINK -O $TMPFILE --progress=bar:force 2>&1 | while IFS= read -r LINE; do
+        ## 只显示最后一行进度信息
+        printf "\r\033[K  - %s: %s" "$NAME" "$LINE"
+    done; then
+        printf "\n"
         mv -f $TMPFILE $IS_OK
+    else
+        printf "\n"
+        return 1
     fi
 }
 
 ##
-## get server ip
+## 获取服务器 IP
 ##
 get_ip() {
     export "$(_wget -4 -qO- https://one.one.one.one/cdn-cgi/trace | grep IP=)" &>/dev/null
@@ -208,17 +279,23 @@ get_ip() {
 }
 
 ##
-## check background tasks status
+## 检查后台任务状态
 ##
 check_status() {
-    # dependent pkg install fail
+    ##
+    ## 依赖包安装失败
+    ##
     [[ ! -f $IS_PKG_OK ]] && {
         msg ERROR "安装依赖包失败"
         msg ERROR "请尝试手动安装依赖包: $CMD update -y; $CMD install -y $IS_PKG"
         IS_FAIL=1
     }
 
-    # download file status
+    ##
+    ## 下载文件状态
+    ## 检查核心文件、脚本文件和 jq 的下载状态，如果任何一个下载失败，设置 IS_FAIL 标志
+    ## 如果 IS_FAIL 被设置，后续安装过程将被中断，并提示用户检查下载问题
+    ##
     if [[ $IS_WGET ]]; then
         [[ ! -f $IS_CORE_OK ]] && {
             msg ERROR "下载 ${IS_CORE_NAME} 失败"
@@ -244,14 +321,16 @@ check_status() {
         }
     fi
 
-    # found fail status, remove tmp dir and exit.
+    ##
+    ## 发现失败状态，删除临时目录并退出
+    ##
     [[ $IS_FAIL ]] && {
         exit_and_del_tmpdir
     }
 }
 
 ##
-## parameters check
+## 参数检查
 ##
 pass_args() {
     while [[ $# -gt 0 ]]; do
@@ -310,14 +389,22 @@ pass_args() {
             show_help
             ;;
         --uninstall)
-            # 执行卸载
+            
+            ##
+            ## 执行卸载
+            ##
             if [[ -f /usr/local/bin/v2ray ]]; then
                 v2ray uninstall
             else
-                # 直接删除文件
+                ##
+                ## 直接删除文件
+                ##
                 rm -rf /etc/v2ray /var/log/v2ray /usr/local/bin/v2ray
                 sed -i '/v2ray/d' /root/.bashrc
-                # 如果选择了卸载 caddy/nginx
+                
+                ##
+                ## 如果选择了卸载 caddy/nginx
+                ##
                 if [[ -f /usr/local/bin/caddy ]]; then
                     systemctl stop caddy &>/dev/null
                     systemctl disable caddy &>/dev/null
@@ -343,7 +430,9 @@ pass_args() {
     }
 }
 
-# exit and remove TMPDIR
+##
+## 退出并删除临时目录
+##
 exit_and_del_tmpdir() {
     rm -rf $TMPDIR
     [[ ! $1 ]] && {
@@ -356,7 +445,9 @@ exit_and_del_tmpdir() {
     exit
 }
 
-# main
+##
+## 主函数
+##
 main() {
     ##
     ## 1.自动检测本地安装模式
@@ -367,7 +458,7 @@ main() {
     fi
 
     ##
-    ## 2.check old version
+    ## 2.检查旧版本
     ## 检查旧版本（提供交互式选项）
     ##
     [[ -f $IS_SH_BIN && -d $IS_CORE_DIR/bin && -d $IS_SH_DIR && -d $IS_CONF_DIR ]] && {
@@ -384,7 +475,7 @@ main() {
         echo "2) 卸载后重新安装"
         echo "3) 退出"
         echo
-        
+
         while :; do
             echo -ne "请输入选择 [1-3] (默认:3): "
             read REINSTALL_CHOICE
@@ -419,12 +510,12 @@ main() {
     }
 
     ##
-    ## check parameters
+    ## 检查参数
     ##
     [[ $# -gt 0 ]] && pass_args $@
 
     ##
-    ## show welcome msg
+    ## 显示欢迎信息
     ##
     clear
     echo
@@ -432,19 +523,19 @@ main() {
     echo
 
     ##
-    ## start installing...
+    ## 开始安装...
     ##
     msg WARNING "开始安装..."
     [[ $IS_CORE_VER ]] && msg WARNING "${IS_CORE_NAME} 版本: ${YELLOW}$IS_CORE_VER${NONE}"
     [[ $PROXY ]] && msg WARNING "使用代理: ${YELLOW}$PROXY${NONE}"
 
     ##
-    ## create temp directory and set up file path
+    ## 创建临时目录并设置文件路径
     ##
     mkdir -p $TMPDIR
     
     ##
-    ## if IS_CORE_FILE, copy file
+    ## 如果是 IS_CORE_FILE，复制文件
     ##
     [[ $IS_CORE_FILE ]] && {
         cp -f $IS_CORE_FILE $IS_CORE_OK
@@ -452,7 +543,7 @@ main() {
     }
 
     ##
-    ## local dir install sh script
+    ## 本地目录安装脚本
     ##
     [[ $LOCAL_INSTALL ]] && {
         >$IS_SH_OK
@@ -464,7 +555,9 @@ main() {
         msg WARNING "${YELLOW}\e[4m提醒!!! 无法设置自动同步时间, 可能会影响使用 VMess 协议.${NONE}"
     }
 
-    # [步骤 1/10] 准备安装环境
+    ##
+    ## [步骤 1/10] 准备安装环境
+    ##
     msg WARNING "[步骤 1/10] 准备安装环境..."
     mkdir -p $TMPDIR
     [[ $IS_CORE_FILE ]] && {
@@ -477,18 +570,23 @@ main() {
     }
     msg OK "  - 安装环境准备完成"
     
-    # [步骤 2/10] 同步系统时间
+    ##
+    ## [步骤 2/10] 同步系统时间
+    ##
     msg WARNING "[步骤 2/10] 同步系统时间..."
     timedatectl set-ntp true &>/dev/null
     [[ $? != 0 ]] && msg WARNING "  - 提醒：无法设置自动同步时间" || msg OK "  - 系统时间已同步"
     
-
-    # [步骤 3/10] 安装依赖包
+    ##
+    ## [步骤 3/10] 安装依赖包
+    ##
     msg WARNING "[步骤 3/10] 安装依赖包..."
     install_pkg $IS_PKG &
     msg OK "  - 依赖包安装进行中 (后台)"
 
-    # [步骤 4/10] 检查 jq
+    ##
+    ## [步骤 4/10] 检查 jq
+    ##
     msg WARNING "[步骤 4/10] 检查 jq..."
     if [[ $(type -P jq) ]]; then
         >$IS_JQ_OK
@@ -497,7 +595,10 @@ main() {
         JQ_NOT_FOUND=1
         msg WARNING "  - jq 未安装，将自动下载"
     fi
-    # [步骤 5/10] 下载必要文件
+    
+    ##
+    ## [步骤 5/10] 下载必要文件
+    ##
     msg WARNING "[步骤 5/10] 下载必要文件..."
     [[ $IS_WGET ]] && {
         [[ ! $IS_CORE_FILE ]] && { download core & msg OK "  - 开始下载 V2Ray 核心"; }
@@ -507,17 +608,37 @@ main() {
         msg OK "  - 已获取服务器 IP"
     }
 
-    # [步骤 6/10] 等待下载完成
+    ##
+    ## [步骤 6/10] 等待下载完成
+    ##
     msg WARNING "[步骤 6/10] 等待下载完成..."
+    ##
+    ## wait: 等待所有后台下载任务完成
+    ## 前面步骤中，core、sh、jq 三个下载任务使用 & 在后台并行执行
+    ## 这里需要等待所有文件下载完成后，才能进行后续的检查步骤
+    ##
+    ## 显示动态加载动画
+    _loading=0
+    _loading_chars=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+    while kill -0 $(jobs -p) 2>/dev/null; do
+        printf "\r  - 下载进行中... %s" "${_loading_chars[$_loading]}"
+        _loading=$(( (_loading + 1) % 10 ))
+        sleep 0.1
+    done
+    printf "\r\033[K"
     wait
     msg OK "  - 所有文件下载完成"
 
-    # [步骤 7/10] 检查下载状态
+    ##
+    ## [步骤 7/10] 检查下载状态
+    ##
     msg WARNING "[步骤 7/10] 检查下载状态..."
     check_status
     msg OK "  - 所有文件检查通过"
 
-    # [步骤 8/10] 测试核心文件
+    ##
+    ## [步骤 8/10] 测试核心文件
+    ##
     msg WARNING "[步骤 8/10] 测试核心文件..."
     if [[ $IS_CORE_FILE ]]; then
         unzip -qo $IS_CORE_OK -d $TMPDIR/testzip &>/dev/null
@@ -537,7 +658,9 @@ main() {
         msg OK "  - 使用官方核心文件"
     fi
 
-    # [步骤 9/10] 获取服务器 IP
+    ##
+    ## [步骤 9/10] 获取服务器 IP
+    ##
     msg WARNING "[步骤 9/10] 获取服务器 IP..."
     [[ ! $IP ]] && {
         msg ERROR "  - 获取服务器 IP 失败"
@@ -545,14 +668,19 @@ main() {
     }
     msg OK "  - 服务器 IP: $IP"
 
-    # [步骤 10/10] 安装文件到系统
+    ##
+    ## [步骤 10/10] 安装文件到系统
+    ##
     msg WARNING "[步骤 10/10] 安装文件到系统..."
     
-    # create sh dir
+    ##
+    ## 创建脚本目录
+    ##
     mkdir -p $IS_SH_DIR
-    msg OK "  - 已创建脚本目录"
 
-    # copy sh file
+    ##
+    ## 复制脚本文件
+    ##
     if [[ $LOCAL_INSTALL ]]; then
         cp -rf $PWD/* $IS_SH_DIR
         msg OK "  - 已复制本地脚本"
@@ -561,52 +689,77 @@ main() {
         msg OK "  - 已解压脚本文件"
     fi
 
-    # create core bin dir
+    ##
+    ## 创建核心二进制目录
+    ##
     mkdir -p $IS_CORE_DIR/bin
     msg OK "  - 已创建核心目录"
     
-    # copy core file
+    ##
+    ## 复制核心文件
+    ##
     if [[ $IS_CORE_FILE ]]; then
         cp -rf $TMPDIR/testzip/* $IS_CORE_DIR/bin
-        msg OK "  - 已复制核心文件"
+        msg OK "  - 已复制核心文件到 $IS_CORE_DIR/bin"
     else
         unzip -qo $IS_CORE_OK -d $IS_CORE_DIR/bin
-        msg OK "  - 已解压核心文件"
+        msg OK "  - 已解压核心文件到 $IS_CORE_DIR/bin"
     fi
 
-    # add alias
+    ##
+    ## 添加别名
+    ##
     echo "alias $IS_CORE=$IS_SH_BIN" >>/root/.bashrc
-    msg OK "  - 已添加别名"
+    msg OK "  - 已添加别名 $IS_CORE -> $IS_SH_BIN"
 
-    # core command
+    ##
+    ## 核心命令
+    ##
     ln -sf $IS_SH_DIR/$IS_CORE.sh $IS_SH_BIN
     msg OK "  - 已创建命令链接"
 
-    # jq
+    ##
+    ## jq 工具
+    ##
     [[ $JQ_NOT_FOUND ]] && mv -f $IS_JQ_OK /usr/bin/jq && msg OK "  - 已安装 jq"
 
-    # chmod
+    ##
+    ## 设置权限
+    ##
     chmod +x $IS_CORE_BIN $IS_SH_BIN /usr/bin/jq
     msg OK "  - 已设置执行权限：$IS_CORE_BIN, $IS_SH_BIN, /usr/bin/jq (+x)"
 
-    # create log dir
+    ##
+    ## 创建日志目录
+    ##
     mkdir -p $IS_LOG_DIR
     msg OK "  - 已创建日志目录：$IS_LOG_DIR (access.log, error.log)"
 
-    # show a tips msg
+    ##
+    ## 显示提示信息
+    ##
     msg OK "生成配置文件..."
 
-    # create systemd service
+    ##
+    ## 创建 systemd 服务
+    ##
     load systemd.sh
     IS_NEW_INSTALL=1
     install_service $IS_CORE &>/dev/null
 
-    # create condf dir
+    ##
+    ## 创建配置目录
+    ##
     mkdir -p $IS_CONF_DIR
 
-    # TLS 方案选择
+    ##
+    ## TLS 方案选择
+    ##
     if [[ ! $IS_INSTALL_CADDY && ! $IS_INSTALL_NGINX ]]; then
-        # 检测已安装的服务
+        
+        ##
+        ## 检测已安装的服务
+        ##
         IS_CADDY_INSTALLED=
         IS_NGINX_INSTALLED=
         [[ -f /usr/local/bin/caddy || $(type -P caddy) ]] && IS_CADDY_INSTALLED=1
@@ -615,8 +768,13 @@ main() {
         echo
         echo -e "${YELLOW}选择 TLS 配置方案:${NONE}"
         
-        # 根据已安装的服务提供选项
+        ##
+        ## 根据已安装的服务提供选项
+        ##
         if [[ $IS_CADDY_INSTALLED && $IS_NGINX_INSTALLED ]]; then
+            ##
+            ## caddy 和 nginx 都已安装，提供更多选项
+            ##
             echo "检测到 Caddy 和 Nginx 都已安装，请选择:"
             echo "1) 使用 Caddy"
             echo "2) 使用 Nginx"
@@ -656,6 +814,9 @@ main() {
                 esac
             done
         elif [[ $IS_CADDY_INSTALLED ]]; then
+            ##
+            ## 仅 caddy 已安装，提供选项
+            ##
             echo "检测到 Caddy 已安装，请选择:"
             echo "1) 使用 Caddy (默认)"
             echo "2) 停止 Caddy，改用 Nginx"
@@ -708,7 +869,9 @@ main() {
                 esac
             done
         else
-            # 都没有安装，提供标准选项
+            ##
+            ## 都没有安装，提供标准选项
+            ##
             echo "1) Caddy (简洁，适合单站点)"
             echo "2) Nginx + Certbot (灵活，适合多站点共存) (默认)"
             
@@ -735,27 +898,39 @@ main() {
 
     load core.sh
     
-    # 初始化 TLS 配置（Nginx 或 Caddy）
+    ##
+    ## 初始化 TLS 配置（Nginx 或 Caddy）
+    ##
     if [[ $IS_INSTALL_NGINX ]]; then
         msg WARNING "初始化 Nginx 配置..."
         create nginx new
-        # 设置 is_nginx 标志，避免端口占用警告
+        
+        ##
+        ## 设置 is_nginx 标志，避免端口占用警告
+        ##
         IS_NGINX=1
     elif [[ $IS_INSTALL_CADDY ]]; then
         msg WARNING "初始化 Caddy 配置..."
         create caddy new
-        # 设置 is_caddy 标志
+        
+        ##
+        ## 设置 is_caddy 标志
+        ##
         IS_CADDY=1
     fi
 
-    # 安装完成后引导用户配置第一个节点（与 v2ray add 完全一致）
+    ##
+    ## 安装完成后引导用户配置第一个节点（与 v2ray add 完全一致）
+    ##
     echo
     echo "=========================================="
     echo "    安装完成！现在配置第一个 V2Ray 节点"
     echo "=========================================="
     echo
     
-    # 显示所有协议选项（与 v2ray add 命令完全一致）
+    ##
+    ## 显示所有协议选项（与 v2ray add 命令完全一致）
+    ##
     echo "请选择协议类型:"
     for i in "${!PROTOCOL_LIST[@]}"; do
         NUM=$((i + 1))
@@ -769,6 +944,9 @@ main() {
         read PROTOCOL_CHOICE
         [[ ! $PROTOCOL_CHOICE ]] && PROTOCOL_CHOICE=1
 
+        ##
+        ## choice 应该 <= protocol list 长度
+        ##
         if [[ $PROTOCOL_CHOICE -le ${#PROTOCOL_LIST[@]} ]]; then
             PROTOCOL_TYPE=${PROTOCOL_LIST[$((PROTOCOL_CHOICE - 1))]}
             break
@@ -794,9 +972,9 @@ main() {
         msg WARNING "未输入域名，已跳过配置"
     fi
 
-    # remove tmp dir and exit.
+    # 删除临时目录并退出
     exit_and_del_tmpdir ok
 }
 
-# start.
+# 开始执行
 main $@

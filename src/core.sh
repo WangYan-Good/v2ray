@@ -1,6 +1,8 @@
 #!/bin/bash
+IS_CADDY_CONF=$IS_CADDY_DIR/$AUTHOR
+IS_NGINX_CONF=$IS_NGINX_DIR/v2ray
 
-protocol_list=(
+PROTOCOL_LIST=(
     VMess-TCP
     VMess-mKCP
     VMess-QUIC
@@ -21,7 +23,7 @@ protocol_list=(
     VMess-QUIC-dynamic-port
     Socks
 )
-ss_method_list=(
+SS_METHOD_LIST=(
     aes-128-gcm
     aes-256-gcm
     chacha20-ietf-poly1305
@@ -30,7 +32,7 @@ ss_method_list=(
     # 2022-blake3-aes-256-gcm
     # 2022-blake3-chacha20-poly1305
 )
-header_type_list=(
+HEADER_TYPE_LIST=(
     none
     srtp
     utp
@@ -38,7 +40,7 @@ header_type_list=(
     dtls
     wireguard
 )
-mainmenu=(
+MAINMENU=(
     "添加配置"
     "更改配置"
     "查看配置"
@@ -50,7 +52,7 @@ mainmenu=(
     "其他"
     "关于"
 )
-info_list=(
+INFO_LIST=(
     "协议 (protocol)"
     "地址 (address)"
     "端口 (port)"
@@ -72,7 +74,7 @@ info_list=(
     "公钥 (Public key)"
     "用户名 (Username)"
 )
-change_list=(
+CHANGE_LIST=(
     "更改协议"
     "更改端口"
     "更改域名"
@@ -90,7 +92,7 @@ change_list=(
     "更改 mKCP seed"
     "更改用户名 (Username)"
 )
-servername_list=(
+SERVERNAME_LIST=(
     www.amazon.com
     www.microsoft.com
     www.apple.com
@@ -99,9 +101,9 @@ servername_list=(
     aws.amazon.com
 )
 
-is_random_ss_method=${ss_method_list[$(shuf -i 0-${#ss_method_list[@]} -n1) - 1]}
-is_random_header_type=${header_type_list[$(shuf -i 1-5 -n1)]} # random dont use none
-is_random_servername=${servername_list[$(shuf -i 0-${#servername_list[@]} -n1) - 1]}
+IS_RANDOM_SS_METHOD=${SS_METHOD_LIST[$(shuf -i 0-${#SS_METHOD_LIST[@]} -n1) - 1]}
+IS_RANDOM_HEADER_TYPE=${HEADER_TYPE_LIST[$(shuf -i 1-5 -n1)]} # random dont use none
+IS_RANDOM_SERVERNAME=${SERVERNAME_LIST[$(shuf -i 0-${#SERVERNAME_LIST[@]} -n1) - 1]}
 
 msg() {
     echo -e "$@"
@@ -120,34 +122,34 @@ pause() {
 }
 
 get_uuid() {
-    tmp_uuid=$(cat /proc/sys/kernel/random/uuid)
+    TMP_UUID=$(cat /proc/sys/kernel/random/uuid)
 }
 
 get_ip() {
-    [[ $ip || $is_no_auto_tls || $is_gen || $is_dont_get_ip ]] && return
+    [[ $IP || $IS_NO_AUTO_TLS || $IS_GEN || $IS_DONT_GET_IP ]] && return
     export "$(_wget -4 -qO- https://one.one.one.one/cdn-cgi/trace | grep ip=)" &>/dev/null
-    [[ ! $ip ]] && export "$(_wget -6 -qO- https://one.one.one.one/cdn-cgi/trace | grep ip=)" &>/dev/null
-    [[ ! $ip ]] && {
+    [[ ! $IP ]] && export "$(_wget -6 -qO- https://one.one.one.one/cdn-cgi/trace | grep ip=)" &>/dev/null
+    [[ ! $IP ]] && {
         err "获取服务器 IP 失败.."
     }
 }
 
 get_port() {
-    is_count=0
+    IS_COUNT=0
     while :; do
-        ((is_count++))
-        if [[ $is_count -ge 233 ]]; then
+        ((IS_COUNT++))
+        if [[ $IS_COUNT -ge 233 ]]; then
             err "自动获取可用端口失败次数达到 233 次, 请检查端口占用情况."
         fi
-        tmp_port=$(shuf -i 445-65535 -n 1)
-        [[ ! $(is_test port_used $tmp_port) && $tmp_port != $port ]] && break
+        TMP_PORT=$(shuf -i 445-65535 -n 1)
+        [[ ! $(is_test port_used $TMP_PORT) && $TMP_PORT != $PORT ]] && break
     done
 }
 
 get_pbk() {
-    is_tmp_pbk=($($is_core_bin x25519 | sed 's/.*://'))
-    is_private_key=${is_tmp_pbk[0]}
-    is_public_key=${is_tmp_pbk[1]}
+    IS_TMP_PBK=($($IS_CORE_BIN x25519 | sed 's/.*://'))
+    IS_PRIVATE_KEY=${IS_TMP_PBK[0]}
+    IS_PUBLIC_KEY=${IS_TMP_PBK[1]}
 }
 
 show_list() {
@@ -158,7 +160,7 @@ show_list() {
     # i=0
     # for v in "$@"; do
     #     ((i++))
-    #     echo "$i) $v"
+    #     echo "$i) $V"
     # done
     # echo
 
@@ -175,7 +177,7 @@ is_test() {
         fi
         ;;
     port_used)
-        [[ $(is_port_used $2) && ! $is_cant_test_port ]] && echo ok
+        [[ $(is_port_used $2) && ! $IS_CANT_TEST_PORT ]] && echo ok
         ;;
     domain)
         echo $2 | grep -E -i '^\w(\w|\-|\.)?+\.\w+$'
@@ -192,17 +194,17 @@ is_test() {
 
 is_port_used() {
     if [[ $(type -P netstat) ]]; then
-        [[ ! $is_used_port ]] && is_used_port="$(netstat -tunlp | sed -n 's/.*:\([0-9]\+\).*/\1/p' | sort -nu)"
-        echo $is_used_port | sed 's/ /\n/g' | grep ^${1}$
+        [[ ! $IS_USED_PORT ]] && IS_USED_PORT="$(netstat -tunlp | sed -n 's/.*:\([0-9]\+\).*/\1/p' | sort -nu)"
+        echo $IS_USED_PORT | sed 's/ /\n/g' | grep ^${1}$
         return
     fi
     if [[ $(type -P ss) ]]; then
-        [[ ! $is_used_port ]] && is_used_port="$(ss -tunlp | sed -n 's/.*:\([0-9]\+\).*/\1/p' | sort -nu)"
-        echo $is_used_port | sed 's/ /\n/g' | grep ^${1}$
+        [[ ! $IS_USED_PORT ]] && IS_USED_PORT="$(ss -tunlp | sed -n 's/.*:\([0-9]\+\).*/\1/p' | sort -nu)"
+        echo $IS_USED_PORT | sed 's/ /\n/g' | grep ^${1}$
         return
     fi
-    is_cant_test_port=1
-    msg "$is_warn 无法检测端口是否可用."
+    IS_CANT_TEST_PORT=1
+    msg "$IS_WARN 无法检测端口是否可用."
     msg "请执行: $(_yellow "${cmd} update -y; ${cmd} install net-tools -y") 来修复此问题."
 }
 
@@ -210,234 +212,234 @@ is_port_used() {
 ask() {
     case $1 in
     set_ss_method)
-        is_tmp_list=(${ss_method_list[@]})
-        is_default_arg=$is_random_ss_method
-        is_opt_msg="\n请选择加密方式:\n"
-        is_opt_input_msg="(默认\e[92m $is_default_arg\e[0m):"
-        is_ask_set=ss_method
+        IS_TMP_LIST=(${SS_METHOD_LIST[@]})
+        IS_DEFAULT_ARG=$IS_RANDOM_SS_METHOD
+        IS_OPT_MSG="\n请选择加密方式:\n"
+        IS_OPT_INPUT_MSG="(默认\e[92m $IS_DEFAULT_ARG\e[0m):"
+        IS_ASK_SET=SS_METHOD
         ;;
     set_header_type)
-        is_tmp_list=(${header_type_list[@]})
-        is_default_arg=$is_random_header_type
-        [[ $(grep -i tcp <<<"$is_new_protocol-$net") ]] && {
-            is_tmp_list=(none http)
-            is_default_arg=none
+        IS_TMP_LIST=(${HEADER_TYPE_LIST[@]})
+        IS_DEFAULT_ARG=$IS_RANDOM_HEADER_TYPE
+        [[ $(grep -i tcp <<<"$IS_NEW_PROTOCOL-$NET") ]] && {
+            IS_TMP_LIST=(none http)
+            IS_DEFAULT_ARG=none
         }
-        is_opt_msg="\n请选择伪装类型:\n"
-        is_opt_input_msg="(默认\e[92m $is_default_arg\e[0m):"
-        is_ask_set=header_type
-        [[ $is_use_header_type ]] && return
+        IS_OPT_MSG="\n请选择伪装类型:\n"
+        IS_OPT_INPUT_MSG="(默认\e[92m $IS_DEFAULT_ARG\e[0m):"
+        IS_ASK_SET=header_type
+        [[ $IS_USE_HEADER_TYPE ]] && return
         ;;
     set_protocol)
-        is_tmp_list=(${protocol_list[@]})
-        [[ $is_no_auto_tls ]] && {
-            unset is_tmp_list
-            for v in ${protocol_list[@]}; do
-                [[ $(grep -i tls$ <<<$v) ]] && is_tmp_list=(${is_tmp_list[@]} $v)
+        IS_TMP_LIST=(${PROTOCOL_LIST[@]})
+        [[ $IS_NO_AUTO_TLS ]] && {
+            unset IS_TMP_LIST
+            for v in ${PROTOCOL_LIST[@]}; do
+                [[ $(grep -i tls$ <<<$v) ]] && IS_TMP_LIST=(${IS_TMP_LIST[@]} $v)
             done
         }
-        is_opt_msg="\n请选择协议:\n"
-        is_ask_set=is_new_protocol
+        IS_OPT_MSG="\n请选择协议:\n"
+        IS_ASK_SET=IS_NEW_PROTOCOL
         ;;
     set_change_list)
-        is_tmp_list=()
-        for v in ${is_can_change[@]}; do
-            is_tmp_list+=("${change_list[$v]}")
+        IS_TMP_LIST=()
+        for v in ${IS_CAN_CHANGE[@]}; do
+            IS_TMP_LIST+=("${CHANGE_LIST[$v]}")
         done
-        is_opt_msg="\n请选择更改:\n"
-        is_ask_set=is_change_str
-        is_opt_input_msg=$3
+        IS_OPT_MSG="\n请选择更改:\n"
+        IS_ASK_SET=IS_CHANGE_STR
+        IS_OPT_INPUT_MSG=$3
         ;;
     string)
-        is_ask_set=$2
-        is_opt_input_msg=$3
+        IS_ASK_SET=$2
+        IS_OPT_INPUT_MSG=$3
         ;;
     list)
-        is_ask_set=$2
-        [[ ! $is_tmp_list ]] && is_tmp_list=($3)
-        is_opt_msg=$4
-        is_opt_input_msg=$5
+        IS_ASK_SET=$2
+        [[ ! $IS_TMP_LIST ]] && IS_TMP_LIST=($3)
+        IS_OPT_MSG=$4
+        IS_OPT_INPUT_MSG=$5
         ;;
     get_config_file)
-        is_tmp_list=("${is_all_json[@]}")
-        is_opt_msg="\n请选择配置:\n"
-        is_ask_set=is_config_file
+        IS_TMP_LIST=("${IS_ALL_JSON[@]}")
+        IS_OPT_MSG="\n请选择配置:\n"
+        IS_ASK_SET=IS_CONFIG_FILE
         ;;
     mainmenu)
-        is_tmp_list=("${mainmenu[@]}")
-        is_ask_set=is_main_pick
-        is_emtpy_exit=1
+        IS_TMP_LIST=("${MAINMENU[@]}")
+        IS_ASK_SET=IS_MAIN_PICK
+        IS_EMPTY_EXIT=1
         ;;
     esac
-    msg $is_opt_msg
-    [[ ! $is_opt_input_msg ]] && is_opt_input_msg="请选择 [\e[91m1-${#is_tmp_list[@]}\e[0m]:"
-    [[ $is_tmp_list ]] && show_list "${is_tmp_list[@]}"
+    msg $IS_OPT_MSG
+    [[ ! $IS_OPT_INPUT_MSG ]] && IS_OPT_INPUT_MSG="请选择 [\e[91m1-${#IS_TMP_LIST[@]}\e[0m]:"
+    [[ $IS_TMP_LIST ]] && show_list "${IS_TMP_LIST[@]}"
     while :; do
-        echo -ne $is_opt_input_msg
+        echo -ne $IS_OPT_INPUT_MSG
         read REPLY
-        [[ ! $REPLY && $is_emtpy_exit ]] && exit
-        [[ ! $REPLY && $is_default_arg ]] && export $is_ask_set=$is_default_arg && break
-        [[ "$REPLY" == "${is_str}2${is_get}3${is_opt}3" && $is_ask_set == 'is_main_pick' ]] && {
-            msg "\n${is_get}2${is_str}3${is_msg}3b${is_tmp}o${is_opt}y\n" && exit
+        [[ ! $REPLY && $IS_EMPTY_EXIT ]] && exit
+        [[ ! $REPLY && $IS_DEFAULT_ARG ]] && export $IS_ASK_SET=$IS_DEFAULT_ARG && break
+        [[ "$REPLY" == "${IS_STR}2${IS_GET}3${IS_OPT}3" && $IS_ASK_SET == 'IS_MAIN_PICK' ]] && {
+            msg "\n${IS_GET}2${IS_STR}3${IS_MSG}3b${IS_TMP}o${IS_OPT}y\n" && exit
         }
-        if [[ ! $is_tmp_list ]]; then
-            [[ $(grep port <<<$is_ask_set) ]] && {
+        if [[ ! $IS_TMP_LIST ]]; then
+            [[ $(grep port <<<$IS_ASK_SET) ]] && {
                 [[ ! $(is_test port "$REPLY") ]] && {
-                    msg "$is_err 请输入正确的端口, 可选(1-65535)"
+                    msg "$IS_ERR 请输入正确的端口, 可选(1-65535)"
                     continue
                 }
-                if [[ $(is_test port_used $REPLY) && $is_ask_set != 'door_port' ]]; then
-                    msg "$is_err 无法使用 ($REPLY) 端口."
+                if [[ $(is_test port_used $REPLY) && $IS_ASK_SET != 'door_port' ]]; then
+                    msg "$IS_ERR 无法使用 ($REPLY) 端口."
                     continue
                 fi
             }
-            [[ $(grep path <<<$is_ask_set) && ! $(is_test path "$REPLY") ]] && {
-                [[ ! $tmp_uuid ]] && get_uuid
-                msg "$is_err 请输入正确的路径, 例如: /$tmp_uuid"
+            [[ $(grep path <<<$IS_ASK_SET) && ! $(is_test path "$REPLY") ]] && {
+                [[ ! $TMP_UUID ]] && get_uuid
+                msg "$IS_ERR 请输入正确的路径, 例如: /$TMP_UUID"
                 continue
             }
-            [[ $(grep uuid <<<$is_ask_set) && ! $(is_test uuid "$REPLY") ]] && {
-                [[ ! $tmp_uuid ]] && get_uuid
-                msg "$is_err 请输入正确的 UUID, 例如: $tmp_uuid"
+            [[ $(grep uuid <<<$IS_ASK_SET) && ! $(is_test uuid "$REPLY") ]] && {
+                [[ ! $TMP_UUID ]] && get_uuid
+                msg "$IS_ERR 请输入正确的 UUID, 例如: $TMP_UUID"
                 continue
             }
-            [[ $(grep ^y$ <<<$is_ask_set) ]] && {
+            [[ $(grep ^y$ <<<$IS_ASK_SET) ]] && {
                 [[ $(grep -i ^y$ <<<"$REPLY") ]] && break
                 msg "请输入 (y)"
                 continue
             }
-            [[ $REPLY ]] && export $is_ask_set=$REPLY && msg "使用: ${!is_ask_set}" && break
+            [[ $REPLY ]] && export $IS_ASK_SET=$REPLY && msg "使用: ${!IS_ASK_SET}" && break
         else
-            [[ $(is_test number "$REPLY") ]] && is_ask_result=${is_tmp_list[$REPLY - 1]}
-            [[ $is_ask_result ]] && export $is_ask_set="$is_ask_result" && msg "选择: ${!is_ask_set}" && break
+            [[ $(is_test number "$REPLY") ]] && IS_ASK_RESULT=${IS_TMP_LIST[$REPLY - 1]}
+            [[ $IS_ASK_RESULT ]] && export $IS_ASK_SET="$IS_ASK_RESULT" && msg "选择: ${!IS_ASK_SET}" && break
         fi
 
-        msg "输入${is_err}"
+        msg "输入${IS_ERR}"
     done
-    unset is_opt_msg is_opt_input_msg is_tmp_list is_ask_result is_default_arg is_emtpy_exit
+    unset IS_OPT_MSG IS_OPT_INPUT_MSG IS_TMP_LIST IS_ASK_RESULT IS_DEFAULT_ARG IS_EMPTY_EXIT
 }
 
 # create file
 create() {
     case $1 in
     server)
-        is_tls=none
+        IS_TLS=none
         get new
 
         # file name
-        if [[ $host ]]; then
-            is_config_name=$2-${host}.json
+        if [[ $HOST ]]; then
+            IS_CONFIG_NAME=$2-${HOST}.json
         else
-            is_config_name=$2-${port}.json
+            IS_CONFIG_NAME=$2-${PORT}.json
         fi
-        is_json_file=$is_conf_dir/$is_config_name
+        IS_JSON_FILE=$IS_CONF_DIR/$IS_CONFIG_NAME
         # get json
-        [[ $is_change || ! $json_str ]] && get protocol $2
-        case $net in
+        [[ $IS_CHANGE || ! $JSON_STR ]] && get protocol $2
+        case $NET in
         ws | h2 | grpc | http)
-            is_listen='"listen": "127.0.0.1"'
+            IS_LISTEN='"listen": "127.0.0.1"'
             ;;
         *)
-            is_listen='"listen": "0.0.0.0"'
+            IS_LISTEN='"listen": "0.0.0.0"'
             ;;
         esac
-        is_sniffing='sniffing:{enabled:true,destOverride:["http","tls"]}'
-        is_new_json=$(jq '{inbounds:[{tag:'\"$is_config_name\"',port:'"$port"','"$is_listen"',protocol:'\"$is_protocol\"','"$json_str"','"$is_sniffing"'}]}' <<<{})
-        if [[ $is_dynamic_port ]]; then
-            [[ ! $is_dynamic_port_range ]] && get dynamic-port
-            is_new_dynamic_port_json=$(jq '{inbounds:[{tag:'\"$is_config_name-link.json\"',port:'\"$is_dynamic_port_range\"','"$is_listen"',protocol:"vmess",'"$is_stream"','"$is_sniffing"',allocate:{strategy:"random"}}]}' <<<{})
+        IS_SNIFFING='sniffing:{enabled:true,destOverride:["http","tls"]}'
+        IS_NEW_JSON=$(jq '{inbounds:[{tag:'\"$IS_CONFIG_NAME\"',port:'"$PORT"','"$IS_LISTEN"',protocol:'\"$IS_PROTOCOL\"','"$JSON_STR"','"$IS_SNIFFING"'}]}' <<<{})
+        if [[ $IS_DYNAMIC_PORT ]]; then
+            [[ ! $IS_DYNAMIC_PORT_RANGE ]] && get dynamic-port
+            IS_NEW_DYNAMIC_PORT_JSON=$(jq '{inbounds:[{tag:'\"$IS_CONFIG_NAME-link.json\"',port:'\"$IS_DYNAMIC_PORT_RANGE\"','"$IS_LISTEN"',protocol:"vmess",'"$IS_STREAM"','"$IS_SNIFFING"',allocate:{strategy:"random"}}]}' <<<{})
         fi
-        [[ $is_test_json ]] && return # tmp test
+        [[ $IS_TEST_JSON ]] && return # tmp test
         # only show json, dont save to file.
-        [[ $is_gen ]] && {
+        [[ $IS_GEN ]] && {
             msg
-            jq <<<$is_new_json
+            jq <<<$IS_NEW_JSON
             msg
-            [[ $is_new_dynamic_port_json ]] && jq <<<$is_new_dynamic_port_json && msg
+            [[ $IS_NEW_DYNAMIC_PORT_JSON ]] && jq <<<$IS_NEW_DYNAMIC_PORT_JSON && msg
             return
         }
         # del old file
-        [[ $is_config_file ]] && is_no_del_msg=1 && del $is_config_file
+        [[ $IS_CONFIG_FILE ]] && IS_NO_DEL_MSG=1 && del $IS_CONFIG_FILE
         # save json to file
-        cat <<<$is_new_json >$is_json_file
-        [[ $is_new_dynamic_port_json ]] && {
-            is_dynamic_port_link_file=$is_json_file-link.json
-            cat <<<$is_new_dynamic_port_json >$is_dynamic_port_link_file
+        cat <<<$IS_NEW_JSON >$IS_JSON_FILE
+        [[ $IS_NEW_DYNAMIC_PORT_JSON ]] && {
+            IS_DYNAMIC_PORT_LINK_FILE=$IS_JSON_FILE-link.json
+            cat <<<$IS_NEW_DYNAMIC_PORT_JSON >$IS_DYNAMIC_PORT_LINK_FILE
         }
-        if [[ $is_new_install ]]; then
+        if [[ $IS_NEW_INSTALL ]]; then
             # config.json
             create config.json
         else
             # use api add config
-            api add $is_json_file $is_dynamic_port_link_file &>/dev/null
+            api add $IS_JSON_FILE $IS_DYNAMIC_PORT_LINK_FILE &>/dev/null
         fi
         # auto tls (caddy or nginx)
-        [[ $host && ! $is_no_auto_tls ]] && {
-            if [[ $is_caddy ]]; then
-                create caddy $net
-            elif [[ $is_nginx ]]; then
-                create nginx $net
+        [[ $HOST && ! $IS_NO_AUTO_TLS ]] && {
+            if [[ $IS_CADDY ]]; then
+                create caddy $NET
+            elif [[ $IS_NGINX ]]; then
+                create nginx $NET
             fi
         }
         # restart core
-        [[ $is_api_fail ]] && manage restart &
+        [[ $IS_API_FAIL ]] && manage restart &
         ;;
     client)
-        is_tls=tls
-        is_client=1
+        IS_TLS=tls
+        IS_CLIENT=1
         get info $2
-        [[ ! $is_client_id_json ]] && err "($is_config_name) 不支持生成客户端配置."
-        is_new_json=$(jq '{outbounds:[{tag:'\"$is_config_name\"',protocol:'\"$is_protocol\"','"$is_client_id_json"','"$is_stream"'}]}' <<<{})
-        if [[ $is_full_client ]]; then
-            is_dns='dns:{servers:[{address:"223.5.5.5",domain:["geosite:cn","geosite:geolocation-cn"],expectIPs:["geoip:cn"]},"1.1.1.1","8.8.8.8"]}'
-            is_route='routing:{rules:[{type:"field",outboundTag:"direct",ip:["geoip:cn","geoip:private"]},{type:"field",outboundTag:"direct",domain:["geosite:cn","geosite:geolocation-cn"]}]}'
-            is_inbounds='inbounds:[{port:2333,listen:"127.0.0.1",protocol:"socks",settings:{udp:true},sniffing:{enabled:true,destOverride:["http","tls"]}}]'
-            is_outbounds='outbounds:[{tag:'\"$is_config_name\"',protocol:'\"$is_protocol\"','"$is_client_id_json"','"$is_stream"'},{tag:"direct",protocol:"freedom"}]'
-            is_new_json=$(jq '{'$is_dns,$is_route,$is_inbounds,$is_outbounds'}' <<<{})
+        [[ ! $IS_CLIENT_ID_JSON ]] && err "($IS_CONFIG_NAME) 不支持生成客户端配置."
+        IS_NEW_JSON=$(jq '{outbounds:[{tag:'\"$IS_CONFIG_NAME\"',protocol:'\"$IS_PROTOCOL\"','"$IS_CLIENT_ID_JSON"','"$IS_STREAM"'}]}' <<<{})
+        if [[ $IS_FULL_CLIENT ]]; then
+            IS_DNS='dns:{servers:[{address:"223.5.5.5",domain:["geosite:cn","geosite:geolocation-cn"],expectIPs:["geoip:cn"]},"1.1.1.1","8.8.8.8"]}'
+            IS_ROUTE='routing:{rules:[{type:"field",outboundTag:"direct",ip:["geoip:cn","geoip:private"]},{type:"field",outboundTag:"direct",domain:["geosite:cn","geosite:geolocation-cn"]}]}'
+            IS_INBOUNDS='inbounds:[{port:2333,listen:"127.0.0.1",protocol:"socks",settings:{udp:true},sniffing:{enabled:true,destOverride:["http","tls"]}}]'
+            IS_OUTBOUNDS='outbounds:[{tag:'\"$IS_CONFIG_NAME\"',protocol:'\"$IS_PROTOCOL\"','"$IS_CLIENT_ID_JSON"','"$IS_STREAM"'},{tag:"direct",protocol:"freedom"}]'
+            IS_NEW_JSON=$(jq '{'$IS_DNS,$IS_ROUTE,$IS_INBOUNDS,$IS_OUTBOUNDS'}' <<<{})
         fi
         msg
-        jq <<<$is_new_json
+        jq <<<$IS_NEW_JSON
         msg
         ;;
     caddy)
         load caddy.sh
-        [[ $is_install_caddy ]] && caddy_config new
-        [[ ! $(grep "$is_caddy_conf" $is_caddyfile) ]] && {
-            msg "import $is_caddy_conf/*.conf" >>$is_caddyfile
+        [[ $IS_INSTALL_CADDY ]] && caddy_config new
+        [[ ! $(grep "$IS_CADDY_CONF" $IS_CADDYFILE) ]] && {
+            msg "import $IS_CADDY_CONF/*.conf" >>$IS_CADDYFILE
         }
-        [[ ! -d $is_caddy_conf ]] && mkdir -p $is_caddy_conf
+        [[ ! -d $IS_CADDY_CONF ]] && mkdir -p $IS_CADDY_CONF
         caddy_config $2
         manage restart caddy &
         ;;
     nginx)
         load nginx.sh
-        [[ $is_install_nginx ]] && nginx_config new
-        [[ ! -d $is_nginx_conf ]] && mkdir -p $is_nginx_conf
+        [[ $IS_INSTALL_NGINX ]] && nginx_config new
+        [[ ! -d $IS_NGINX_CONF ]] && mkdir -p $IS_NGINX_CONF
         if ! nginx_config $2; then
             msg ERROR "Nginx 配置生成失败，证书申请未成功"
             msg WARNING "V2Ray 配置已生成，但 TLS 尚未启用"
             msg WARNING "你可以稍后手动申请证书并重载 Nginx"
-            is_api_fail=1
+            IS_API_FAIL=1
         fi
         nginx_reload
         ;;
     config.json)
         get_port
-        is_log='log:{access:"/var/log/'"$is_core"'/access.log",error:"/var/log/'"$is_core"'/error.log",loglevel:"warning"}'
-        is_dns='dns:{}'
-        is_api='api:{tag:"api",services:["HandlerService","LoggerService","StatsService"]}'
-        is_stats='stats:{}'
-        is_policy_system='system:{statsInboundUplink:true,statsInboundDownlink:true,statsOutboundUplink:true,statsOutboundDownlink:true}'
-        is_policy='policy:{levels:{"0":{handshake:'"$((${tmp_port:0:1} + 1))"',connIdle:'"${tmp_port:0:3}"',uplinkOnly:'"$((${tmp_port:2:1} + 1))"',downlinkOnly:'"$((${tmp_port:3:1} + 3))"',statsUserUplink:true,statsUserDownlink:true}},'"$is_policy_system"'}'
-        is_ban_ad='{type:"field",domain:["geosite:category-ads-all"],marktag:"ban_ad",outboundTag:"block"}'
-        is_ban_bt='{type:"field",protocol:["bittorrent"],marktag:"ban_bt",outboundTag:"block"}'
-        is_ban_cn='{type:"field",ip:["geoip:cn"],marktag:"ban_geoip_cn",outboundTag:"block"}'
-        is_openai='{type:"field",domain:["domain:openai.com"],marktag:"fix_openai",outboundTag:"direct"}'
-        is_routing='routing:{domainStrategy:"IPIfNonMatch",rules:[{type:"field",inboundTag:["api"],outboundTag:"api"},'"$is_ban_bt"','"$is_ban_cn"','"$is_openai"',{type:"field",ip:["geoip:private"],outboundTag:"block"}]}'
-        is_inbounds='inbounds:[{tag:"api",port:'"$tmp_port"',listen:"127.0.0.1",protocol:"dokodemo-door",settings:{address:"127.0.0.1"}}]'
-        is_outbounds='outbounds:[{tag:"direct",protocol:"freedom"},{tag:"block",protocol:"blackhole"}]'
-        is_server_config_json=$(jq '{'"$is_log"','"$is_dns"','"$is_api"','"$is_stats"','"$is_policy"','"$is_routing"','"$is_inbounds"','"$is_outbounds"'}' <<<{})
-        cat <<<$is_server_config_json >$is_config_json
+        IS_LOG='log:{access:"/var/log/'"$IS_CORE"'/access.log",error:"/var/log/'"$IS_CORE"'/error.log",loglevel:"warning"}'
+        IS_DNS='dns:{}'
+        IS_API='api:{tag:"api",services:["HandlerService","LoggerService","StatsService"]}'
+        IS_STATS='stats:{}'
+        IS_POLICY_SYSTEM='system:{statsInboundUplink:true,statsInboundDownlink:true,statsOutboundUplink:true,statsOutboundDownlink:true}'
+        IS_POLICY='policy:{levels:{"0":{handshake:'"$((${TMP_PORT:0:1} + 1))"',connIdle:'"${TMP_PORT:0:3}"',uplinkOnly:'"$((${TMP_PORT:2:1} + 1))"',downlinkOnly:'"$((${TMP_PORT:3:1} + 3))"',statsUserUplink:true,statsUserDownlink:true}},'"$IS_POLICY_SYSTEM"'}'
+        IS_BAN_AD='{type:"field",domain:["geosite:category-ads-all"],marktag:"ban_ad",outboundTag:"block"}'
+        IS_BAN_BT='{type:"field",protocol:["bittorrent"],marktag:"ban_bt",outboundTag:"block"}'
+        IS_BAN_CN='{type:"field",ip:["geoip:cn"],marktag:"ban_geoip_cn",outboundTag:"block"}'
+        IS_OPENAI='{type:"field",domain:["domain:openai.com"],marktag:"fix_openai",outboundTag:"direct"}'
+        IS_ROUTING='routing:{domainStrategy:"IPIfNonMatch",rules:[{type:"field",inboundTag:["api"],outboundTag:"api"},'"$IS_BAN_BT"','"$IS_BAN_CN"','"$IS_OPENAI"',{type:"field",ip:["geoip:private"],outboundTag:"block"}]}'
+        IS_INBOUNDS='inbounds:[{tag:"api",port:'"$TMP_PORT"',listen:"127.0.0.1",protocol:"dokodemo-door",settings:{address:"127.0.0.1"}}]'
+        IS_OUTBOUNDS='outbounds:[{tag:"direct",protocol:"freedom"},{tag:"block",protocol:"blackhole"}]'
+        IS_SERVER_CONFIG_JSON=$(jq '{'"$IS_LOG"','"$IS_DNS"','"$IS_API"','"$IS_STATS"','"$IS_POLICY"','"$IS_ROUTING"','"$IS_INBOUNDS"','"$IS_OUTBOUNDS"'}' <<<{})
+        cat <<<$IS_SERVER_CONFIG_JSON >$IS_CONFIG_JSON
         manage restart &
         ;;
     esac
@@ -445,302 +447,302 @@ create() {
 
 # change config file
 change() {
-    is_change=1
-    is_dont_show_info=1
+    IS_CHANGE=1
+    IS_DONT_SHOW_INFO=1
     if [[ $2 ]]; then
         case ${2,,} in
         full)
-            is_change_id=full
+            IS_CHANGE_ID=full
             ;;
         new)
-            is_change_id=0
+            IS_CHANGE_ID=0
             ;;
         port)
-            is_change_id=1
+            IS_CHANGE_ID=1
             ;;
         host)
-            is_change_id=2
+            IS_CHANGE_ID=2
             ;;
         path)
-            is_change_id=3
+            IS_CHANGE_ID=3
             ;;
         pass | passwd | password)
-            is_change_id=4
+            IS_CHANGE_ID=4
             ;;
         id | uuid)
-            is_change_id=5
+            IS_CHANGE_ID=5
             ;;
         ssm | method | ss-method | ss_method)
-            is_change_id=6
+            IS_CHANGE_ID=6
             ;;
         type | header | header-type | header_type)
-            is_change_id=7
+            IS_CHANGE_ID=7
             ;;
         dda | door-addr | door_addr)
-            is_change_id=8
+            IS_CHANGE_ID=8
             ;;
         ddp | door-port | door_port)
-            is_change_id=9
+            IS_CHANGE_ID=9
             ;;
         key | publickey | privatekey)
-            is_change_id=10
+            IS_CHANGE_ID=10
             ;;
         sni | servername | servernames)
-            is_change_id=11
+            IS_CHANGE_ID=11
             ;;
         dp | dyp | dynamic | dynamicport | dynamic-port)
-            is_change_id=12
+            IS_CHANGE_ID=12
             ;;
         web | proxy-site)
-            is_change_id=13
+            IS_CHANGE_ID=13
             ;;
         seed | kcpseed | kcp-seed | kcp_seed)
-            is_change_id=14
+            IS_CHANGE_ID=14
             ;;
         *)
-            [[ $is_try_change ]] && return
+            [[ $IS_TRY_CHANGE ]] && return
             err "无法识别 ($2) 更改类型."
             ;;
         esac
     fi
-    [[ $is_try_change ]] && return
-    [[ $is_dont_auto_exit ]] && {
+    [[ $IS_TRY_CHANGE ]] && return
+    [[ $IS_DONT_AUTO_EXIT ]] && {
         get info $1
     } || {
-        [[ $is_change_id ]] && {
-            is_change_msg=${change_list[$is_change_id]}
-            [[ $is_change_id == 'full' ]] && {
-                [[ $3 ]] && is_change_msg="更改多个参数" || is_change_msg=
+        [[ $IS_CHANGE_ID ]] && {
+            IS_CHANGE_MSG=${CHANGE_LIST[$IS_CHANGE_ID]}
+            [[ $IS_CHANGE_ID == 'full' ]] && {
+                [[ $3 ]] && IS_CHANGE_MSG="更改多个参数" || IS_CHANGE_MSG=
             }
-            [[ $is_change_msg ]] && _green "\n快速执行: $is_change_msg"
+            [[ $IS_CHANGE_MSG ]] && _green "\n快速执行: $IS_CHANGE_MSG"
         }
         info $1
-        [[ $is_auto_get_config ]] && msg "\n自动选择: $is_config_file"
+        [[ $IS_AUTO_GET_CONFIG ]] && msg "\n自动选择: $IS_CONFIG_FILE"
     }
-    is_old_net=$net
-    [[ $is_protocol == 'vless' && ! $is_reality ]] && net=v$net
-    [[ $is_protocol == 'trojan' ]] && net=t$net
-    [[ $is_dynamic_port ]] && net=${net}d
-    [[ $3 == 'auto' ]] && is_auto=1
-    # if is_dont_show_info exist, cant show info.
-    is_dont_show_info=
+    IS_OLD_NET=$NET
+    [[ $IS_PROTOCOL == 'vless' && ! $IS_REALITY ]] && NET=v$NET
+    [[ $IS_PROTOCOL == 'trojan' ]] && NET=t$NET
+    [[ $IS_DYNAMIC_PORT ]] && NET=${NET}d
+    [[ $3 == 'auto' ]] && IS_AUTO=1
+    # if IS_DONT_SHOW_INFO exist, cant show info.
+    IS_DONT_SHOW_INFO=
     # if not prefer args, show change list and then get change id.
-    [[ ! $is_change_id ]] && {
+    [[ ! $IS_CHANGE_ID ]] && {
         ask set_change_list
-        is_change_id=${is_can_change[$REPLY - 1]}
+        IS_CHANGE_ID=${IS_CAN_CHANGE[$REPLY - 1]}
     }
-    case $is_change_id in
+    case $IS_CHANGE_ID in
     full)
-        add $net ${@:3}
+        add $NET ${@:3}
         ;;
     0)
         # new protocol
-        is_set_new_protocol=1
+        IS_SET_NEW_PROTOCOL=1
         add ${@:3}
         ;;
     1)
         # new port
-        is_new_port=$3
-        [[ $host && ! $is_caddy && ! $is_nginx || $is_no_auto_tls ]] && err "($is_config_file) 不支持更改端口, 因为没啥意义."
-        if [[ $is_new_port && ! $is_auto ]]; then
-            [[ ! $(is_test port $is_new_port) ]] && err "请输入正确的端口, 可选(1-65535)"
-            [[ $is_new_port != 443 && $(is_test port_used $is_new_port) ]] && err "无法使用 ($is_new_port) 端口"
+        IS_NEW_PORT=$3
+        [[ $HOST && ! $IS_CADDY && ! $IS_NGINX || $IS_NO_AUTO_TLS ]] && err "($IS_CONFIG_FILE) 不支持更改端口, 因为没啥意义."
+        if [[ $IS_NEW_PORT && ! $IS_AUTO ]]; then
+            [[ ! $(is_test port $IS_NEW_PORT) ]] && err "请输入正确的端口, 可选(1-65535)"
+            [[ $IS_NEW_PORT != 443 && $(is_test port_used $IS_NEW_PORT) ]] && err "无法使用 ($IS_NEW_PORT) 端口"
         fi
-        [[ $is_auto ]] && get_port && is_new_port=$tmp_port
-        [[ ! $is_new_port ]] && ask string is_new_port "请输入新端口:"
-        if [[ $host && ($is_caddy || $is_nginx) ]]; then
-            net=$is_old_net
-            is_https_port=$is_new_port
-            if [[ $is_caddy ]]; then
+        [[ $IS_AUTO ]] && get_port && IS_NEW_PORT=$TMP_PORT
+        [[ ! $IS_NEW_PORT ]] && ask string IS_NEW_PORT "请输入新端口:"
+        if [[ $HOST && ($IS_CADDY || $IS_NGINX) ]]; then
+            NET=$IS_OLD_NET
+            IS_HTTPS_PORT=$IS_NEW_PORT
+            if [[ $IS_CADDY ]]; then
                 load caddy.sh
-                caddy_config $net
+                caddy_config $NET
                 manage restart caddy &
-            elif [[ $is_nginx ]]; then
+            elif [[ $IS_NGINX ]]; then
                 load nginx.sh
-                nginx_config $net
+                nginx_config $NET
                 nginx_reload
             fi
             info
         else
-            add $net $is_new_port
+            add $NET $IS_NEW_PORT
         fi
         ;;
     2)
         # new host
-        is_new_host=$3
-        [[ ! $host ]] && err "($is_config_file) 不支持更改域名."
-        [[ ! $is_new_host ]] && ask string is_new_host "请输入新域名:"
-        old_host=$host # del old host
-        add $net $is_new_host
+        IS_NEW_HOST=$3
+        [[ ! $HOST ]] && err "($IS_CONFIG_FILE) 不支持更改域名."
+        [[ ! $IS_NEW_HOST ]] && ask string IS_NEW_HOST "请输入新域名:"
+        OLD_HOST=$HOST # del old host
+        add $NET $IS_NEW_HOST
         ;;
     3)
         # new path
-        is_new_path=$3
-        [[ ! $path ]] && err "($is_config_file) 不支持更改路径."
-        [[ $is_auto ]] && get_uuid && is_new_path=/$tmp_uuid
-        [[ ! $is_new_path ]] && ask string is_new_path "请输入新路径:"
-        add $net auto auto $is_new_path
+        IS_NEW_PATH=$3
+        [[ ! $PATH ]] && err "($IS_CONFIG_FILE) 不支持更改路径."
+        [[ $IS_AUTO ]] && get_uuid && IS_NEW_PATH=/$TMP_UUID
+        [[ ! $IS_NEW_PATH ]] && ask string IS_NEW_PATH "请输入新路径:"
+        add $NET auto auto $IS_NEW_PATH
         ;;
     4)
         # new password
-        is_new_pass=$3
-        if [[ $net == 'ss' || $is_trojan || $is_socks_pass ]]; then
-            [[ $is_auto ]] && get_uuid && is_new_pass=$tmp_uuid
+        IS_NEW_PASS=$3
+        if [[ $NET == 'ss' || $IS_TROJAN || $IS_SOCKS_PASS ]]; then
+            [[ $IS_AUTO ]] && get_uuid && IS_NEW_PASS=$TMP_UUID
         else
-            err "($is_config_file) 不支持更改密码."
+            err "($IS_CONFIG_FILE) 不支持更改密码."
         fi
-        [[ ! $is_new_pass ]] && ask string is_new_pass "请输入新密码:"
-        trojan_password=$is_new_pass
-        ss_password=$is_new_pass
-        is_socks_pass=$is_new_pass
-        add $net
+        [[ ! $IS_NEW_PASS ]] && ask string IS_NEW_PASS "请输入新密码:"
+        TROJAN_PASSWORD=$IS_NEW_PASS
+        SS_PASSWORD=$IS_NEW_PASS
+        IS_SOCKS_PASS=$IS_NEW_PASS
+        add $NET
         ;;
     5)
         # new uuid
-        is_new_uuid=$3
-        [[ ! $uuid ]] && err "($is_config_file) 不支持更改 UUID."
-        [[ $is_auto ]] && get_uuid && is_new_uuid=$tmp_uuid
-        [[ ! $is_new_uuid ]] && ask string is_new_uuid "请输入新 UUID:"
-        add $net auto $is_new_uuid
+        IS_NEW_UUID=$3
+        [[ ! $UUID ]] && err "($IS_CONFIG_FILE) 不支持更改 UUID."
+        [[ $IS_AUTO ]] && get_uuid && IS_NEW_UUID=$TMP_UUID
+        [[ ! $IS_NEW_UUID ]] && ask string IS_NEW_UUID "请输入新 UUID:"
+        add $NET auto $IS_NEW_UUID
         ;;
     6)
         # new method
-        is_new_method=$3
-        [[ $net != 'ss' ]] && err "($is_config_file) 不支持更改加密方式."
-        [[ $is_auto ]] && is_new_method=$is_random_ss_method
-        [[ ! $is_new_method ]] && {
+        IS_NEW_METHOD=$3
+        [[ $NET != 'ss' ]] && err "($IS_CONFIG_FILE) 不支持更改加密方式."
+        [[ $IS_AUTO ]] && IS_NEW_METHOD=$IS_RANDOM_SS_METHOD
+        [[ ! $IS_NEW_METHOD ]] && {
             ask set_ss_method
-            is_new_method=$ss_method
+            IS_NEW_METHOD=$SS_METHOD
         }
-        add $net auto auto $is_new_method
+        add $NET auto auto $IS_NEW_METHOD
         ;;
     7)
         # new header type
-        is_new_header_type=$3
-        [[ ! $header_type ]] && err "($is_config_file) 不支持更改伪装类型."
-        [[ $is_auto ]] && {
-            is_new_header_type=$is_random_header_type
-            if [[ $net == 'tcp' ]]; then
-                is_tmp_header_type=(none http)
-                is_new_header_type=${is_tmp_header_type[$(shuf -i 0-1 -n1)]}
+        IS_NEW_HEADER_TYPE=$3
+        [[ ! $HEADER_TYPE ]] && err "($IS_CONFIG_FILE) 不支持更改伪装类型."
+        [[ $IS_AUTO ]] && {
+            IS_NEW_HEADER_TYPE=$IS_RANDOM_HEADER_TYPE
+            if [[ $NET == 'tcp' ]]; then
+                IS_TMP_HEADER_TYPE=(none http)
+                IS_NEW_HEADER_TYPE=${IS_TMP_HEADER_TYPE[$(shuf -i 0-1 -n1)]}
             fi
         }
-        [[ ! $is_new_header_type ]] && {
+        [[ ! $IS_NEW_HEADER_TYPE ]] && {
             ask set_header_type
-            is_new_header_type=$header_type
+            IS_NEW_HEADER_TYPE=$HEADER_TYPE
         }
-        add $net auto auto $is_new_header_type
+        add $NET auto auto $IS_NEW_HEADER_TYPE
         ;;
     8)
         # new remote addr
-        is_new_door_addr=$3
-        [[ $net != 'door' ]] && err "($is_config_file) 不支持更改目标地址."
-        [[ ! $is_new_door_addr ]] && ask string is_new_door_addr "请输入新的目标地址:"
-        door_addr=$is_new_door_addr
-        add $net
+        IS_NEW_DOOR_ADDR=$3
+        [[ $NET != 'door' ]] && err "($IS_CONFIG_FILE) 不支持更改目标地址."
+        [[ ! $IS_NEW_DOOR_ADDR ]] && ask string IS_NEW_DOOR_ADDR "请输入新的目标地址:"
+        DOOR_ADDR=$IS_NEW_DOOR_ADDR
+        add $NET
         ;;
     9)
         # new remote port
-        is_new_door_port=$3
-        [[ $net != 'door' ]] && err "($is_config_file) 不支持更改目标端口."
-        [[ ! $is_new_door_port ]] && {
+        IS_NEW_DOOR_PORT=$3
+        [[ $NET != 'door' ]] && err "($IS_CONFIG_FILE) 不支持更改目标端口."
+        [[ ! $IS_NEW_DOOR_PORT ]] && {
             ask string door_port "请输入新的目标端口:"
-            is_new_door_port=$door_port
+            IS_NEW_DOOR_PORT=$DOOR_PORT
         }
-        add $net auto auto $is_new_door_port
+        add $NET auto auto $IS_NEW_DOOR_PORT
         ;;
     10)
         # new is_private_key is_public_key
-        is_new_private_key=$3
-        is_new_public_key=$4
-        [[ ! $is_reality ]] && err "($is_config_file) 不支持更改密钥."
-        if [[ $is_auto ]]; then
+        IS_NEW_PRIVATE_KEY=$3
+        IS_NEW_PUBLIC_KEY=$4
+        [[ ! $IS_REALITY ]] && err "($IS_CONFIG_FILE) 不支持更改密钥."
+        if [[ $IS_AUTO ]]; then
             get_pbk
-            add $net
+            add $NET
         else
-            [[ $is_new_private_key && ! $is_new_public_key ]] && {
+            [[ $IS_NEW_PRIVATE_KEY && ! $IS_NEW_PUBLIC_KEY ]] && {
                 err "无法找到 Public key."
             }
-            [[ ! $is_new_private_key ]] && ask string is_new_private_key "请输入新 Private key:"
-            [[ ! $is_new_public_key ]] && ask string is_new_public_key "请输入新 Public key:"
-            if [[ $is_new_private_key == $is_new_public_key ]]; then
+            [[ ! $IS_NEW_PRIVATE_KEY ]] && ask string IS_NEW_PRIVATE_KEY "请输入新 Private key:"
+            [[ ! $IS_NEW_PUBLIC_KEY ]] && ask string IS_NEW_PUBLIC_KEY "请输入新 Public key:"
+            if [[ $IS_NEW_PRIVATE_KEY == $IS_NEW_PUBLIC_KEY ]]; then
                 err "Private key 和 Public key 不能一样."
             fi
-            is_private_key=$is_new_private_key
-            is_test_json=1
-            # create server $is_protocol-$net | $is_core_bin -test &>/dev/null
-            create server $is_protocol-$net
-            $is_core_bin -test <<<"$is_new_json" &>/dev/null
+            IS_PRIVATE_KEY=$IS_NEW_PRIVATE_KEY
+            IS_TEST_JSON=1
+            # create server $IS_PROTOCOL-$NET | $IS_CORE_BIN -test &>/dev/null
+            create server $IS_PROTOCOL-$NET
+            $IS_CORE_BIN -test <<<"$IS_NEW_JSON" &>/dev/null
             if [[ $? != 0 ]]; then
                 err "Private key 无法通过测试."
             fi
-            is_private_key=$is_new_public_key
-            # create server $is_protocol-$net | $is_core_bin -test &>/dev/null
-            create server $is_protocol-$net
-            $is_core_bin -test <<<"$is_new_json" &>/dev/null
+            IS_PRIVATE_KEY=$IS_NEW_PUBLIC_KEY
+            # create server $IS_PROTOCOL-$NET | $IS_CORE_BIN -test &>/dev/null
+            create server $IS_PROTOCOL-$NET
+            $IS_CORE_BIN -test <<<"$IS_NEW_JSON" &>/dev/null
             if [[ $? != 0 ]]; then
                 err "Public key 无法通过测试."
             fi
-            is_private_key=$is_new_private_key
-            is_public_key=$is_new_public_key
-            is_test_json=
-            add $net
+            IS_PRIVATE_KEY=$IS_NEW_PRIVATE_KEY
+            IS_PUBLIC_KEY=$IS_NEW_PUBLIC_KEY
+            IS_TEST_JSON=
+            add $NET
         fi
         ;;
     11)
         # new serverName
-        is_new_servername=$3
-        [[ ! $is_reality ]] && err "($is_config_file) 不支持更改 serverName."
-        [[ $is_auto ]] && is_new_servername=$is_random_servername
-        [[ ! $is_new_servername ]] && ask string is_new_servername "请输入新的 serverName:"
-        is_servername=$is_new_servername
-        add $net
+        IS_NEW_SERVERNAME=$3
+        [[ ! $IS_REALITY ]] && err "($IS_CONFIG_FILE) 不支持更改 serverName."
+        [[ $IS_AUTO ]] && IS_NEW_SERVERNAME=$IS_RANDOM_SERVERNAME
+        [[ ! $IS_NEW_SERVERNAME ]] && ask string IS_NEW_SERVERNAME "请输入新的 serverName:"
+        IS_SERVERNAME=$IS_NEW_SERVERNAME
+        add $NET
         ;;
     12)
         # new dynamic-port
-        is_new_dynamic_port_start=$3
-        is_new_dynamic_port_end=$4
-        [[ ! $is_dynamic_port ]] && err "($is_config_file) 不支持更改动态端口."
-        if [[ $is_auto ]]; then
+        IS_NEW_DYNAMIC_PORT_START=$3
+        IS_NEW_DYNAMIC_PORT_END=$4
+        [[ ! $IS_DYNAMIC_PORT ]] && err "($IS_CONFIG_FILE) 不支持更改动态端口."
+        if [[ $IS_AUTO ]]; then
             get dynamic-port
-            add $net
+            add $NET
         else
-            [[ $is_new_dynamic_port_start && ! $is_new_dynamic_port_end ]] && {
+            [[ $IS_NEW_DYNAMIC_PORT_START && ! $IS_NEW_DYNAMIC_PORT_END ]] && {
                 err "无法找到动态结束端口."
             }
-            [[ ! $is_new_dynamic_port_start ]] && ask string is_new_dynamic_port_start "请输入新的动态开始端口:"
-            [[ ! $is_new_dynamic_port_end ]] && ask string is_new_dynamic_port_end "请输入新的动态结束端口:"
-            add $net auto auto auto $is_new_dynamic_port_start $is_new_dynamic_port_end
+            [[ ! $IS_NEW_DYNAMIC_PORT_START ]] && ask string IS_NEW_DYNAMIC_PORT_START "请输入新的动态开始端口:"
+            [[ ! $IS_NEW_DYNAMIC_PORT_END ]] && ask string IS_NEW_DYNAMIC_PORT_END "请输入新的动态结束端口:"
+            add $NET auto auto auto $IS_NEW_DYNAMIC_PORT_START $IS_NEW_DYNAMIC_PORT_END
         fi
         ;;
     13)
         # new proxy site
-        is_new_proxy_site=$3
-        [[ ! $is_caddy && ! $is_nginx && ! $host ]] && {
-            err "($is_config_file) 不支持更改伪装网站."
+        IS_NEW_PROXY_SITE=$3
+        [[ ! $IS_CADDY && ! $IS_NGINX && ! $HOST ]] && {
+            err "($IS_CONFIG_FILE) 不支持更改伪装网站."
         }
-        [[ $is_caddy && ! -f $is_caddy_conf/${host}.conf.add ]] || [[ $is_nginx && ! -f $is_nginx_conf/${host}.conf.add ]] && err "无法配置伪装网站."
-        [[ ! $is_new_proxy_site ]] && ask string is_new_proxy_site "请输入新的伪装网站 (例如 example.com):"
-        proxy_site=$(sed 's#^.*//##;s#/$##' <<<$is_new_proxy_site)
+        [[ $IS_CADDY && ! -f $IS_CADDY_CONF/${HOST}.conf.add ]] || [[ $IS_NGINX && ! -f $IS_NGINX_CONF/${HOST}.conf.add ]] && err "无法配置伪装网站."
+        [[ ! $IS_NEW_PROXY_SITE ]] && ask string IS_NEW_PROXY_SITE "请输入新的伪装网站 (例如 example.com):"
+        PROXY_SITE=$(sed 's#^.*//##;s#/$##' <<<$IS_NEW_PROXY_SITE)
         load caddy.sh
         caddy_config proxy
         manage restart caddy &
-        msg "\n已更新伪装网站为: $(_green $proxy_site) \n"
+        msg "\n已更新伪装网站为: $(_green $PROXY_SITE) \n"
         ;;
     14)
         # new kcp seed
-        is_new_kcp_seed=$3
-        [[ ! $kcp_seed ]] && err "($is_config_file) 不支持更改 mKCP seed."
-        [[ $is_auto ]] && get_uuid && is_new_kcp_seed=$tmp_uuid
-        [[ ! $is_new_kcp_seed ]] && ask string is_new_kcp_seed "请输入新 mKCP seed:"
-        kcp_seed=$is_new_kcp_seed
-        add $net
+        IS_NEW_KCP_SEED=$3
+        [[ ! $KCP_SEED ]] && err "($IS_CONFIG_FILE) 不支持更改 mKCP seed."
+        [[ $IS_AUTO ]] && get_uuid && IS_NEW_KCP_SEED=$TMP_UUID
+        [[ ! $IS_NEW_KCP_SEED ]] && ask string IS_NEW_KCP_SEED "请输入新 mKCP seed:"
+        KCP_SEED=$IS_NEW_KCP_SEED
+        add $NET
         ;;
     15)
         # new socks user
-        [[ ! $is_socks_user ]] && err "($is_config_file) 不支持更改用户名 (Username)."
-        ask string is_socks_user "请输入新用户名 (Username):"
-        add $net
+        [[ ! $IS_SOCKS_USER ]] && err "($IS_CONFIG_FILE) 不支持更改用户名 (Username)."
+        ask string IS_SOCKS_USER "请输入新用户名 (Username):"
+        add $NET
         ;;
     esac
 }
@@ -748,112 +750,112 @@ change() {
 # delete config.
 del() {
     # dont get ip
-    is_dont_get_ip=1
-    [[ $is_conf_dir_empty ]] && return # not found any json file.
+    IS_DONT_GET_IP=1
+    [[ $IS_CONF_DIR_EMPTY ]] && return # not found any json file.
     # get a config file
-    [[ ! $is_config_file ]] && get info $1
-    if [[ $is_config_file ]]; then
-        if [[ $is_main_start && ! $is_no_del_msg ]]; then
-            msg "\n是否删除配置文件?: $is_config_file"
+    [[ ! $IS_CONFIG_FILE ]] && get info $1
+    if [[ $IS_CONFIG_FILE ]]; then
+        if [[ $IS_MAIN_START && ! $IS_NO_DEL_MSG ]]; then
+            msg "\n是否删除配置文件?: $IS_CONFIG_FILE"
             pause
         fi
-        api del $is_conf_dir/"$is_config_file" $is_dynamic_port_file &>/dev/null
-        rm -rf $is_conf_dir/"$is_config_file" $is_dynamic_port_file
-        [[ $is_api_fail && ! $is_new_json ]] && manage restart &
-        [[ ! $is_no_del_msg ]] && _green "\n已删除: $is_config_file\n"
+        api del $IS_CONF_DIR/"$IS_CONFIG_FILE" $IS_DYNAMIC_PORT_FILE &>/dev/null
+        rm -rf $IS_CONF_DIR/"$IS_CONFIG_FILE" $IS_DYNAMIC_PORT_FILE
+        [[ $IS_API_FAIL && ! $IS_NEW_JSON ]] && manage restart &
+        [[ ! $IS_NO_DEL_MSG ]] && _green "\n已删除: $IS_CONFIG_FILE\n"
 
-        [[ $is_caddy ]] && {
-            is_del_host=$host
-            [[ $is_change ]] && {
-                [[ ! $old_host ]] && return # no host exist or not set new host;
-                is_del_host=$old_host
+        [[ $IS_CADDY ]] && {
+            IS_DEL_HOST=$HOST
+            [[ $IS_CHANGE ]] && {
+                [[ ! $OLD_HOST ]] && return # no host exist or not set new host;
+                IS_DEL_HOST=$OLD_HOST
             }
-            [[ $is_del_host && $host != $old_host && ! $is_no_auto_tls ]] && {
-                rm -rf $is_caddy_conf/$is_del_host.conf $is_caddy_conf/$is_del_host.conf.add
-                [[ ! $is_new_json ]] && manage restart caddy &
+            [[ $IS_DEL_HOST && $HOST != $OLD_HOST && ! $IS_NO_AUTO_TLS ]] && {
+                rm -rf $IS_CADDY_CONF/$IS_DEL_HOST.conf $IS_CADDY_CONF/$IS_DEL_HOST.conf.add
+                [[ ! $IS_NEW_JSON ]] && manage restart caddy &
             }
         }
-        [[ $is_nginx ]] && {
+        [[ $IS_NGINX ]] && {
             load nginx.sh
             nginx_config del
             nginx_reload
         }
     fi
-    if [[ ! $(ls $is_conf_dir | grep .json) && ! $is_change ]]; then
+    if [[ ! $(ls $IS_CONF_DIR | grep .json) && ! $IS_CHANGE ]]; then
         warn "当前配置目录为空! 因为你刚刚删除了最后一个配置文件."
-        is_conf_dir_empty=1
+        IS_CONF_DIR_EMPTY=1
     fi
-    unset is_dont_get_ip
-    [[ $is_dont_auto_exit ]] && unset is_config_file
+    unset IS_DONT_GET_IP
+    [[ $IS_DONT_AUTO_EXIT ]] && unset IS_CONFIG_FILE
 }
 
 # uninstall
 uninstall() {
-    if [[ $is_caddy ]]; then
-        is_tmp_list=("卸载 $is_core_name" "卸载 ${is_core_name} & Caddy")
-        ask list is_do_uninstall
+    if [[ $IS_CADDY ]]; then
+        IS_TMP_LIST=("卸载 $IS_CORE_NAME" "卸载 ${IS_CORE_NAME} & Caddy")
+        ask list IS_DO_UNINSTALL
     else
-        ask string y "是否卸载 ${is_core_name}? [y]:"
+        ask string y "是否卸载 ${IS_CORE_NAME}? [y]:"
     fi
     manage stop &>/dev/null
     manage disable &>/dev/null
-    rm -rf $is_core_dir $is_log_dir $is_sh_bin /lib/systemd/system/$is_core.service
-    sed -i "/$is_core/d" /root/.bashrc
+    rm -rf $IS_CORE_dir $IS_LOG_DIR $IS_SH_BIN /lib/systemd/system/$IS_CORE.service
+    sed -i "/$IS_CORE/d" /root/.bashrc
     # uninstall caddy; 2 is ask result
     if [[ $REPLY == '2' ]]; then
         manage stop caddy &>/dev/null
         manage disable caddy &>/dev/null
-        rm -rf $is_caddy_dir $is_caddy_bin /lib/systemd/system/caddy.service
+        rm -rf $IS_CADDY_DIR $IS_CADDY_BIN /lib/systemd/system/caddy.service
     fi
-    [[ $is_install_sh ]] && return # reinstall
+    [[ $IS_INSTALL_SH ]] && return # reinstall
     _green "\n卸载完成!"
     msg "脚本哪里需要完善? 请反馈"
-    msg "反馈问题) $(msg_ul https://github.com/${is_sh_repo}/issues)\n"
+    msg "反馈问题) $(msg_ul https://github.com/${IS_SH_REPO}/issues)\n"
 }
 
 # manage run status
 manage() {
-    [[ $is_dont_auto_exit ]] && return
+    [[ $IS_DONT_AUTO_EXIT ]] && return
     case $1 in
     1 | start)
-        is_do=start
-        is_do_msg=启动
-        is_test_run=1
+        IS_DO=start
+        IS_DO_MSG=启动
+        IS_TEST_RUN=1
         ;;
     2 | stop)
-        is_do=stop
-        is_do_msg=停止
+        IS_DO=stop
+        IS_DO_MSG=停止
         ;;
     3 | r | restart)
-        is_do=restart
-        is_do_msg=重启
-        is_test_run=1
+        IS_DO=restart
+        IS_DO_MSG=重启
+        IS_TEST_RUN=1
         ;;
     *)
-        is_do=$1
-        is_do_msg=$1
+        IS_DO=$1
+        IS_DO_MSG=$1
         ;;
     esac
     case $2 in
     caddy)
-        is_do_name=$2
-        is_run_bin=$is_caddy_bin
-        is_do_name_msg=Caddy
+        IS_DO_NAME=$2
+        IS_RUN_BIN=$IS_CADDY_BIN
+        IS_DO_NAME_MSG=Caddy
         ;;
     *)
-        is_do_name=$is_core
-        is_run_bin=$is_core_bin
-        is_do_name_msg=$is_core_name
+        IS_DO_NAME=$IS_CORE
+        IS_RUN_BIN=$IS_CORE_BIN
+        IS_DO_NAME_MSG=$IS_CORE_NAME
         ;;
     esac
-    systemctl $is_do $is_do_name
-    [[ $is_test_run && ! $is_new_install ]] && {
+    systemctl $IS_DO $IS_DO_NAME
+    [[ $IS_TEST_RUN && ! $IS_NEW_INSTALL ]] && {
         sleep 2
-        if [[ ! $(pgrep -f $is_run_bin) ]]; then
-            is_run_fail=${is_do_name_msg,,}
-            [[ ! $is_no_manage_msg ]] && {
+        if [[ ! $(pgrep -f $IS_RUN_BIN) ]]; then
+            IS_RUN_FAIL=${IS_DO_NAME_MSG,,}
+            [[ ! $IS_NO_MANAGE_MSG ]] && {
                 msg
-                warn "($is_do_msg) $is_do_name_msg 失败"
+                warn "($IS_DO_MSG) $IS_DO_NAME_MSG 失败"
                 _yellow "检测到运行失败, 自动执行测试运行."
                 get test-run
                 _yellow "测试结束, 请按 Enter 退出."
@@ -864,337 +866,342 @@ manage() {
 
 # use api add or del inbounds
 api() {
-    [[ $is_core_ver_lt_5 ]] && {
-        warn "$is_core_ver 版本不支持使用 API 操作. 请升级内核版本: $is_core update core"
-        is_api_fail=1
+    [[ $IS_CORE_VER_LT_5 ]] && {
+        warn "$IS_CORE_VER 版本不支持使用 API 操作. 请升级内核版本: $IS_CORE UPDATE CORE"
+        IS_API_FAIL=1
         return
     }
     [[ ! $1 ]] && err "无法识别 API 的参数."
-    [[ $is_core_stop ]] && {
-        warn "$is_core_name 当前处于停止状态."
-        is_api_fail=1
+    [[ $IS_CORE_STOP ]] && {
+        warn "$IS_CORE_NAME 当前处于停止状态."
+        IS_API_FAIL=1
         return
     }
     case $1 in
     add)
-        is_api_do=adi
+        IS_API_DO=adi
         ;;
     del)
-        is_api_do=rmi
+        IS_API_DO=rmi
         ;;
     s)
-        is_api_do=stats
+        IS_API_DO=stats
         ;;
     t | sq)
-        is_api_do=statsquery
+        IS_API_DO=statsquery
         ;;
     esac
-    [[ ! $is_api_do ]] && is_api_do=$1
-    [[ ! $is_api_port ]] && {
-        is_api_port=$(jq '.inbounds[] | select(.tag == "api") | .port' $is_config_json)
+    [[ ! $IS_API_DO ]] && IS_API_DO=$1
+    [[ ! $IS_API_PORT ]] && {
+        IS_API_PORT=$(jq '.inbounds[] | select(.tag == "api") | .PORT' $IS_CONFIG_JSON)
         [[ $? != 0 ]] && {
             warn "读取 API 端口失败, 无法使用 API 操作."
             return
         }
     }
-    $is_core_bin api $is_api_do --server=127.0.0.1:$is_api_port ${@:2}
+    $IS_CORE_BIN api $IS_API_DO --server=127.0.0.1:$IS_API_PORT ${@:2}
     [[ $? != 0 ]] && {
-        is_api_fail=1
+        IS_API_FAIL=1
     }
 }
 
-# add a config
+##
+## 增加配置
+## param 1: protocol
+## param 2~6: prefer args, different protocol use different args, will ask if not exist.
+##
 add() {
-    is_lower=${1,,}
-    if [[ $is_lower ]]; then
-        case $is_lower in
+    IS_LOWER=${1,,}
+    if [[ $IS_LOWER ]]; then
+        case $IS_LOWER in
         tcp | kcp | quic | tcpd | kcpd | quicd)
-            is_new_protocol=VMess-$(sed 's/^K/mK/;s/D$/-dynamic-port/' <<<${is_lower^^})
+            IS_NEW_PROTOCOL=VMess-$(sed 's/^K/mK/;s/D$/-dynamic-port/' <<<${IS_LOWER^^})
             ;;
         ws | h2 | grpc | vws | vh2 | vgrpc | tws | th2 | tgrpc)
-            is_new_protocol=$(sed -E "s/^V/VLESS-/;s/^T/Trojan-/;/^(W|H|G)/{s/^/VMess-/};s/G/g/" <<<${is_lower^^})-TLS
+            IS_NEW_PROTOCOL=$(sed -E "s/^V/VLESS-/;s/^T/Trojan-/;/^(W|H|G)/{s/^/VMess-/};s/G/g/" <<<${IS_LOWER^^})-TLS
             ;;
         # r | reality)
-        #     is_new_protocol=VLESS-XTLS-uTLS-REALITY
+        #     IS_NEW_PROTOCOL=VLESS-XTLS-uTLS-REALITY
         #     ;;
         ss)
-            is_new_protocol=Shadowsocks
+            IS_NEW_PROTOCOL=Shadowsocks
             ;;
         door)
-            is_new_protocol=Dokodemo-Door
+            IS_NEW_PROTOCOL=Dokodemo-Door
             ;;
         socks)
-            is_new_protocol=Socks
+            IS_NEW_PROTOCOL=Socks
             ;;
         http)
-            is_new_protocol=local-$is_lower
+            IS_NEW_PROTOCOL=local-$IS_LOWER
             ;;
         *)
-            for v in ${protocol_list[@]}; do
-                [[ $(grep -E -i "^$is_lower$" <<<$v) ]] && is_new_protocol=$v && break
+            for v in ${PROTOCOL_LIST[@]}; do
+                [[ $(grep -E -i "^$IS_LOWER$" <<<$v) ]] && IS_NEW_PROTOCOL=$v && break
             done
 
-            [[ ! $is_new_protocol ]] && err "无法识别 ($1), 请使用: $is_core add [protocol] [args... | auto]"
+            [[ ! $IS_NEW_PROTOCOL ]] && err "无法识别 ($1), 请使用: $IS_CORE add [protocol] [args... | auto]"
             ;;
         esac
     fi
 
-    # no prefer protocol
-    [[ ! $is_new_protocol ]] && ask set_protocol
-
-    case ${is_new_protocol,,} in
+    ##
+    ## no prefer protocol
+    ##
+    [[ ! $IS_NEW_PROTOCOL ]] && ask set_protocol
+    case ${IS_NEW_PROTOCOL,,} in
     *-tls)
-        is_use_tls=1
-        is_use_host=$2
-        is_use_uuid=$3
-        is_use_path=$4
-        is_add_opts="[host] [uuid] [/path]"
+        IS_USE_TLS=1
+        IS_USE_HOST=$2
+        IS_USE_UUID=$3
+        IS_USE_PATH=$4
+        IS_ADD_OPTS="[host] [uuid] [/path]"
         ;;
     vmess*)
-        is_use_port=$2
-        is_use_uuid=$3
-        is_use_header_type=$4
-        is_use_dynamic_port_start=$5
-        is_use_dynamic_port_end=$6
-        [[ $(grep dynamic-port <<<$is_new_protocol) ]] && is_dynamic_port=1
-        if [[ $is_dynamic_port ]]; then
-            is_add_opts="[port] [uuid] [type] [start_port] [end_port]"
+        IS_USE_PORT=$2
+        IS_USE_UUID=$3
+        IS_USE_HEADER_TYPE=$4
+        IS_USE_DYNAMIC_PORT_START=$5
+        IS_USE_DYNAMIC_PORT_END=$6
+        [[ $(grep dynamic-port <<<$IS_NEW_PROTOCOL) ]] && IS_DYNAMIC_PORT=1
+        if [[ $IS_DYNAMIC_PORT ]]; then
+            IS_ADD_OPTS="[port] [uuid] [type] [start_port] [end_port]"
         else
-            is_add_opts="[port] [uuid] [type]"
+            IS_ADD_OPTS="[port] [uuid] [type]"
         fi
         ;;
     # *reality*)
-    #     is_reality=1
-    #     is_use_port=$2
-    #     is_use_uuid=$3
-    #     is_use_servername=$4
+    #     IS_REALITY=1
+    #     IS_USE_PORT=$2
+    #     IS_USE_UUID=$3
+    #     IS_USE_SERVERNAME=$4
     #     ;;
     shadowsocks)
-        is_use_port=$2
-        is_use_pass=$3
-        is_use_method=$4
-        is_add_opts="[port] [password] [method]"
+        IS_USE_PORT=$2
+        IS_USE_PASS=$3
+        IS_USE_METHOD=$4
+        IS_ADD_OPTS="[port] [password] [method]"
         ;;
     *door)
-        is_use_port=$2
-        is_use_door_addr=$3
-        is_use_door_port=$4
-        is_add_opts="[port] [remote_addr] [remote_port]"
+        IS_USE_PORT=$2
+        IS_USE_DOOR_ADDR=$3
+        IS_USE_DOOR_PORT=$4
+        IS_ADD_OPTS="[port] [remote_addr] [remote_port]"
         ;;
     socks)
-        is_socks=1
-        is_use_port=$2
-        is_use_socks_user=$3
-        is_use_socks_pass=$4
-        is_add_opts="[port] [username] [password]"
+        IS_SOCKS=1
+        IS_USE_PORT=$2
+        IS_USE_SOCKS_USER=$3
+        IS_USE_SOCKS_PASS=$4
+        IS_ADD_OPTS="[port] [username] [password]"
         ;;
     *http)
-        is_use_port=$2
-        is_add_opts="[port]"
+        IS_USE_PORT=$2
+        IS_ADD_OPTS="[port]"
         ;;
     esac
 
-    [[ $1 && ! $is_change ]] && {
-        msg "\n使用协议: $is_new_protocol"
+    [[ $1 && ! $IS_CHANGE ]] && {
+        msg "\n使用协议: $IS_NEW_PROTOCOL"
         # err msg tips
-        is_err_tips="\n\n请使用: $(_green $is_core add $1 $is_add_opts) 来添加 $is_new_protocol 配置"
+        IS_ERR_TIPS="\n\n请使用: $(_green $IS_CORE add $1 $IS_ADD_OPTS) 来添加 $IS_NEW_PROTOCOL 配置"
     }
 
     # remove old protocol args
-    if [[ $is_set_new_protocol ]]; then
-        case $is_old_net in
+    if [[ $IS_SET_NEW_PROTOCOL ]]; then
+        case $IS_OLD_NET in
         tcp)
             unset header_type net
             ;;
         kcp | quic)
-            kcp_seed=
-            [[ $(grep -i tcp <<<$is_new_protocol) ]] && header_type=
+            KCP_SEED=
+            [[ $(grep -i tcp <<<$IS_NEW_PROTOCOL) ]] && HEADER_TYPE=
             ;;
         h2 | ws | grpc)
-            old_host=$host
-            if [[ ! $is_use_tls ]]; then
-                unset host is_no_auto_tls
+            OLD_HOST=$HOST
+            if [[ ! $IS_USE_TLS ]]; then
+                unset host IS_NO_AUTO_TLS
             else
-                [[ $is_old_net == 'grpc' ]] && {
-                    path=/$path
+                [[ $IS_OLD_NET == 'grpc' ]] && {
+                    PATH=/$PATH
                 }
             fi
-            [[ ! $(grep -i trojan <<<$is_new_protocol) ]] && is_trojan=
+            [[ ! $(grep -i trojan <<<$IS_NEW_PROTOCOL) ]] && IS_TROJAN=
             ;;
         reality)
-            [[ ! $(grep -i reality <<<$is_new_protocol) ]] && is_reality=
+            [[ ! $(grep -i reality <<<$IS_NEW_PROTOCOL) ]] && IS_REALITY=
             ;;
         ss)
-            [[ $(is_test uuid $ss_password) ]] && uuid=$ss_password
+            [[ $(is_test uuid $SS_PASSWORD) ]] && UUID=$SS_PASSWORD
             ;;
         esac
-        [[ $is_dynamic_port && ! $(grep dynamic-port <<<$is_new_protocol) ]] && {
-            is_dynamic_port=
+        [[ $IS_DYNAMIC_PORT && ! $(grep dynamic-port <<<$IS_NEW_PROTOCOL) ]] && {
+            IS_DYNAMIC_PORT=
         }
 
-        [[ ! $(is_test uuid $uuid) ]] && uuid=
+        [[ ! $(is_test uuid $UUID) ]] && UUID=
     fi
 
     # no-auto-tls only use h2,ws,grpc
-    if [[ $is_no_auto_tls && ! $is_use_tls ]]; then
-        err "$is_new_protocol 不支持手动配置 tls."
+    if [[ $IS_NO_AUTO_TLS && ! $IS_USE_TLS ]]; then
+        err "$IS_NEW_PROTOCOL 不支持手动配置 tls."
     fi
 
     # prefer args.
     if [[ $2 ]]; then
-        for v in is_use_port is_use_uuid is_use_header_type is_use_host is_use_path is_use_pass is_use_method is_use_door_addr is_use_door_port is_use_dynamic_port_start is_use_dynamic_port_end; do
-            [[ ${!v} == 'auto' ]] && unset $v
+        for v in IS_USE_PORT IS_USE_UUID IS_USE_HEADER_TYPE IS_USE_HOST IS_USE_PATH IS_USE_PASS IS_USE_METHOD IS_USE_DOOR_ADDR IS_USE_DOOR_PORT IS_USE_DYNAMIC_PORT_START IS_USE_DYNAMIC_PORT_END; do
+            [[ ${!v} == 'auto' ]] && unset $V
         done
 
-        if [[ $is_use_port ]]; then
-            [[ ! $(is_test port ${is_use_port}) ]] && {
-                err "($is_use_port) 不是一个有效的端口. $is_err_tips"
+        if [[ $IS_USE_PORT ]]; then
+            [[ ! $(is_test port ${IS_USE_PORT}) ]] && {
+                err "($IS_USE_PORT) 不是一个有效的端口. $IS_ERR_TIPS"
             }
-            [[ $(is_test port_used $is_use_port) ]] && {
-                err "无法使用 ($is_use_port) 端口. $is_err_tips"
+            [[ $(is_test port_used $IS_USE_PORT) ]] && {
+                err "无法使用 ($IS_USE_PORT) 端口. $IS_ERR_TIPS"
             }
-            port=$is_use_port
+            PORT=$IS_USE_PORT
         fi
-        if [[ $is_use_door_port ]]; then
-            [[ ! $(is_test port ${is_use_door_port}) ]] && {
-                err "(${is_use_door_port}) 不是一个有效的目标端口. $is_err_tips"
+        if [[ $IS_USE_DOOR_PORT ]]; then
+            [[ ! $(is_test port ${IS_USE_DOOR_PORT}) ]] && {
+                err "(${IS_USE_DOOR_PORT}) 不是一个有效的目标端口. $IS_ERR_TIPS"
             }
-            door_port=$is_use_door_port
+            DOOR_PORT=$IS_USE_DOOR_PORT
         fi
-        if [[ $is_use_uuid ]]; then
-            [[ ! $(is_test uuid $is_use_uuid) ]] && {
-                err "($is_use_uuid) 不是一个有效的 UUID. $is_err_tips"
+        if [[ $IS_USE_UUID ]]; then
+            [[ ! $(is_test uuid $IS_USE_UUID) ]] && {
+                err "($IS_USE_UUID) 不是一个有效的 uuid. $IS_ERR_TIPS"
             }
-            uuid=$is_use_uuid
+            UUID=$IS_USE_UUID
         fi
-        if [[ $is_use_path ]]; then
-            [[ ! $(is_test path $is_use_path) ]] && {
-                err "($is_use_path) 不是有效的路径. $is_err_tips"
+        if [[ $IS_USE_PATH ]]; then
+            [[ ! $(is_test path $IS_USE_PATH) ]] && {
+                err "($IS_USE_PATH) 不是有效的路径. $IS_ERR_TIPS"
             }
-            path=$is_use_path
+            PATH=$IS_USE_PATH
         fi
-        if [[ $is_use_header_type || $is_use_method ]]; then
-            is_tmp_use_name=加密方式
-            is_tmp_list=${ss_method_list[@]}
-            [[ ! $is_use_method ]] && {
-                is_tmp_use_name=伪装类型
+        if [[ $IS_USE_HEADER_TYPE || $IS_USE_METHOD ]]; then
+            IS_TMP_USE_NAME=加密方式
+            IS_TMP_LIST=${SS_METHOD_LIST[@]}
+            [[ ! $IS_USE_METHOD ]] && {
+                IS_TMP_USE_NAME=伪装类型
                 ask set_header_type
             }
-            for v in ${is_tmp_list[@]}; do
-                [[ $(grep -E -i "^${is_use_header_type}${is_use_method}$" <<<$v) ]] && is_tmp_use_type=$v && break
+            for v in ${IS_TMP_LIST[@]}; do
+                [[ $(grep -E -i "^${IS_USE_HEADER_TYPE}${IS_USE_METHOD}$" <<<$V) ]] && IS_TMP_USE_TYPE=$V && break
             done
-            [[ ! ${is_tmp_use_type} ]] && {
-                warn "(${is_use_header_type}${is_use_method}) 不是一个可用的${is_tmp_use_name}."
-                msg "${is_tmp_use_name}可用如下: "
-                for v in ${is_tmp_list[@]}; do
-                    msg "\t\t$v"
+            [[ ! ${IS_TMP_USE_TYPE} ]] && {
+                warn "(${IS_USE_HEADER_TYPE}${IS_USE_METHOD}) 不是一个可用的${IS_TMP_USE_NAME}."
+                msg "${IS_TMP_USE_NAME}可用如下: "
+                for v in ${IS_TMP_LIST[@]}; do
+                    msg "\t\t$V"
                 done
-                msg "$is_err_tips\n"
+                msg "$IS_ERR_TIPS\n"
                 exit 1
             }
-            ss_method=$is_tmp_use_type
-            header_type=$is_tmp_use_type
+            SS_METHOD=$IS_TMP_USE_TYPE
+            HEADER_TYPE=$IS_TMP_USE_TYPE
         fi
-        if [[ $is_dynamic_port && $is_use_dynamic_port_start ]]; then
+        if [[ $IS_DYNAMIC_PORT && $IS_USE_DYNAMIC_PORT_START ]]; then
             get dynamic-port-test
         fi
-        [[ $is_use_pass ]] && ss_password=$is_use_pass
-        [[ $is_use_host ]] && host=$is_use_host
-        [[ $is_use_door_addr ]] && door_addr=$is_use_door_addr
-        [[ $is_use_servername ]] && is_servername=$is_use_servername
-        [[ $is_use_socks_user ]] && is_socks_user=$is_use_socks_user
-        [[ $is_use_socks_pass ]] && is_socks_pass=$is_use_socks_pass
+        [[ $IS_USE_PASS ]] && SS_PASSWORD=$IS_USE_PASS
+        [[ $IS_USE_HOST ]] && host=$IS_USE_HOST
+        [[ $IS_USE_DOOR_ADDR ]] && DOOR_ADDR=$IS_USE_DOOR_ADDR
+        [[ $IS_USE_SERVERNAME ]] && IS_SERVERNAME=$IS_USE_SERVERNAME
+        [[ $IS_USE_SOCKS_USER ]] && IS_SOCKS_USER=$IS_USE_SOCKS_USER
+        [[ $IS_USE_SOCKS_PASS ]] && IS_SOCKS_PASS=$IS_USE_SOCKS_PASS
     fi
 
-    if [[ $is_use_tls ]]; then
-        if [[ ! $is_no_auto_tls && ! $is_caddy && ! $is_nginx && ! $is_gen ]]; then
+    if [[ $IS_USE_TLS ]]; then
+        if [[ ! $IS_NO_AUTO_TLS && ! $IS_CADDY && ! $IS_NGINX && ! $IS_GEN ]]; then
             # test auto tls
             [[ $(is_test port_used 80) || $(is_test port_used 443) ]] && {
                 get_port
-                is_http_port=$tmp_port
+                IS_HTTP_PORT=$TMP_PORT
                 get_port
-                is_https_port=$tmp_port
+                IS_HTTPS_PORT=$TMP_PORT
                 warn "端口 (80 或 443) 已经被占用, 你也可以考虑使用 no-auto-tls"
                 msg "\e[41m no-auto-tls 帮助(help)\e[0m: $(msg_ul https://wangyan-good.github.io/v2ray/no-auto-tls/)\n"
-                msg "\n Caddy 将使用非标准端口实现自动配置 TLS, HTTP:$is_http_port HTTPS:$is_https_port\n"
+                msg "\n Caddy 将使用非标准端口实现自动配置 TLS, HTTP:$IS_HTTP_PORT HTTPS:$IS_HTTPS_PORT\n"
                 msg "请确定是否继续???"
                 pause
             }
-            is_install_caddy=1
+            IS_INSTALL_CADDY=1
         fi
         # set host
-        [[ ! $host ]] && ask string host "请输入域名:"
+        [[ ! $HOST ]] && ask string host "请输入域名:"
         # test host dns
         get host-test
     else
         # for main menu start, dont auto create args
-        if [[ $is_main_start ]]; then
+        if [[ $IS_MAIN_START ]]; then
 
             # set port
-            [[ ! $port ]] && ask string port "请输入端口:"
+            [[ ! $PORT ]] && ask string port "请输入端口:"
 
-            case ${is_new_protocol,,} in
+            case ${IS_NEW_PROTOCOL,,} in
             *tcp* | *kcp* | *quic*)
-                [[ ! $header_type ]] && ask set_header_type
+                [[ ! $HEADER_TYPE ]] && ask set_header_type
                 ;;
             socks)
                 # set user
-                [[ ! $is_socks_user ]] && ask string is_socks_user "请设置用户名:"
+                [[ ! $IS_SOCKS_USER ]] && ask string IS_SOCKS_USER "请设置用户名:"
                 # set password
-                [[ ! $is_socks_pass ]] && ask string is_socks_pass "请设置密码:"
+                [[ ! $IS_SOCKS_PASS ]] && ask string IS_SOCKS_PASS "请设置密码:"
                 ;;
             shadowsocks)
                 # set method
-                [[ ! $ss_method ]] && ask set_ss_method
+                [[ ! $SS_METHOD ]] && ask set_ss_method
                 # set password
-                [[ ! $ss_password ]] && ask string ss_password "请设置密码:"
+                [[ ! $SS_PASSWORD ]] && ask string ss_password "请设置密码:"
                 ;;
             esac
             # set dynamic port
-            [[ $is_dynamic_port && ! $is_dynamic_port_range ]] && {
-                ask string is_use_dynamic_port_start "请输入动态开始端口:"
-                ask string is_use_dynamic_port_end "请输入动态结束端口:"
+            [[ $IS_DYNAMIC_PORT && ! $IS_DYNAMIC_PORT_RANGE ]] && {
+                ask string IS_USE_DYNAMIC_PORT_START "请输入动态开始端口:"
+                ask string IS_USE_DYNAMIC_PORT_END "请输入动态结束端口:"
                 get dynamic-port-test
             }
         fi
     fi
 
     # Dokodemo-Door
-    if [[ $is_new_protocol == 'Dokodemo-Door' ]]; then
+    if [[ $IS_NEW_PROTOCOL == 'Dokodemo-Door' ]]; then
         # set remote addr
-        [[ ! $door_addr ]] && ask string door_addr "请输入目标地址:"
-        # set remote port
-        [[ ! $door_port ]] && ask string door_port "请输入目标端口:"
+        [[ ! $DOOR_ADDR ]] && ask string door_addr "请输入目标地址:"
+        # set remote PORT
+        [[ ! $DOOR_PORT ]] && ask string door_addr "请输入目标端口:"
     fi
 
     # Shadowsocks 2022
-    if [[ $(grep 2022 <<<$ss_method) ]]; then
+    if [[ $(grep 2022 <<<$SS_METHOD) ]]; then
         # test ss2022 password
-        [[ $ss_password ]] && {
-            is_test_json=1
-            # create server Shadowsocks | $is_core_bin -test &>/dev/null
+        [[ $SS_PASSWORD ]] && {
+            IS_TEST_JSON=1
+            # create server Shadowsocks | $IS_CORE_BIN -test &>/dev/null
             create server Shadowsocks
-            $is_core_bin -test <<<"$is_new_json" &>/dev/null
+            $IS_CORE_BIN -test <<<"$IS_NEW_JSON" &>/dev/null
             if [[ $? != 0 ]]; then
-                warn "Shadowsocks 协议 ($ss_method) 不支持使用密码 ($(_red_bg $ss_password))\n\n你可以使用命令: $(_green $is_core ss2022) 生成支持的密码.\n\n脚本将自动创建可用密码:)"
-                ss_password=
+                warn "Shadowsocks 协议 ($SS_METHOD) 不支持使用密码 ($(_red_bg $SS_PASSWORD))\n\n你可以使用命令: $(_green $IS_CORE ss2022) 生成支持的密码.\n\n脚本将自动创建可用密码:)"
+                SS_PASSWORD=
                 # create new json.
-                json_str=
+                JSON_STR=
             fi
-            is_test_json=
+            IS_TEST_JSON=
         }
 
     fi
 
     # install caddy or nginx
-    if [[ $is_install_caddy ]]; then
+    if [[ $IS_INSTALL_CADDY ]]; then
         get install-caddy
-    elif [[ $is_install_nginx ]]; then
+    elif [[ $IS_INSTALL_NGINX ]]; then
         get install-nginx
     fi
 
     # create json
-    create server $is_new_protocol
+    create server $IS_NEW_PROTOCOL
 
     # show config info.
     info
@@ -1205,282 +1212,278 @@ add() {
 get() {
     case $1 in
     addr)
-        is_addr=$host
-        [[ ! $is_addr ]] && {
+        IS_ADDR=$HOST
+        [[ ! $IS_ADDR ]] && {
             get_ip
-            is_addr=$ip
-            [[ $(grep ":" <<<$ip) ]] && is_addr="[$ip]"
+            IS_ADDR=$IP
+            [[ $(grep ":" <<<$IP) ]] && IS_ADDR="[$IP]"
         }
         ;;
     new)
-        [[ ! $host ]] && get_ip
-        [[ ! $port ]] && get_port && port=$tmp_port
-        [[ ! $uuid ]] && get_uuid && uuid=$tmp_uuid
+        [[ ! $HOST ]] && get_ip
+        [[ ! $PORT ]] && get_port && PORT=$TMP_PORT
+        [[ ! $UUID ]] && get_uuid && UUID=$TMP_UUID
         ;;
     file)
-        is_file_str=$2
-        [[ ! $is_file_str ]] && is_file_str='.json$'
-        # is_all_json=("$(ls $is_conf_dir | grep -E $is_file_str)")
-        readarray -t is_all_json <<<"$(ls $is_conf_dir | grep -E -i "$is_file_str" | sed '/dynamic-port-.*-link/d' | head -233)" # limit max 233 lines for show.
-        [[ ! $is_all_json ]] && err "无法找到相关的配置文件: $2"
-        [[ ${#is_all_json[@]} -eq 1 ]] && is_config_file=$is_all_json && is_auto_get_config=1
-        [[ ! $is_config_file ]] && {
-            [[ $is_dont_auto_exit ]] && return
+        IS_FILE_STR=$2
+        [[ ! $IS_FILE_STR ]] && IS_FILE_STR='.json$'
+        # IS_ALL_JSON=("$(ls $IS_CONF_DIR | grep -E $IS_FILE_STR)")
+        readarray -t IS_ALL_JSON <<<"$(ls $IS_CONF_DIR | grep -E -i "$IS_FILE_STR" | sed '/dynamic-port-.*-link/d' | head -233)" # limit max 233 lines for show.
+        [[ ! $IS_ALL_JSON ]] && err "无法找到相关的配置文件: $2"
+        [[ ${#IS_ALL_JSON[@]} -eq 1 ]] && IS_CONFIG_FILE=$IS_ALL_JSON && IS_AUTO_GET_CONFIG=1
+        [[ ! $IS_CONFIG_FILE ]] && {
+            [[ $IS_DONT_AUTO_EXIT ]] && return
             ask get_config_file
         }
         ;;
     info)
         get file $2
-        if [[ $is_config_file ]]; then
-            is_json_str=$(cat $is_conf_dir/"$is_config_file")
-            is_json_data_base=$(jq -r '(.inbounds[0].protocol//""),(.inbounds[0].port//""),(.inbounds[0].settings.clients[0].id//""),(.inbounds[0].settings.clients[0].password//""),(.inbounds[0].settings.method//""),(.inbounds[0].settings.address//""),(.inbounds[0].settings.port//""),(.inbounds[0].settings.detour.to//""),(.inbounds[0].settings.accounts[0].user//""),(.inbounds[0].settings.accounts[0].pass//"")' <<<$is_json_str)
-            [[ $? != 0 ]] && err "无法读取此文件: $is_config_file"
-            is_json_data_more=$(jq -r '(.inbounds[0].streamSettings.network//""),(.inbounds[0].streamSettings.security//""),(.inbounds[0].streamSettings.tcpSettings.header.type//""),(.inbounds[0].streamSettings.kcpSettings.seed//""),(.inbounds[0].streamSettings.kcpSettings.header.type//""),(.inbounds[0].streamSettings.quicSettings.header.type//""),(.inbounds[0].streamSettings.wsSettings.path//""),(.inbounds[0].streamSettings.httpSettings.path//""),(.inbounds[0].streamSettings.grpcSettings.serviceName//"")' <<<$is_json_str)
-            is_json_data_host=$(jq -r '(.inbounds[0].streamSettings.grpc_host//""),(.inbounds[0].streamSettings.wsSettings.headers.Host//""),(.inbounds[0].streamSettings.httpSettings.host[0]//"")' <<<$is_json_str)
-            is_json_data_reality=$(jq -r '(.inbounds[0].streamSettings.realitySettings.serverNames[0]//""),(.inbounds[0].streamSettings.realitySettings.publicKey//""),(.inbounds[0].streamSettings.realitySettings.privateKey//"")' <<<$is_json_str)
-            [[ $is_debug ]] && {
-                msg "DEBUG: is_json_data_base=[$is_json_data_base]"
-                msg "DEBUG: is_json_data_more=[$is_json_data_more]"
-                msg "DEBUG: is_json_data_host=[$is_json_data_host]"
-                msg "DEBUG: is_json_data_reality=[$is_json_data_reality]"
+        if [[ $IS_CONFIG_FILE ]]; then
+            IS_JSON_STR=$(cat $IS_CONF_DIR/"$IS_CONFIG_FILE")
+            IS_JSON_DATA_BASE=$(jq -r '(.inbounds[0].protocol//""),(.inbounds[0].port//""),(.inbounds[0].settings.clients[0].id//""),(.inbounds[0].settings.clients[0].password//""),(.inbounds[0].settings.method//""),(.inbounds[0].settings.address//""),(.inbounds[0].settings.port//""),(.inbounds[0].settings.detour.to//""),(.inbounds[0].settings.accounts[0].user//""),(.inbounds[0].settings.accounts[0].pass//"")' <<<$IS_JSON_STR)
+            [[ $? != 0 ]] && err "无法读取此文件: $IS_CONFIG_FILE"
+            IS_JSON_DATA_MORE=$(jq -r '(.inbounds[0].streamSettings.network//""),(.inbounds[0].streamSettings.security//""),(.inbounds[0].streamSettings.tcpSettings.header.type//""),(.inbounds[0].streamSettings.kcpSettings.seed//""),(.inbounds[0].streamSettings.kcpSettings.header.type//""),(.inbounds[0].streamSettings.quicSettings.header.type//""),(.inbounds[0].streamSettings.wsSettings.path//""),(.inbounds[0].streamSettings.httpSettings.path//""),(.inbounds[0].streamSettings.grpcSettings.serviceName//"")' <<<$IS_JSON_STR)
+            IS_JSON_DATA_HOST=$(jq -r '(.inbounds[0].streamSettings.grpc_host//""),(.inbounds[0].streamSettings.wsSettings.headers.Host//""),(.inbounds[0].streamSettings.httpSettings.host[0]//"")' <<<$IS_JSON_STR)
+            IS_JSON_DATA_REALITY=$(jq -r '(.inbounds[0].streamSettings.realitySettings.serverNames[0]//""),(.inbounds[0].streamSettings.realitySettings.publicKey//""),(.inbounds[0].streamSettings.realitySettings.privateKey//"")' <<<$IS_JSON_STR)
+            [[ $IS_DEBUG ]] && {
+                msg "DEBUG: IS_JSON_DATA_BASE=[$IS_JSON_DATA_BASE]"
+                msg "DEBUG: IS_JSON_DATA_MORE=[$IS_JSON_DATA_MORE]"
+                msg "DEBUG: IS_JSON_DATA_HOST=[$IS_JSON_DATA_HOST]"
+                msg "DEBUG: IS_JSON_DATA_REALITY=[$IS_JSON_DATA_REALITY]"
             }
             # 变量映射表 (按 jq 输出顺序): 0-9 base, 10-18 more, 19-21 host, 22-24 reality
             # base(10): protocol,port,uuid,password,method,address,port,detour,user,pass
             # more(9): network,security,tcp_type,kcp_seed,kcp_type,quic_type,ws_path,h2_path,grpc_serviceName
             # host(3): grpc_host,ws_host,h2_host
             # reality(3): serverName,publicKey,privateKey
-            is_up_var_set=(is_protocol port uuid trojan_password ss_method door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_security tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host is_servername is_public_key is_private_key)
+            IS_UP_VAR_SET=(IS_PROTOCOL PORT UUID TROJAN_PASSWORD SS_METHOD DOOR_ADDR DOOR_PORT IS_DYNAMIC_PORT IS_SOCKS_USER IS_SOCKS_PASS NET IS_SECURITY tcp_type KCP_SEED kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host IS_SERVERNAME IS_PUBLIC_KEY IS_PRIVATE_KEY)
             # 使用 readarray 分别读取每个 jq 输出，确保空行不丢失
-            readarray -t base_arr <<< "$is_json_data_base"
-            readarray -t more_arr <<< "$is_json_data_more"
-            readarray -t host_arr <<< "$is_json_data_host"
-            readarray -t reality_arr <<< "$is_json_data_reality"
-            local -a all_json_output=("${base_arr[@]}" "${more_arr[@]}" "${host_arr[@]}" "${reality_arr[@]}")
-            [[ $is_debug ]] && msg "DEBUG: all_json_output count=${#all_json_output[@]} (base:${#base_arr[@]} more:${#more_arr[@]} host:${#host_arr[@]} reality:${#reality_arr[@]})"
-            for i in "${!all_json_output[@]}"; do
-                [[ $is_debug ]] && msg "$i-${is_up_var_set[$i]}: ${all_json_output[$i]}"
-                export ${is_up_var_set[$i]}="${all_json_output[$i]}"
+            readarray -t BASE_ARR <<< "$IS_JSON_DATA_BASE"
+            readarray -t MORE_ARR <<< "$IS_JSON_DATA_MORE"
+            readarray -t HOST_ARR <<< "$IS_JSON_DATA_HOST"
+            readarray -t REALITY_ARR <<< "$IS_JSON_DATA_REALITY"
+            local -a ALL_JSON_OUTPUT=("${BASE_ARR[@]}" "${MORE_ARR[@]}" "${HOST_ARR[@]}" "${REALITY_ARR[@]}")
+            [[ $IS_DEBUG ]] && msg "DEBUG: all_json_output count=${#ALL_JSON_OUTPUT[@]} (base:${#BASE_ARR[@]} more:${#MORE_ARR[@]} host:${#HOST_ARR[@]} reality:${#REALITY_ARR[@]})"
+            for i in "${!ALL_JSON_OUTPUT[@]}"; do
+                [[ $IS_DEBUG ]] && msg "$i-${IS_UP_VAR_SET[$i]}: ${ALL_JSON_OUTPUT[$i]}"
+                export ${IS_UP_VAR_SET[$i]}="${ALL_JSON_OUTPUT[$i]}"
             done
-            [[ $is_debug ]] && msg "DEBUG: net='$net', host='$host', grpc_host='$grpc_host'"
-            for v in ${is_up_var_set[@]}; do
-                [[ -z "${!v}" || "${!v}" == "null" ]] && unset $v
+            [[ $IS_DEBUG ]] && msg "DEBUG: net='$NET', host='$HOST', grpc_host='$grpc_host'"
+            for v in ${IS_UP_VAR_SET[@]}; do
+                [[ -z "${!v}" || "${!v}" == "null" ]] && unset $V
             done
 
             # 合并变量（如果从 JSON 读取失败，使用备用方式）
-            [[ -z $host ]] && host="${grpc_host:-${ws_host:-${h2_host:-}}}"
+            [[ -z $HOST ]] && host="${grpc_host:-${ws_host:-${h2_host:-}}}"
             # grpc 的 serviceName 存储在 grpc_serviceName 变量中，需要赋值给 path
-            [[ -z $path && $grpc_serviceName ]] && path="$grpc_serviceName"
+            [[ -z $PATH && $GRPC_SERVICE_NAME ]] && PATH="$GRPC_SERVICE_NAME"
             # 备用：如果 net 为空，尝试从 JSON 直接提取
-            [[ -z $net ]] && net=$(jq -r '.inbounds[0].streamSettings.network // ""' <<<$is_json_str)
-            [[ $is_debug ]] && msg "DEBUG (backup): net='$net'"
-            [[ -z $is_https_port ]] && is_https_port=443
-            header_type="${tcp_type:-}${kcp_type:-}${quic_type:-}"
+            [[ -z $NET ]] && NET=$(jq -r '.inbounds[0].streamSettings.network // ""' <<<$IS_JSON_STR)
+            [[ $IS_DEBUG ]] && msg "DEBUG (backup): net='$NET'"
+            [[ -z $IS_HTTPS_PORT ]] && IS_HTTPS_PORT=443
+            HEADER_TYPE="${tcp_type:-}${kcp_type:-}${quic_type:-}"
             # 判断是否为 reality 协议
-            if [[ $is_security == 'reality' ]]; then
-                net=reality
-                is_reality=reality
+            if [[ $IS_SECURITY == 'reality' ]]; then
+                NET=reality
+                IS_REALITY=reality
             else
-                is_reality=
+                IS_REALITY=
             fi
-            [[ ! $kcp_seed ]] && is_no_kcp_seed=1
-            is_config_name=$is_config_file
-            if [[ $is_dynamic_port ]]; then
-                is_dynamic_port_file=$is_conf_dir/$is_dynamic_port
-                is_dynamic_port_range=$(jq -r '.inbounds[0].port' $is_dynamic_port_file)
-                [[ $? != 0 ]] && err "无法读取动态端口文件: $is_dynamic_port"
+            [[ ! $KCP_SEED ]] && IS_NO_KCP_SEED=1
+            IS_CONFIG_NAME=$IS_CONFIG_FILE
+            if [[ $IS_DYNAMIC_PORT ]]; then
+                IS_DYNAMIC_PORT_FILE=$IS_CONF_DIR/$IS_DYNAMIC_PORT
+                IS_DYNAMIC_PORT_RANGE=$(jq -r '.inbounds[0].port' $IS_DYNAMIC_PORT_FILE)
+                [[ $? != 0 ]] && err "无法读取动态端口文件: $IS_DYNAMIC_PORT"
             fi
-            if [[ $is_caddy && $host && -f $is_caddy_conf/$host.conf ]]; then
-                is_tmp_https_port=$(grep -E -o "$host:[1-9][0-9]?+" $is_caddy_conf/$host.conf | sed s/.*://)
+            if [[ $IS_CADDY && $HOST && -f $IS_CADDY_CONF/$HOST.conf ]]; then
+                IS_TMP_HTTPS_PORT=$(grep -E -o "$HOST:[1-9][0-9]?+" $IS_CADDY_CONF/$HOST.conf | sed s/.*://)
             fi
-            if [[ $is_nginx && $host && -f $is_nginx_conf/$host.conf ]]; then
-                # 优先匹配带 ssl 的 listen 行（HTTPS 端口），否则默认为 443
-                is_tmp_https_port=$(grep -E "listen.*ssl" $is_nginx_conf/$host.conf | grep -oE '[0-9]+' | head -1)
-                [[ ! $is_tmp_https_port ]] && is_tmp_https_port=443
+            if [[ $IS_NGINX && $HOST && -f $IS_NGINX_CONF/$HOST.conf ]]; then
+                IS_TMP_HTTPS_PORT=$(grep -E "listen.*ssl" $IS_NGINX_CONF/$HOST.conf | grep -oE '[0-9]+' | head -1)
+                [[ ! $IS_TMP_HTTPS_PORT ]] && IS_TMP_HTTPS_PORT=443
             fi
-            if [[ $host && ! -f $is_caddy_conf/$host.conf && ! -f $is_nginx_conf/$host.conf ]]; then
-                # 新配置默认使用 443 端口
-                is_tmp_https_port=443
+            if [[ $HOST && ! -f $IS_CADDY_CONF/$HOST.conf && ! -f $IS_NGINX_CONF/$HOST.conf ]]; then
+                IS_TMP_HTTPS_PORT=443
             fi
-            [[ $is_tmp_https_port ]] && is_https_port=$is_tmp_https_port
-            [[ $is_client && $host ]] && port=$is_https_port
+            [[ $IS_TMP_HTTPS_PORT ]] && IS_HTTPS_PORT=$IS_TMP_HTTPS_PORT
+            [[ $IS_CLIENT && $HOST ]] && PORT=$IS_HTTPS_PORT
             # 注意：不再调用 get protocol，因为 info() 不需要构建 JSON，只需要显示信息
         fi
         ;;
     protocol)
         get addr # get host or server ip
-        is_lower=${2,,}
-        net=
-        case $is_lower in
+        IS_LOWER=${2,,}
+        NET=
+        case $IS_LOWER in
         vmess*)
-            is_protocol=vmess
-            if [[ $is_dynamic_port ]]; then
-                is_server_id_json='settings:{clients:[{id:'\"$uuid\"'}],detour:{to:'\"$is_config_name-link.json\"'}}'
+            IS_PROTOCOL=vmess
+            if [[ $IS_DYNAMIC_PORT ]]; then
+                IS_SERVER_ID_JSON='settings:{clients:[{id:'\"$UUID\"'}],detour:{to:'\"$IS_CONFIG_NAME-link.json\"'}}'
             else
-                is_server_id_json='settings:{clients:[{id:'\"$uuid\"'}]}'
+                IS_SERVER_ID_JSON='settings:{clients:[{id:'\"$UUID\"'}]}'
             fi
-            is_client_id_json='settings:{vnext:[{address:'\"$is_addr\"',port:'"$port"',users:[{id:'\"$uuid\"'}]}]}'
+            IS_CLIENT_ID_JSON='settings:{vnext:[{address:'\"$IS_ADDR\"',port:'"$PORT"',users:[{id:'\"$UUID\"'}]}]}'
             ;;
         vless*)
-            is_protocol=vless
-            is_server_id_json='settings:{clients:[{id:'\"$uuid\"'}],decryption:"none"}'
-            is_client_id_json='settings:{vnext:[{address:'\"$is_addr\"',port:'"$port"',users:[{id:'\"$uuid\"',encryption:"none"}]}]}'
-            if [[ $is_reality ]]; then
-                is_server_id_json='settings:{clients:[{id:'\"$uuid\"',flow:"xtls-rprx-vision"}],decryption:"none"}'
-                is_client_id_json='settings:{vnext:[{address:'\"$is_addr\"',port:'"$port"',users:[{id:'\"$uuid\"',encryption:"none",flow:"xtls-rprx-vision"}]}]}'
+            IS_PROTOCOL=vless
+            IS_SERVER_ID_JSON='settings:{clients:[{id:'\"$UUID\"'}],decryption:"none"}'
+            IS_CLIENT_ID_JSON='settings:{vnext:[{address:'\"$IS_ADDR\"',port:'"$PORT"',users:[{id:'\"$UUID\"',encryption:"none"}]}]}'
+            if [[ $IS_REALITY ]]; then
+                IS_SERVER_ID_JSON='settings:{clients:[{id:'\"$UUID\"',flow:"xtls-rprx-vision"}],decryption:"none"}'
+                IS_CLIENT_ID_JSON='settings:{vnext:[{address:'\"$IS_ADDR\"',port:'"$PORT"',users:[{id:'\"$UUID\"',encryption:"none",flow:"xtls-rprx-vision"}]}]}'
             fi
             ;;
         trojan*)
-            is_protocol=trojan
-            [[ ! $trojan_password ]] && trojan_password=$uuid
-            is_server_id_json='settings:{clients:[{password:'\"$trojan_password\"'}]}'
-            is_client_id_json='settings:{servers:[{address:'\"$is_addr\"',port:'"$port"',password:'\"$trojan_password\"'}]}'
-            is_trojan=1
+            IS_PROTOCOL=trojan
+            [[ ! $TROJAN_PASSWORD ]] && TROJAN_PASSWORD=$UUID
+            IS_SERVER_ID_JSON='settings:{clients:[{password:'\"$TROJAN_PASSWORD\"'}]}'
+            IS_CLIENT_ID_JSON='settings:{servers:[{address:'\"$IS_ADDR\"',port:'"$PORT"',password:'\"$TROJAN_PASSWORD\"'}]}'
+            IS_TROJAN=1
             ;;
         shadowsocks*)
-            is_protocol=shadowsocks
-            net=ss
-            [[ ! $ss_method ]] && ss_method=$is_random_ss_method
-            [[ ! $ss_password ]] && {
-                ss_password=$uuid
-                [[ $(grep 2022 <<<$ss_method) ]] && ss_password=$(get ss2022)
+            IS_PROTOCOL=shadowsocks
+            NET=ss
+            [[ ! $SS_METHOD ]] && SS_METHOD=$IS_RANDOM_SS_METHOD
+            [[ ! $SS_PASSWORD ]] && {
+                SS_PASSWORD=$UUID
+                [[ $(grep 2022 <<<$SS_METHOD) ]] && SS_PASSWORD=$(get ss2022)
             }
-            is_client_id_json='settings:{servers:[{address:'\"$is_addr\"',port:'"$port"',method:'\"$ss_method\"',password:'\"$ss_password\"',}]}'
-            json_str='settings:{method:'\"$ss_method\"',password:'\"$ss_password\"',network:"tcp,udp"}'
+            IS_CLIENT_ID_JSON='settings:{servers:[{address:'\"$IS_ADDR\"',port:'"$PORT"',method:'\"$SS_METHOD\"',password:'\"$SS_PASSWORD\"',}]}'
+            JSON_STR='settings:{method:'\"$SS_METHOD\"',password:'\"$SS_PASSWORD\"',network:"tcp,udp"}'
             ;;
         dokodemo-door*)
-            is_protocol=dokodemo-door
-            net=door
-            json_str='settings:{port:'"$door_port"',address:'\"$door_addr\"',network:"tcp,udp"}'
+            IS_PROTOCOL=dokodemo-door
+            NET=door
+            JSON_STR='settings:{port:'"$DOOR_PORT"',address:'\"$DOOR_ADDR\"',network:"tcp,udp"}'
             ;;
         *http*)
-            is_protocol=http
-            net=http
-            json_str='settings:{"timeout": 233}'
+            IS_PROTOCOL=http
+            NET=http
+            JSON_STR='settings:{"timeout": 233}'
             ;;
         *socks*)
-            is_protocol=socks
-            net=socks
-            [[ ! $is_socks_user ]] && is_socks_user=admin
-            [[ ! $is_socks_pass ]] && is_socks_pass=$uuid
-            json_str='settings:{auth:"password",accounts:[{user:'\"$is_socks_user\"',pass:'\"$is_socks_pass\"'}],udp:true,ip:"0.0.0.0"}'
+            IS_PROTOCOL=socks
+            NET=socks
+            [[ ! $IS_SOCKS_USER ]] && IS_SOCKS_USER=admin
+            [[ ! $IS_SOCKS_PASS ]] && IS_SOCKS_PASS=$UUID
+            JSON_STR='settings:{auth:"password",accounts:[{user:'\"$IS_SOCKS_USER\"',pass:'\"$IS_SOCKS_PASS\"'}],udp:true,ip:"0.0.0.0"}'
             ;;
         *)
-            err "无法识别协议: $is_config_file"
+            err "无法识别协议: $IS_CONFIG_FILE"
             ;;
         esac
-        [[ $net ]] && return # if net exist, dont need more json args
-        case $is_lower in
+        [[ $NET ]] && return # if net exist, dont need more json args
+        case $IS_LOWER in
         *tcp*)
-            net=tcp
-            [[ ! $header_type ]] && header_type=none
-            is_stream='streamSettings:{network:"tcp",tcpSettings:{header:{type:'\"$header_type\"'}}}'
-            json_str=''"$is_server_id_json"','"$is_stream"''
+            NET=tcp
+            [[ ! $HEADER_TYPE ]] && HEADER_TYPE=none
+            IS_STREAM='streamSettings:{network:"tcp",tcpSettings:{header:{type:'\"$HEADER_TYPE\"'}}}'
+            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
             ;;
         *kcp* | *mkcp)
-            net=kcp
-            [[ ! $header_type ]] && header_type=$is_random_header_type
-            [[ ! $is_no_kcp_seed && ! $kcp_seed ]] && kcp_seed=$uuid
-            is_stream='streamSettings:{network:"kcp",kcpSettings:{seed:'\"$kcp_seed\"',header:{type:'\"$header_type\"'}}}'
-            json_str=''"$is_server_id_json"','"$is_stream"''
+            NET=kcp
+            [[ ! $HEADER_TYPE ]] && HEADER_TYPE=$IS_RANDOM_HEADER_TYPE
+            [[ ! $IS_NO_KCP_SEED && ! $KCP_SEED ]] && KCP_SEED=$UUID
+            IS_STREAM='streamSettings:{network:"kcp",kcpSettings:{seed:'\"$KCP_SEED\"',header:{type:'\"$HEADER_TYPE\"'}}}'
+            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
             ;;
         *quic*)
-            net=quic
-            [[ ! $header_type ]] && header_type=$is_random_header_type
-            is_stream='streamSettings:{network:"quic",quicSettings:{header:{type:'\"$header_type\"'}}}'
-            json_str=''"$is_server_id_json"','"$is_stream"''
+            NET=quic
+            [[ ! $HEADER_TYPE ]] && HEADER_TYPE=$IS_RANDOM_HEADER_TYPE
+            IS_STREAM='streamSettings:{network:"quic",quicSettings:{header:{type:'\"$HEADER_TYPE\"'}}}'
+            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
             ;;
         *ws* | *websocket)
-            net=ws
-            [[ ! $path ]] && path="/$uuid"
-            is_stream='streamSettings:{network:"ws",security:'\"$is_tls\"',wsSettings:{path:'\"$path\"',headers:{Host:'\"$host\"'}}}'
-            json_str=''"$is_server_id_json"','"$is_stream"''
+            NET=ws
+            [[ ! $PATH ]] && PATH="/$UUID"
+            IS_STREAM='streamSettings:{network:"ws",security:'\"$IS_TLS\"',wsSettings:{path:'\"$PATH\"',headers:{Host:'\"$HOST\"'}}}'
+            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
             ;;
         *grpc* | *gun)
-            net=grpc
-            # gRPC 默认 serviceName 为 "grpc"，而不是 UUID
-            [[ ! $path ]] && path="grpc"
-            # 移除路径中的斜杠 (gRPC serviceName 不支持斜杠)
-            [[ $path == */* ]] && path=$(sed 's#/##g' <<<$path)
-            is_stream='streamSettings:{network:"grpc",grpc_host:'\"$host\"',security:'\"$is_tls\"',grpcSettings:{serviceName:'\"$path\"'}}'
-            json_str=''"$is_server_id_json"','"$is_stream"''
+            NET=grpc
+            [[ ! $PATH ]] && PATH="grpc"
+            [[ $PATH == */* ]] && PATH=$(sed 's#/##g' <<<$PATH)
+            IS_STREAM='streamSettings:{network:"grpc",grpc_host:'\"$HOST\"',security:'\"$IS_TLS\"',grpcSettings:{serviceName:'\"$PATH\"'}}'
+            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
             ;;
         *h2* | *http*)
-            net=h2
-            [[ ! $path ]] && path="/$uuid"
-            is_stream='streamSettings:{network:"h2",security:'\"$is_tls\"',httpSettings:{path:'\"$path\"',host:['\"$host\"']}}'
-            json_str=''"$is_server_id_json"','"$is_stream"''
+            NET=h2
+            [[ ! $PATH ]] && PATH="/$UUID"
+            IS_STREAM='streamSettings:{network:"h2",security:'\"$IS_TLS\"',httpSettings:{path:'\"$PATH\"',host:['\"$HOST\"']}}'
+            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
             ;;
         *reality*)
-            net=reality
-            [[ ! $is_servername ]] && is_servername=$is_random_servername
-            [[ ! $is_private_key ]] && get_pbk
-            is_stream='streamSettings:{network:"tcp",security:"reality",realitySettings:{dest:'\"${is_servername}\:443\"',serverNames:['\"${is_servername}\"',""],publicKey:'\"$is_public_key\"',privateKey:'\"$is_private_key\"',shortIds:[""]}}'
-            if [[ $is_client ]]; then
-                is_stream='streamSettings:{network:"tcp",security:"reality",realitySettings:{serverName:'\"${is_servername}\"',"fingerprint": "ios",publicKey:'\"$is_public_key\"',"shortId": "","spiderX": "/"}}'
+            NET=reality
+            [[ ! $IS_SERVERNAME ]] && IS_SERVERNAME=$IS_RANDOM_SERVERNAME
+            [[ ! $IS_PRIVATE_KEY ]] && get_pbk
+            IS_STREAM='streamSettings:{network:"tcp",security:"reality",realitySettings:{dest:'\"${IS_SERVERNAME}\:443\"',serverNames:['\"${IS_SERVERNAME}\"',""],publicKey:'\"$IS_PUBLIC_KEY\"',privateKey:'\"$IS_PRIVATE_KEY\"',shortIds:[""]}}'
+            if [[ $IS_CLIENT ]]; then
+                IS_STREAM='streamSettings:{network:"tcp",security:"reality",realitySettings:{serverName:'\"${IS_SERVERNAME}\"',"fingerprint": "ios",publicKey:'\"$IS_PUBLIC_KEY\"',"shortId": "","spiderX": "/"}}'
             fi
-            json_str=''"$is_server_id_json"','"$is_stream"''
+            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
             ;;
         *)
-            err "无法识别传输协议: $is_config_file"
+            err "无法识别传输协议: $IS_CONFIG_FILE"
             ;;
         esac
         ;;
     dynamic-port) # create random dynamic port
         if [[ $port -ge 60000 ]]; then
-            is_dynamic_port_end=$(shuf -i $(($port - 2333))-$port -n1)
-            is_dynamic_port_start=$(shuf -i $(($is_dynamic_port_end - 2333))-$is_dynamic_port_end -n1)
+            IS_DYNAMIC_PORT_END=$(shuf -i $(($port - 2333))-$port -n1)
+            IS_DYNAMIC_PORT_START=$(shuf -i $(($IS_DYNAMIC_PORT_END - 2333))-$IS_DYNAMIC_PORT_END -n1)
         else
-            is_dynamic_port_start=$(shuf -i $port-$(($port + 2333)) -n1)
-            is_dynamic_port_end=$(shuf -i $is_dynamic_port_start-$(($is_dynamic_port_start + 2333)) -n1)
+            IS_DYNAMIC_PORT_START=$(shuf -i $port-$(($port + 2333)) -n1)
+            IS_DYNAMIC_PORT_END=$(shuf -i $IS_DYNAMIC_PORT_START-$(($IS_DYNAMIC_PORT_START + 2333)) -n1)
         fi
-        is_dynamic_port_range="$is_dynamic_port_start-$is_dynamic_port_end"
+        IS_DYNAMIC_PORT_RANGE="$IS_DYNAMIC_PORT_START-$IS_DYNAMIC_PORT_END"
         ;;
     dynamic-port-test) # test dynamic port
-        [[ ! $(is_test port ${is_use_dynamic_port_start}) || ! $(is_test port ${is_use_dynamic_port_end}) ]] && {
-            err "无法正确处理动态端口 ($is_use_dynamic_port_start-$is_use_dynamic_port_end) 范围."
+        [[ ! $(is_test port ${IS_USE_DYNAMIC_PORT_START}) || ! $(is_test port ${IS_USE_DYNAMIC_PORT_END}) ]] && {
+            err "无法正确处理动态端口 ($IS_USE_DYNAMIC_PORT_START-$IS_USE_DYNAMIC_PORT_END) 范围."
         }
-        [[ $(is_test port_used $is_use_dynamic_port_start) ]] && {
-            err "动态端口 ($is_use_dynamic_port_start-$is_use_dynamic_port_end), 但 ($is_use_dynamic_port_start) 端口无法使用."
+        [[ $(is_test port_used $IS_USE_DYNAMIC_PORT_START) ]] && {
+            err "动态端口 ($IS_USE_DYNAMIC_PORT_START-$IS_USE_DYNAMIC_PORT_END), 但 ($IS_USE_DYNAMIC_PORT_START) 端口无法使用."
         }
-        [[ $(is_test port_used $is_use_dynamic_port_end) ]] && {
-            err "动态端口 ($is_use_dynamic_port_start-$is_use_dynamic_port_end), 但 ($is_use_dynamic_port_end) 端口无法使用."
+        [[ $(is_test port_used $IS_USE_DYNAMIC_PORT_END) ]] && {
+            err "动态端口 ($IS_USE_DYNAMIC_PORT_START-$IS_USE_DYNAMIC_PORT_END), 但 ($IS_USE_DYNAMIC_PORT_END) 端口无法使用."
         }
-        [[ $is_use_dynamic_port_end -le $is_use_dynamic_port_start ]] && {
-            err "无法正确处理动态端口 ($is_use_dynamic_port_start-$is_use_dynamic_port_end) 范围."
+        [[ $IS_USE_DYNAMIC_PORT_END -le $IS_USE_DYNAMIC_PORT_START ]] && {
+            err "无法正确处理动态端口 ($IS_USE_DYNAMIC_PORT_START-$IS_USE_DYNAMIC_PORT_END) 范围."
         }
-        [[ $is_use_dynamic_port_start == $port || $is_use_dynamic_port_end == $port ]] && {
-            err "动态端口 ($is_use_dynamic_port_start-$is_use_dynamic_port_end) 范围和主端口 ($port) 冲突."
+        [[ $IS_USE_DYNAMIC_PORT_START == $PORT || $IS_USE_DYNAMIC_PORT_END == $PORT ]] && {
+            err "动态端口 ($IS_USE_DYNAMIC_PORT_START-$IS_USE_DYNAMIC_PORT_END) 范围和主端口 ($PORT) 冲突."
         }
-        is_dynamic_port_range="$is_use_dynamic_port_start-$is_use_dynamic_port_end"
+        IS_DYNAMIC_PORT_RANGE="$IS_USE_DYNAMIC_PORT_START-$IS_USE_DYNAMIC_PORT_END"
         ;;
     host-test) # test host dns record; for auto *tls required.
-        [[ $is_no_auto_tls || $is_gen ]] && return
+        [[ $IS_NO_AUTO_TLS || $IS_GEN ]] && return
         get_ip
         get ping
         
         # 第一次检测：使用 Cloudflare DNS API
-        if [[ ! $(grep $ip <<<$is_host_dns) ]]; then
+        if [[ ! $(grep $IP <<<$IS_HOST_DNS) ]]; then
             # 第二次检测：使用本地 DNS 解析（可能通过 /etc/hosts 或本地 DNS）
-            local_host_ip=$(getent hosts $host 2>/dev/null | awk '{print $1}' | head -1)
-            if [[ $local_host_ip && $local_host_ip == $ip ]]; then
+            LOCAL_HOST_IP=$(getent hosts $HOST 2>/dev/null | awk '{print $1}' | head -1)
+            if [[ $LOCAL_HOST_IP && $LOCAL_HOST_IP == $IP ]]; then
                 msg OK "域名解析验证通过（本地 DNS）"
                 return
             fi
             
             # 检测失败，提示用户
-            msg "\n请将 ($(_red_bg $host)) 解析到 ($(_red_bg $ip))"
+            msg "\n请将 ($(_red_bg $HOST)) 解析到 ($(_red_bg $IP))"
             msg "\n如果使用 Cloudflare, 在 DNS 那；关闭 (Proxy status / 代理状态), 即是 (DNS only / 仅限 DNS)"
             ask string y "我已经确定解析 [y]:"
             get ping
-            if [[ ! $(grep $ip <<<$is_host_dns) ]]; then
+            if [[ ! $(grep $IP <<<$IS_HOST_DNS) ]]; then
                 # 再次尝试本地 DNS
-                local_host_ip=$(getent hosts $host 2>/dev/null | awk '{print $1}' | head -1)
-                if [[ $local_host_ip && $local_host_ip == $ip ]]; then
+                LOCAL_HOST_IP=$(getent hosts $HOST 2>/dev/null | awk '{print $1}' | head -1)
+                if [[ $LOCAL_HOST_IP && $LOCAL_HOST_IP == $IP ]]; then
                     msg OK "域名解析验证通过（本地 DNS）"
                     return
                 fi
-                _cyan "\n测试结果：$is_host_dns"
-                err "域名 ($host) 没有解析到 ($ip)"
+                _cyan "\n测试结果：$IS_HOST_DNS"
+                err "域名 ($HOST) 没有解析到 ($IP)"
             fi
         fi
         ;;
@@ -1489,17 +1492,17 @@ get() {
         [[ $? != 0 ]] && err "无法生成 Shadowsocks 2022 密码, 请安装 openssl."
         ;;
     ping)
-        # is_ip_type="-4"
-        # [[ $(grep ":" <<<$ip) ]] && is_ip_type="-6"
-        # is_host_dns=$(ping $host $is_ip_type -c 1 -W 2 | head -1)
-        is_dns_type="a"
-        [[ $(grep ":" <<<$ip) ]] && is_dns_type="aaaa"
-        is_host_dns=$(_wget -qO- --header="accept: application/dns-json" "https://one.one.one.one/dns-query?name=$host&type=$is_dns_type")
+        # IS_IP_TYPE="-4"
+        # [[ $(grep ":" <<<$IP) ]] && IS_IP_TYPE="-6"
+        # IS_HOST_DNS=$(ping $HOST $IS_IP_TYPE -c 1 -W 2 | head -1)
+        IS_DNS_TYPE="a"
+        [[ $(grep ":" <<<$IP) ]] && IS_DNS_TYPE="aaaa"
+        IS_HOST_DNS=$(_wget -qO- --header="accept: application/dns-json" "https://one.one.one.one/dns-query?name=$HOST&type=$IS_DNS_TYPE")
         ;;
     log | logerr)
         msg "\n 提醒: 按 $(_green Ctrl + C) 退出\n"
-        [[ $1 == 'log' ]] && tail -f $is_log_dir/access.log
-        [[ $1 == 'logerr' ]] && tail -f $is_log_dir/error.log
+        [[ $1 == 'log' ]] && tail -f $IS_LOG_DIR/access.log
+        [[ $1 == 'logerr' ]] && tail -f $IS_LOG_DIR/error.log
         ;;
     install-caddy)
         _green "\n安装 Caddy 实现自动配置 TLS.\n"
@@ -1507,7 +1510,7 @@ get() {
         download caddy
         load systemd.sh
         install_service caddy &>/dev/null
-        is_caddy=1
+        IS_CADDY=1
         _green "安装 Caddy 成功.\n"
         ;;
     install-nginx)
@@ -1516,13 +1519,13 @@ get() {
         download nginx
         load systemd.sh
         install_service nginx &>/dev/null
-        is_nginx=1
+        IS_NGINX=1
         _green "安装 Nginx 成功.\n"
         ;;
     reinstall)
-        is_install_sh=$(cat $is_sh_dir/install.sh)
+        IS_INSTALL_SH=$(cat $IS_SH_DIR/install.sh)
         uninstall
-        bash <<<$is_install_sh
+        bash <<<$IS_INSTALL_SH
         ;;
     test-run)
         systemctl list-units --full -all &>/dev/null
@@ -1530,26 +1533,26 @@ get() {
             _yellow "\n无法执行测试, 请检查 systemctl 状态.\n"
             return
         }
-        is_no_manage_msg=1
-        if [[ ! $(pgrep -f $is_core_bin) ]]; then
-            _yellow "\n测试运行 $is_core_name ..\n"
+        IS_NO_MANAGE_MSG=1
+        if [[ ! $(pgrep -f $IS_CORE_BIN) ]]; then
+            _yellow "\n测试运行 $IS_CORE_NAME ..\n"
             manage start &>/dev/null
-            if [[ $is_run_fail == $is_core ]]; then
-                _red "$is_core_name 运行失败信息:"
-                $is_core_bin $is_with_run_arg -c $is_config_json -confdir $is_conf_dir
+            if [[ $IS_RUN_FAIL == $IS_CORE ]]; then
+                _red "$IS_CORE_NAME 运行失败信息:"
+                $IS_CORE_BIN $IS_WITH_RUN_ARG -c $IS_CONFIG_JSON -confdir $IS_CONF_DIR
             else
-                _green "\n测试通过, 已启动 $is_core_name ..\n"
+                _green "\n测试通过, 已启动 $IS_CORE_NAME ..\n"
             fi
         else
-            _green "\n$is_core_name 正在运行, 跳过测试\n"
+            _green "\n$IS_CORE_NAME 正在运行, 跳过测试\n"
         fi
-        if [[ $is_caddy ]]; then
-            if [[ ! $(pgrep -f $is_caddy_bin) ]]; then
+        if [[ $IS_CADDY ]]; then
+            if [[ ! $(pgrep -f $IS_CADDY_BIN) ]]; then
                 _yellow "\n测试运行 Caddy ..\n"
                 manage start caddy &>/dev/null
-                if [[ $is_run_fail == 'caddy' ]]; then
+                if [[ $IS_RUN_FAIL == 'caddy' ]]; then
                     _red "Caddy 运行失败信息:"
-                    $is_caddy_bin run --config $is_caddyfile
+                    $IS_CADDY_BIN run --config $IS_CADDYFILE
                 else
                     _green "\n测试通过, 已启动 Caddy ..\n"
                 fi
@@ -1557,11 +1560,11 @@ get() {
                 _green "\nCaddy 正在运行, 跳过测试\n"
             fi
         fi
-        if [[ $is_nginx ]]; then
+        if [[ $IS_NGINX ]]; then
             if [[ ! $(pgrep -f nginx) ]]; then
                 _yellow "\n测试运行 Nginx ..\n"
                 manage start nginx &>/dev/null
-                if [[ $is_run_fail == 'nginx' ]]; then
+                if [[ $IS_RUN_FAIL == 'nginx' ]]; then
                     _red "Nginx 运行失败信息:"
                     nginx -t
                 else
@@ -1579,105 +1582,105 @@ get() {
 info() {
     # 总是从 JSON 文件读取配置信息，确保变量正确设置
     get info $1
-    # is_color=$(shuf -i 41-45 -n1)
-    is_color=44
-    # 调试：检查 net 变量
-    [[ $is_debug ]] && msg "DEBUG: net='$net', host='$host', is_protocol='$is_protocol'"
-    case $net in
+    # IS_COLOR=$(shuf -i 41-45 -n1)
+    IS_COLOR=44
+    # 调试：检查 NET 变量
+    [[ $IS_DEBUG ]] && msg "DEBUG: NET='$NET', host='$HOST', IS_PROTOCOL='$IS_PROTOCOL'"
+    case $NET in
     tcp | kcp | quic)
-        is_can_change=(0 1 5 7)
-        is_info_show=(0 1 2 3 4 5)
-        is_vmess_url=$(jq -c '{v:2,ps:'\"${net}-$is_addr\"',add:'\"$is_addr\"',port:'\"$port\"',id:'\"$uuid\"',aid:"0",net:'\"$net\"',type:'\"$header_type\"',path:'\"$kcp_seed\"'}' <<<{})
-        is_url=vmess://$(echo -n $is_vmess_url | base64 -w 0)
-        is_tmp_port=$port
-        [[ $is_dynamic_port ]] && {
-            is_can_change+=(12)
-            is_tmp_port="$port & 动态端口: $is_dynamic_port_range"
+        IS_CAN_CHANGE=(0 1 5 7)
+        IS_INFO_SHOW=(0 1 2 3 4 5)
+        IS_VMESS_URL=$(jq -c '{v:2,ps:'\"${NET}-$IS_ADDR\"',add:'\"$IS_ADDR\"',port:'\"$PORT\"',id:'\"$UUID\"',aid:"0",net:'\"$NET\"',type:'\"$HEADER_TYPE\"',path:'\"$KCP_SEED\"'}' <<<{})
+        IS_URL=vmess://$(echo -n $IS_VMESS_URL | base64 -w 0)
+        IS_TMP_PORT=$PORT
+        [[ $IS_DYNAMIC_PORT ]] && {
+            IS_CAN_CHANGE+=(12)
+            IS_TMP_PORT="$PORT & 动态端口: $IS_DYNAMIC_PORT_RANGE"
         }
-        [[ $kcp_seed ]] && {
-            is_info_show+=(9)
-            is_can_change+=(14)
+        [[ $KCP_SEED ]] && {
+            IS_INFO_SHOW+=(9)
+            IS_CAN_CHANGE+=(14)
         }
-        is_info_str=($is_protocol $is_addr "$is_tmp_port" $uuid $net $header_type $kcp_seed)
+        IS_INFO_STR=($IS_PROTOCOL $IS_ADDR "$IS_TMP_PORT" $UUID $NET $HEADER_TYPE $KCP_SEED)
         ;;
     ss)
-        is_can_change=(0 1 4 6)
-        is_info_show=(0 1 2 10 11)
-        is_url="ss://$(echo -n ${ss_method}:${ss_password} | base64 -w 0)@${is_addr}:${port}#$net-${is_addr}"
-        is_info_str=($is_protocol $is_addr $port $ss_password $ss_method)
+        IS_CAN_CHANGE=(0 1 4 6)
+        IS_INFO_SHOW=(0 1 2 10 11)
+        IS_URL="ss://$(echo -n ${SS_METHOD}:${SS_PASSWORD} | base64 -w 0)@${IS_ADDR}:${PORT}#$NET-${IS_ADDR}"
+        IS_INFO_STR=($IS_PROTOCOL $IS_ADDR $PORT $SS_PASSWORD $SS_METHOD)
         ;;
     ws | h2 | grpc)
-        is_color=45
-        is_can_change=(0 1 2 3 5)
-        is_info_show=(0 1 2 3 4 6 7 8)
-        is_url_path=path
-        is_display_path=$path
-        [[ $net == 'grpc' ]] && {
-            is_display_path=$(sed 's#/##g' <<<$path)
-            is_url_path=serviceName
+        IS_COLOR=45
+        IS_CAN_CHANGE=(0 1 2 3 5)
+        IS_INFO_SHOW=(0 1 2 3 4 6 7 8)
+        IS_URL_path=path
+        IS_DISPLAY_PATH=$PATH
+        [[ $NET == 'grpc' ]] && {
+            IS_DISPLAY_PATH=$(sed 's#/##g' <<<$PATH)
+            IS_URL_path=serviceName
         }
-        [[ $is_protocol == 'vmess' ]] && {
-            is_vmess_url=$(jq -c '{v:2,ps:'\"$net-$host\"',add:'\"$is_addr\"',port:'\"$is_https_port\"',id:'\"$uuid\"',aid:"0",net:'\"$net\"',host:'\"$host\"',path:'\"$path\"',tls:'\"tls\"'}' <<<{})
-            is_url=vmess://$(echo -n $is_vmess_url | base64 -w 0)
+        [[ $IS_PROTOCOL == 'vmess' ]] && {
+            IS_VMESS_URL=$(jq -c '{v:2,ps:'\"$NET-$HOST\"',add:'\"$IS_ADDR\"',port:'\"$IS_HTTPS_PORT\"',id:'\"$UUID\"',aid:"0",net:'\"$NET\"',host:'\"$HOST\"',path:'\"$PATH\"',tls:'\"tls\"'}' <<<{})
+            IS_URL=vmess://$(echo -n $IS_VMESS_URL | base64 -w 0)
         } || {
-            [[ $is_trojan ]] && {
-                uuid=$trojan_password
-                is_can_change=(0 1 2 3 4)
-                is_info_show=(0 1 2 10 4 6 7 8)
+            [[ $IS_TROJAN ]] && {
+                UUID=$TROJAN_PASSWORD
+                IS_CAN_CHANGE=(0 1 2 3 4)
+                IS_INFO_SHOW=(0 1 2 10 4 6 7 8)
             }
-            is_url="$is_protocol://$uuid@$host:$is_https_port?encryption=none&security=tls&type=$net&host=$host&${is_url_path}=$(sed 's#/#%2F#g' <<<$is_display_path)#$net-$host"
+            IS_URL="$IS_PROTOCOL://$UUID@$HOST:$IS_HTTPS_PORT?encryption=none&security=tls&type=$NET&host=$HOST&${IS_URL_path}=$(sed 's#/#%2F#g' <<<$IS_DISPLAY_PATH)#$NET-$HOST"
         }
-        [[ $is_caddy || $is_nginx ]] && is_can_change+=(13)
-        is_info_str=($is_protocol $is_addr $is_https_port $uuid $net $host $is_display_path 'tls')
+        [[ $IS_CADDY || $IS_NGINX ]] && IS_CAN_CHANGE+=(13)
+        IS_INFO_STR=($IS_PROTOCOL $IS_ADDR $IS_HTTPS_PORT $UUID $NET $HOST $IS_DISPLAY_PATH 'tls')
         ;;
     reality)
-        is_color=41
-        is_can_change=(0 1 5 10 11)
-        is_info_show=(0 1 2 3 15 8 16 17 18)
-        is_info_str=($is_protocol $is_addr $port $uuid xtls-rprx-vision reality $is_servername "ios" $is_public_key)
-        is_url="$is_protocol://$uuid@$is_addr:$port?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp&sni=$is_servername&pbk=$is_public_key&fp=ios#$net-$is_addr"
+        IS_COLOR=41
+        IS_CAN_CHANGE=(0 1 5 10 11)
+        IS_INFO_SHOW=(0 1 2 3 15 8 16 17 18)
+        IS_INFO_STR=($IS_PROTOCOL $IS_ADDR $PORT $UUID xtls-rprx-vision reality $IS_SERVERNAME "ios" $IS_PUBLIC_KEY)
+        IS_URL="$IS_PROTOCOL://$UUID@$IS_ADDR:$PORT?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp&sni=$IS_SERVERNAME&pbk=$IS_PUBLIC_KEY&fp=ios#$NET-$IS_ADDR"
         ;;
     door)
-        is_can_change=(0 1 8 9)
-        is_info_show=(0 1 2 13 14)
-        is_info_str=($is_protocol $is_addr $port $door_addr $door_port)
+        IS_CAN_CHANGE=(0 1 8 9)
+        IS_INFO_SHOW=(0 1 2 13 14)
+        IS_INFO_STR=($IS_PROTOCOL $IS_ADDR $PORT $DOOR_ADDR $DOOR_PORT)
         ;;
     socks)
-        is_can_change=(0 1 15 4)
-        is_info_show=(0 1 2 19 10)
-        is_info_str=($is_protocol $is_addr $port $is_socks_user $is_socks_pass)
-        is_url="socks://$(echo -n ${is_socks_user}:${is_socks_pass} | base64 -w 0)@${is_addr}:${port}#$net-${is_addr}"
+        IS_CAN_CHANGE=(0 1 15 4)
+        IS_INFO_SHOW=(0 1 2 19 10)
+        IS_INFO_STR=($IS_PROTOCOL $IS_ADDR $PORT $IS_SOCKS_USER $IS_SOCKS_PASS)
+        IS_URL="socks://$(echo -n ${IS_SOCKS_USER}:${IS_SOCKS_PASS} | base64 -w 0)@${IS_ADDR}:${PORT}#$NET-${IS_ADDR}"
         ;;
     http)
-        is_can_change=(0 1)
-        is_info_show=(0 1 2)
-        is_info_str=($is_protocol 127.0.0.1 $port)
+        IS_CAN_CHANGE=(0 1)
+        IS_INFO_SHOW=(0 1 2)
+        IS_INFO_STR=($IS_PROTOCOL 127.0.0.1 $PORT)
         ;;
     esac
-    [[ $is_dont_show_info || $is_gen || $is_dont_auto_exit ]] && return # dont show info
-    msg "-------------- $is_config_name -------------"
-    for ((i = 0; i < ${#is_info_show[@]}; i++)); do
-        a=${info_list[${is_info_show[$i]}]}
+    [[ $IS_DONT_SHOW_INFO || $IS_GEN || $IS_DONT_AUTO_EXIT ]] && return # dont show info
+    msg "-------------- $IS_CONFIG_NAME -------------"
+    for ((i = 0; i < ${#IS_INFO_SHOW[@]}; i++)); do
+        A=${INFO_LIST[${IS_INFO_SHOW[$i]}]}
         if [[ ${#a} -eq 11 || ${#a} -ge 13 ]]; then
-            tt='\t'
+            TT='\t'
         else
-            tt='\t\t'
+            TT='\t\t'
         fi
-        msg "$a $tt= \e[${is_color}m${is_info_str[$i]}\e[0m"
+        msg "$a $TT= \e[${IS_COLOR}m${IS_INFO_STR[$i]}\e[0m"
     done
-    if [[ $is_new_install ]]; then
-        warn "首次安装请查看脚本帮助文档: $(msg_ul https://wangyan-good.github.io/v2ray/$is_core-script/)"
+    if [[ $IS_NEW_INSTALL ]]; then
+        warn "首次安装请查看脚本帮助文档: $(msg_ul https://wangyan-good.github.io/v2ray/$IS_CORE-script/)"
     fi
-    if [[ $is_url ]]; then
-        msg "------------- ${info_list[12]} -------------"
-        msg "\e[4;${is_color}m${is_url}\e[0m"
+    if [[ $IS_URL ]]; then
+        msg "------------- ${INFO_LIST[12]} -------------"
+        msg "\e[4;${IS_COLOR}m${IS_URL}\e[0m"
     fi
-    if [[ $is_no_auto_tls ]]; then
-        is_tmp_path=$path
-        [[ $net == 'grpc' ]] && is_tmp_path="/$path/*"
+    if [[ $IS_NO_AUTO_TLS ]]; then
+        IS_TMP_PATH=$PATH
+        [[ $NET == 'grpc' ]] && IS_TMP_PATH="/$PATH/*"
         msg "------------- no-auto-tls INFO -------------"
-        msg "端口(port): $port"
-        msg "路径(path): $is_tmp_path"
+        msg "端口(port): $PORT"
+        msg "路径(path): $IS_TMP_PATH"
         msg "\e[41m帮助(help)\e[0m: $(msg_ul https://wangyan-good.github.io/v2ray/no-auto-tls/)"
     fi
     footer_msg
@@ -1685,41 +1688,41 @@ info() {
 
 # footer msg
 footer_msg() {
-    [[ $is_core_stop && ! $is_new_json ]] && warn "$is_core_name 当前处于停止状态."
-    [[ $is_caddy_stop && $host ]] && warn "Caddy 当前处于停止状态."
-    [[ $is_nginx_stop && $host ]] && warn "Nginx 当前处于停止状态."
+    [[ $IS_CORE_stop && ! $IS_NEW_JSON ]] && warn "$IS_CORE_name 当前处于停止状态."
+    [[ $IS_CADDY_stop && $HOST ]] && warn "Caddy 当前处于停止状态."
+    [[ $IS_NGINX_stop && $HOST ]] && warn "Nginx 当前处于停止状态."
     msg "------------- END -------------"
-    msg "文档(doc): $(msg_ul https://wangyan-good.github.io/v2ray/$is_core-script/)"
+    msg "文档(doc): $(msg_ul https://wangyan-good.github.io/v2ray/$IS_CORE-script/)"
 }
 
 # URL or qrcode
 url_qr() {
-    is_dont_show_info=1
+    IS_DONT_SHOW_INFO=1
     info $2
-    if [[ $is_url ]]; then
+    if [[ $IS_URL ]]; then
         [[ $1 == 'url' ]] && {
-            msg "\n------------- $is_config_name & URL 链接 -------------"
-            msg "\n\e[${is_color}m${is_url}\e[0m\n"
+            msg "\n------------- $IS_CONFIG_NAME & URL 链接 -------------"
+            msg "\n\e[${IS_COLOR}m${IS_URL}\e[0m\n"
             footer_msg
         } || {
-            link="https://WangYan-Good.github.io/tools/qr.html#${is_url}"
-            msg "\n------------- $is_config_name & QR code 二维码 -------------"
+            LINK="https://WangYan-Good.github.io/tools/qr.html#${IS_URL}"
+            msg "\n------------- $IS_CONFIG_NAME & QR code 二维码 -------------"
             msg
             if [[ $(type -P qrencode) ]]; then
-                qrencode -t ANSI "${is_url}"
+                qrencode -t ANSI "${IS_URL}"
             else
-                msg "请安装 qrencode: $(_green "$cmd update -y; $cmd install qrencode -y")"
+                msg "请安装 qrencode: $(_green "$CMD update -y; $CMD install qrencode -y")"
             fi
             msg
             msg "如果无法正常显示或识别, 请使用下面的链接来生成二维码:"
-            msg "\n\e[4;${is_color}m${link}\e[0m\n"
+            msg "\n\e[4;${IS_COLOR}m${LINK}\e[0m\n"
             footer_msg
         }
     else
         [[ $1 == 'url' ]] && {
-            err "($is_config_name) 无法生成 URL 链接."
+            err "($IS_CONFIG_NAME) 无法生成 URL 链接."
         } || {
-            err "($is_config_name) 无法生成 QR code 二维码."
+            err "($IS_CONFIG_NAME) 无法生成 QR code 二维码."
         }
     fi
 }
@@ -1728,64 +1731,64 @@ url_qr() {
 update() {
     case $1 in
     1 | core | $is_core)
-        is_update_name=core
-        is_show_name=$is_core_name
-        is_run_ver=v${is_core_ver##* }
-        is_update_repo=$is_core_repo
+        IS_UPDATE_NAME=core
+        IS_SHOW_NAME=$IS_CORE_name
+        IS_RUN_VER=v${is_core_ver##* }
+        IS_UPDATE_REPO=$IS_CORE_repo
         ;;
     2 | sh)
-        is_update_name=sh
-        is_show_name="$is_core_name 脚本"
-        is_run_ver=$is_sh_ver
-        is_update_repo=$is_sh_repo
+        IS_UPDATE_NAME=sh
+        IS_SHOW_NAME="$IS_CORE_name 脚本"
+        IS_RUN_VER=$IS_SH_VER
+        IS_UPDATE_REPO=$IS_SH_REPO
         ;;
     3 | caddy)
-        [[ ! $is_caddy ]] && err "不支持更新 Caddy."
-        is_update_name=caddy
-        is_show_name="Caddy"
-        is_run_ver=$is_caddy_ver
-        is_update_repo=$is_caddy_repo
+        [[ ! $IS_CADDY ]] && err "不支持更新 Caddy."
+        IS_UPDATE_NAME=caddy
+        IS_SHOW_NAME="Caddy"
+        IS_RUN_VER=$IS_CADDY_ver
+        IS_UPDATE_REPO=$IS_CADDY_repo
         ;;
     4 | nginx)
-        [[ ! $is_nginx ]] && err "不支持更新 Nginx."
-        is_update_name=nginx
-        is_show_name="Nginx"
-        is_run_ver=$is_nginx_ver
-        is_update_repo=$is_nginx_repo
+        [[ ! $IS_NGINX ]] && err "不支持更新 Nginx."
+        IS_UPDATE_NAME=nginx
+        IS_SHOW_NAME="Nginx"
+        IS_RUN_VER=$IS_NGINX_ver
+        IS_UPDATE_REPO=$IS_NGINX_repo
         ;;
     *)
-        err "无法识别 ($1), 请使用: $is_core update [core | sh | caddy | nginx] [ver]"
+        err "无法识别 ($1), 请使用: $IS_CORE update [core | sh | caddy | nginx] [ver]"
         ;;
     esac
-    [[ $2 ]] && is_new_ver=v${2#v}
-    [[ $is_run_ver == $is_new_ver ]] && {
-        msg "\n自定义版本和当前 $is_show_name 版本一样, 无需更新.\n"
+    [[ $2 ]] && IS_NEW_VER=v${2#v}
+    [[ $IS_RUN_VER == $IS_NEW_VER ]] && {
+        msg "\n自定义版本和当前 $IS_SHOW_NAME 版本一样, 无需更新.\n"
         exit
     }
     load download.sh
-    if [[ $is_new_ver ]]; then
-        msg "\n使用自定义版本更新 $is_show_name: $(_green $is_new_ver)\n"
+    if [[ $IS_NEW_VER ]]; then
+        msg "\n使用自定义版本更新 $IS_SHOW_NAME: $(_green $IS_NEW_VER)\n"
     else
-        get_latest_version $is_update_name
-        [[ $is_run_ver == $latest_ver ]] && {
-            msg "\n$is_show_name 当前已经是最新版本了.\n"
+        get_latest_version $IS_UPDATE_NAME
+        [[ $IS_RUN_VER == $latest_ver ]] && {
+            msg "\n$IS_SHOW_NAME 当前已经是最新版本了.\n"
             exit
         }
-        msg "\n发现 $is_show_name 新版本: $(_green $latest_ver)\n"
-        is_new_ver=$latest_ver
+        msg "\n发现 $IS_SHOW_NAME 新版本: $(_green $latest_ver)\n"
+        IS_NEW_VER=$latest_ver
     fi
-    download $is_update_name $is_new_ver
-    msg "更新成功, 当前 $is_show_name 版本: $(_green $is_new_ver)\n"
-    msg "$(_green 请查看更新说明: https://github.com/$is_update_repo/releases/tag/$is_new_ver)\n"
-    [[ $is_update_name == 'core' ]] && $is_core restart
-    [[ $is_update_name == 'caddy' ]] && manage restart $is_update_name &
+    download $IS_UPDATE_NAME $IS_NEW_VER
+    msg "更新成功, 当前 $IS_SHOW_NAME 版本: $(_green $IS_NEW_VER)\n"
+    msg "$(_green 请查看更新说明: https://github.com/$IS_UPDATE_REPO/releases/tag/$IS_NEW_VER)\n"
+    [[ $IS_UPDATE_NAME == 'core' ]] && $IS_CORE restart
+    [[ $IS_UPDATE_NAME == 'caddy' ]] && manage restart $IS_UPDATE_NAME &
 }
 
 # main menu; if no prefer args.
 is_main_menu() {
-    msg "\n------------- $is_core_name script $is_sh_ver by $author -------------"
-    msg "$is_core_ver: $is_core_status"
-    is_main_start=1
+    msg "\n------------- $IS_CORE_name script $IS_SH_VER by $AUTHOR -------------"
+    msg "$IS_CORE_ver: $IS_CORE_status"
+    IS_MAIN_START=1
     ask mainmenu
     case $REPLY in
     1)
@@ -1801,14 +1804,14 @@ is_main_menu() {
         del
         ;;
     5)
-        ask list is_do_manage "启动 停止 重启"
+        ask list IS_DO_MANAGE "启动 停止 重启"
         manage $REPLY &
-        msg "\n管理状态执行: $(_green $is_do_manage)\n"
+        msg "\n管理状态执行: $(_green $IS_DO_MANAGE)\n"
         ;;
     6)
-        is_tmp_list=("更新$is_core_name" "更新脚本")
-        [[ $is_caddy ]] && is_tmp_list+=("更新Caddy")
-        ask list is_do_update null "\n请选择更新:\n"
+        IS_TMP_LIST=("更新$IS_CORE_name" "更新脚本")
+        [[ $IS_CADDY ]] && IS_TMP_LIST+=("更新Caddy")
+        ask list IS_DO_UPDATE null "\n请选择更新:\n"
         update $REPLY
         ;;
     7)
@@ -1820,7 +1823,7 @@ is_main_menu() {
         show_help
         ;;
     9)
-        ask list is_do_other "启用BBR 查看日志 查看错误日志 测试运行 重装脚本 设置DNS"
+        ask list IS_DO_OTHER "启用BBR 查看日志 查看错误日志 测试运行 重装脚本 设置DNS"
         case $REPLY in
         1)
             load bbr.sh
@@ -1855,21 +1858,21 @@ is_main_menu() {
 main() {
     case $1 in
     a | add | gen | no-auto-tls)
-        [[ $1 == 'gen' ]] && is_gen=1
-        [[ $1 == 'no-auto-tls' ]] && is_no_auto_tls=1
+        [[ $1 == 'gen' ]] && IS_GEN=1
+        [[ $1 == 'no-auto-tls' ]] && IS_NO_AUTO_TLS=1
         add ${@:2}
         ;;
     api | bin | convert | tls | run | uuid)
-        [[ $is_core_ver_lt_5 ]] && {
-            warn "$is_core_ver 版本不支持使用命令. 请升级内核版本: $is_core update core"
+        [[ $IS_CORE_VER_LT_5 ]] && {
+            warn "$IS_CORE_VER 版本不支持使用命令. 请升级内核版本: $IS_CORE UPDATE CORE"
             return
         }
-        is_run_command=$1
+        IS_RUN_COMMAND=$1
         if [[ $1 == 'bin' ]]; then
-            $is_core_bin ${@:2}
+            $IS_CORE_BIN ${@:2}
         else
-            # [[ $is_run_command == 'pbk' ]] && is_run_command=x25519
-            $is_core_bin $is_run_command ${@:2}
+            # [[ $IS_RUN_COMMAND == 'pbk' ]] && IS_RUN_COMMAND=x25519
+            $IS_CORE_BIN $IS_RUN_COMMAND ${@:2}
         fi
         ;;
     bbr)
@@ -1880,7 +1883,7 @@ main() {
         change ${@:2}
         ;;
     client | genc)
-        [[ $1 == 'client' ]] && is_full_client=1
+        [[ $1 == 'client' ]] && IS_FULL_CLIENT=1
         create client $2
         ;;
     d | del | rm)
@@ -1892,35 +1895,35 @@ main() {
             [[ $2 ]] && {
                 change $2 full
             } || {
-                is_change_id=full && change
+                IS_CHANGE_ID=full && change
             }
             return
             ;;
         fix-all)
-            is_dont_auto_exit=1
+            IS_DONT_AUTO_EXIT=1
             msg
-            for v in $(ls $is_conf_dir | grep .json$ | sed '/dynamic-port-.*-link/d'); do
-                msg "fix: $v"
-                change $v full
+            for v in $(ls $IS_CONF_DIR | grep .json$ | sed '/dynamic-port-.*-link/d'); do
+                msg "fix: $V"
+                change $V full
             done
             _green "\nfix 完成.\n"
             ;;
         *)
-            is_dont_auto_exit=1
+            IS_DONT_AUTO_EXIT=1
             [[ ! $2 ]] && {
                 err "无法找到需要删除的参数"
             } || {
                 for v in ${@:2}; do
-                    del $v
+                    del $V
                 done
             }
             ;;
         esac
-        is_dont_auto_exit=
-        [[ $is_api_fail ]] && manage restart &
-        [[ $is_del_host ]] && {
-            [[ $is_caddy ]] && manage restart caddy &
-            [[ $is_nginx ]] && manage restart nginx &
+        IS_DONT_AUTO_EXIT=
+        [[ $IS_API_FAIL ]] && manage restart &
+        [[ $IS_DEL_HOST ]] && {
+            [[ $IS_CADDY ]] && manage restart caddy &
+            [[ $IS_NGINX ]] && manage restart nginx &
         }
         ;;
     dns)
@@ -1928,7 +1931,7 @@ main() {
         dns_set ${@:2}
         ;;
     debug)
-        is_debug=1
+        IS_DEBUG=1
         get info $2
         warn "如果需要复制; 请把 *uuid, *password, *host, *key 的值改写, 以避免泄露."
         ;;
@@ -1936,7 +1939,7 @@ main() {
         create config.json
         ;;
     fix-caddyfile)
-        if [[ $is_caddy ]]; then
+        if [[ $IS_CADDY ]]; then
             load caddy.sh
             caddy_config new
             manage restart caddy &
@@ -1946,7 +1949,7 @@ main() {
         fi
         ;;
     fix-nginxfile)
-        if [[ $is_nginx ]]; then
+        if [[ $IS_NGINX ]]; then
             load nginx.sh
             nginx_config new
             nginx_reload
@@ -1960,7 +1963,7 @@ main() {
         ;;
     ip)
         get_ip
-        msg $ip
+        msg $IP
         ;;
     log | logerr | errlog)
         load log.sh
@@ -1973,12 +1976,12 @@ main() {
         uninstall
         ;;
     u | up | update | U | update.sh)
-        is_update_name=$2
-        is_update_ver=$3
-        [[ ! $is_update_name ]] && is_update_name=core
+        IS_UPDATE_NAME=$2
+        IS_UPDATE_VER=$3
+        [[ ! $IS_UPDATE_NAME ]] && IS_UPDATE_NAME=core
         [[ $1 == 'U' || $1 == 'update.sh' ]] && {
-            is_update_name=sh
-            is_update_ver=
+            IS_UPDATE_NAME=sh
+            IS_UPDATE_VER=
         }
         if [[ $2 == 'dat' ]]; then
             load download.sh
@@ -1986,19 +1989,19 @@ main() {
             msg "$(_green 更新 geoip.dat geosite.dat 成功.)\n"
             manage restart &
         else
-            update $is_update_name $is_update_ver
+            update $IS_UPDATE_NAME $IS_UPDATE_VER
         fi
         ;;
     ssss | ss2022)
         get $@
         ;;
     s | status)
-        msg "\n$is_core_ver: $is_core_status\n"
-        [[ $is_caddy ]] && msg "Caddy $is_caddy_ver: $is_caddy_status\n"
-        [[ $is_nginx ]] && msg "Nginx $is_nginx_ver: $is_nginx_status\n"
+        msg "\n$IS_CORE_VER: $IS_CORE_STATUS\n"
+        [[ $IS_CADDY ]] && msg "Caddy $IS_CADDY_VER: $IS_CADDY_STATUS\n"
+        [[ $IS_NGINX ]] && msg "Nginx $IS_NGINX_VER: $IS_NGINX_STATUS\n"
         ;;
     start | stop | r | restart)
-        [[ $2 && $2 != 'caddy' ]] && err "无法识别 ($2), 请使用: $is_core $1 [caddy]"
+        [[ $2 && $2 != 'caddy' ]] && err "无法识别 ($2), 请使用: $IS_CORE $1 [caddy]"
         manage $1 $2 &
         ;;
     t | test)
@@ -2009,14 +2012,14 @@ main() {
         ;;
     get-port)
         get_port
-        msg $tmp_port
+        msg $TMP_PORT
         ;;
     main)
         is_main_menu
         ;;
     v | ver | version)
-        [[ $is_caddy_ver ]] && is_caddy_ver="/ $(_blue Caddy $is_caddy_ver)"
-        msg "\n$(_green $is_core_ver) / $(_cyan $is_core_name script $is_sh_ver) $is_caddy_ver\n"
+        [[ $IS_CADDY_VER ]] && IS_CADDY_VER="/ $(_blue Caddy $IS_CADDY_VER)"
+        msg "\n$(_green $IS_CORE_VER) / $(_cyan $IS_CORE_NAME script $IS_SH_VER) $IS_CADDY_VER\n"
         ;;
     xapi)
         api ${@:2}
@@ -2026,17 +2029,17 @@ main() {
         show_help ${@:2}
         ;;
     *)
-        is_try_change=1
+        IS_TRY_CHANGE=1
         change test $1
-        if [[ $is_change_id ]]; then
-            unset is_try_change
+        if [[ $IS_CHANGE_ID ]]; then
+            unset IS_TRY_CHANGE
             [[ $2 ]] && {
                 change $2 $1 ${@:3}
             } || {
                 change
             }
         else
-            err "无法识别 ($1), 获取帮助请使用: $is_core help"
+            err "无法识别 ($1), 获取帮助请使用: $IS_CORE help"
         fi
         ;;
     esac
