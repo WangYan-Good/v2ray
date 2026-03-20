@@ -127,8 +127,17 @@ get_uuid() {
 
 get_ip() {
     [[ $IP || $IS_NO_AUTO_TLS || $IS_GEN || $IS_DONT_GET_IP ]] && return
-    export "$(_wget -4 -qO- https://one.one.one.one/cdn-cgi/trace | grep ip=)" &>/dev/null
-    [[ ! $IP ]] && export "$(_wget -6 -qO- https://one.one.one.one/cdn-cgi/trace | grep ip=)" &>/dev/null
+    
+    # 尝试 IPv4
+    local trace=$(_wget -4 -qO- https://one.one.one.one/cdn-cgi/trace 2>/dev/null)
+    IP=$(echo "$trace" | grep "^ip=" | cut -d= -f2)
+    
+    # 如果 IPv4 失败，尝试 IPv6
+    [[ ! $IP ]] && {
+        trace=$(_wget -6 -qO- https://one.one.one.one/cdn-cgi/trace 2>/dev/null)
+        IP=$(echo "$trace" | grep "^ip=" | cut -d= -f2)
+    }
+    
     [[ ! $IP ]] && {
         err "获取服务器 IP 失败.."
     }
@@ -208,7 +217,9 @@ is_port_used() {
     msg "请执行: $(_yellow "${cmd} update -y; ${cmd} install net-tools -y") 来修复此问题."
 }
 
-# ask input a string or pick a option for list.
+##
+## ask input a string or pick a option for list.
+##
 ask() {
     case $1 in
     set_ss_method)
