@@ -112,8 +112,8 @@ EOF
     
     *ws*)
         # 检测配置冲突
-        [[ -f ${is_nginx_site_file} ]] && {
-            msg WARNING "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
+        [[ -f ${IS_NGINX_SITE_FILE} ]] && {
+            msg WARNING "检测到已存在的 Nginx 配置：${IS_NGINX_SITE_FILE}"
             msg WARNING "请选择:"
             msg "1) 覆盖现有配置 (备份为 .bak)"
             msg "2) 跳过，保留现有配置"
@@ -124,8 +124,8 @@ EOF
                 [[ ! $NGINX_CONF_CHOICE ]] && NGINX_CONF_CHOICE=1
                 case $NGINX_CONF_CHOICE in
                 1)
-                    cp -f ${is_nginx_site_file} ${is_nginx_site_file}.bak
-                    msg OK "已备份现有配置：${is_nginx_site_file}.bak"
+                    cp -f ${IS_NGINX_SITE_FILE} ${IS_NGINX_SITE_FILE}.bak
+                    msg OK "已备份现有配置：${IS_NGINX_SITE_FILE}.bak"
                     break
                     ;;
                 2)
@@ -133,7 +133,7 @@ EOF
                     return 0
                     ;;
                 3)
-                    msg WARNING "请手动编辑：${is_nginx_site_file}"
+                    msg WARNING "请手动编辑：${IS_NGINX_SITE_FILE}"
                     return 0
                     ;;
                 *)
@@ -143,7 +143,7 @@ EOF
             done
         }
         # WebSocket 配置 (VMess/VLESS/Trojan)
-        cat >${is_nginx_site_file} <<<"
+        cat >${IS_NGINX_SITE_FILE} <<<"
 # ${HOST} - V2Ray WebSocket
 # 由 V2Ray 脚本自动生成 - 请勿手动编辑
 
@@ -169,8 +169,8 @@ server {
     server_name ${HOST};
 
     # SSL 证书路径
-    ssl_certificate ${is_ssl_cert};
-    ssl_certificate_key ${is_ssl_key};
+    ssl_certificate ${IS_SSL_CERT};
+    ssl_certificate_key ${IS_SSL_KEY};
 
     # SSL 会话优化
     ssl_session_timeout 1d;
@@ -206,11 +206,11 @@ server {
     }
 
     # 伪装网站配置 (可选)
-    include ${is_nginx_site_file}.add;
+    include ${IS_NGINX_SITE_FILE}.add;
 }
 "
         # 创建空的 .add 文件（避免 Nginx 启动失败）
-        [[ ! -f ${is_nginx_site_file}.add ]] && echo "# 伪装网站配置" >${is_nginx_site_file}.add
+        [[ ! -f ${IS_NGINX_SITE_FILE}.add ]] && echo "# 伪装网站配置" >${IS_NGINX_SITE_FILE}.add
         
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${HOST}; then
@@ -223,8 +223,8 @@ server {
 
     *h2*)
         # 检测配置冲突
-        [[ -f ${is_nginx_site_file} ]] && {
-            msg WARNING "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
+        [[ -f ${IS_NGINX_SITE_FILE} ]] && {
+            msg WARNING "检测到已存在的 Nginx 配置：${IS_NGINX_SITE_FILE}"
             msg WARNING "请选择:"
             msg "1) 覆盖现有配置 (备份为 .bak)"
             msg "2) 跳过，保留现有配置"
@@ -235,8 +235,8 @@ server {
                 [[ ! $NGINX_CONF_CHOICE ]] && NGINX_CONF_CHOICE=1
                 case $NGINX_CONF_CHOICE in
                 1)
-                    cp -f ${is_nginx_site_file} ${is_nginx_site_file}.bak
-                    msg OK "已备份现有配置：${is_nginx_site_file}.bak"
+                    cp -f ${IS_NGINX_SITE_FILE} ${IS_NGINX_SITE_FILE}.bak
+                    msg OK "已备份现有配置：${IS_NGINX_SITE_FILE}.bak"
                     break
                     ;;
                 2)
@@ -244,7 +244,7 @@ server {
                     return
                     ;;
                 3)
-                    msg WARNING "请手动编辑：${is_nginx_site_file}"
+                    msg WARNING "请手动编辑：${IS_NGINX_SITE_FILE}"
                     return
                     ;;
                 *)
@@ -254,7 +254,7 @@ server {
             done
         }
         # HTTP/2 配置
-        cat >${is_nginx_site_file} <<<"
+        cat >${IS_NGINX_SITE_FILE} <<<"
 # ${HOST} - V2Ray HTTP/2
 # 由 V2Ray 脚本自动生成 - 请勿手动编辑
 
@@ -277,8 +277,8 @@ server {
     listen [::]:443 ssl http2;
     server_name ${HOST};
 
-    ssl_certificate ${is_ssl_cert};
-    ssl_certificate_key ${is_ssl_key};
+    ssl_certificate ${IS_SSL_CERT};
+    ssl_certificate_key ${IS_SSL_KEY};
 
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:50m;
@@ -304,11 +304,11 @@ server {
         proxy_read_timeout 300s;
     }
 
-    include ${is_nginx_site_file}.add;
+    include ${IS_NGINX_SITE_FILE}.add;
 }
 "
         # 创建空的 .add 文件（避免 Nginx 启动失败）
-        [[ ! -f ${is_nginx_site_file}.add ]] && echo "# 伪装网站配置" >${is_nginx_site_file}.add
+        [[ ! -f ${IS_NGINX_SITE_FILE}.add ]] && echo "# 伪装网站配置" >${IS_NGINX_SITE_FILE}.add
         
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${HOST}; then
@@ -321,8 +321,8 @@ server {
 
     *grpc*)
         # 检测配置冲突
-        [[ -f ${is_nginx_site_file} ]] && {
-            msg WARNING "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
+        [[ -f ${IS_NGINX_SITE_FILE} ]] && {
+            msg WARNING "检测到已存在的 Nginx 配置：${IS_NGINX_SITE_FILE}"
             msg WARNING "请选择:"
             msg "1) 覆盖现有配置 (备份为 .bak)"
             msg "2) 跳过，保留现有配置"
@@ -333,8 +333,8 @@ server {
                 [[ ! $NGINX_CONF_CHOICE ]] && NGINX_CONF_CHOICE=1
                 case $NGINX_CONF_CHOICE in
                 1)
-                    cp -f ${is_nginx_site_file} ${is_nginx_site_file}.bak
-                    msg OK "已备份现有配置：${is_nginx_site_file}.bak"
+                    cp -f ${IS_NGINX_SITE_FILE} ${IS_NGINX_SITE_FILE}.bak
+                    msg OK "已备份现有配置：${IS_NGINX_SITE_FILE}.bak"
                     break
                     ;;
                 2)
@@ -342,7 +342,7 @@ server {
                     return 0
                     ;;
                 3)
-                    msg WARNING "请手动编辑：${is_nginx_site_file}"
+                    msg WARNING "请手动编辑：${IS_NGINX_SITE_FILE}"
                     return 0
                     ;;
                 *)
@@ -352,7 +352,7 @@ server {
             done
         }
         # gRPC 配置
-        cat >${is_nginx_site_file} <<<"
+        cat >${IS_NGINX_SITE_FILE} <<<"
 # ${HOST} - V2Ray gRPC
 # 由 V2Ray 脚本自动生成 - 请勿手动编辑
 
@@ -375,8 +375,8 @@ server {
     listen [::]:443 ssl http2;
     server_name ${HOST};
 
-    ssl_certificate ${is_ssl_cert};
-    ssl_certificate_key ${is_ssl_key};
+    ssl_certificate ${IS_SSL_CERT};
+    ssl_certificate_key ${IS_SSL_KEY};
 
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:50m;
@@ -400,11 +400,11 @@ server {
         grpc_read_timeout 300s;
     }
 
-    include ${is_nginx_site_file}.add;
+    include ${IS_NGINX_SITE_FILE}.add;
 }
 "
         # 创建空的 .add 文件（避免 Nginx 启动失败）
-        [[ ! -f ${is_nginx_site_file}.add ]] && echo "# 伪装网站配置" >${is_nginx_site_file}.add
+        [[ ! -f ${IS_NGINX_SITE_FILE}.add ]] && echo "# 伪装网站配置" >${IS_NGINX_SITE_FILE}.add
         
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${HOST}; then
@@ -417,7 +417,7 @@ server {
 
     proxy)
         # 伪装网站配置（反向代理到目标网站）
-        cat >${is_nginx_site_file}.add <<<"
+        cat >${IS_NGINX_SITE_FILE}.add <<<"
     # 伪装网站 - 反向代理到 ${proxy_site}
     location / {
         proxy_pass https://${proxy_site};
@@ -434,7 +434,7 @@ server {
     
     del)
         # 删除配置
-        rm -rf ${is_nginx_site_file} ${is_nginx_site_file}.add
+        rm -rf ${IS_NGINX_SITE_FILE} ${IS_NGINX_SITE_FILE}.add
         # 清理证书（可选，注释掉以保留证书）
         # rm -rf $IS_NGINX_DIR/ssl/${HOST}
         ;;
@@ -442,7 +442,7 @@ server {
     
     # 创建空的 .add 文件（如果没有）
     if [[ $1 != "new" && $1 != 'proxy' && $1 != 'del' ]]; then
-        [[ ! -f ${is_nginx_site_file}.add ]] && echo "# 伪装网站配置" >${is_nginx_site_file}.add
+        [[ ! -f ${IS_NGINX_SITE_FILE}.add ]] && echo "# 伪装网站配置" >${IS_NGINX_SITE_FILE}.add
     fi
 }
 
