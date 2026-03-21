@@ -545,8 +545,8 @@ nginx_certbot() {
 
             # 续期证书（根据版本决定是否使用 ECDSA）
             local ECDSA_OPT=""
-            [[ $IS_ECDSA_SUPPORTED -eq 1 ]] && ecdsa_opt="--key-type ecdsa"
-            
+            [[ $IS_ECDSA_SUPPORTED -eq 1 ]] && ECDSA_OPT="--key-type ecdsa"
+
             if certbot certonly --webroot \
                 -w /var/www/certbot \
                 -d ${DOMAIN} \
@@ -589,8 +589,8 @@ nginx_certbot() {
 
             # 申请证书（根据版本决定是否使用 ECDSA）
             local ECDSA_OPT=""
-            [[ $IS_ECDSA_SUPPORTED -eq 1 ]] && ecdsa_opt="--key-type ecdsa"
-            
+            [[ $IS_ECDSA_SUPPORTED -eq 1 ]] && ECDSA_OPT="--key-type ecdsa"
+
             if certbot certonly --standalone \
                 -d ${DOMAIN} \
                 --email admin@${DOMAIN} \
