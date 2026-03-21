@@ -1693,12 +1693,12 @@ info() {
     msg "-------------- $IS_CONFIG_NAME -------------"
     for ((i = 0; i < ${#IS_INFO_SHOW[@]}; i++)); do
         A=${INFO_LIST[${IS_INFO_SHOW[$i]}]}
-        if [[ ${#a} -eq 11 || ${#a} -ge 13 ]]; then
+        if [[ ${#A} -eq 11 || ${#A} -ge 13 ]]; then
             TT='\t'
         else
             TT='\t\t'
         fi
-        msg "$a $TT= \e[${IS_COLOR}m${IS_INFO_STR[$i]}\e[0m"
+        msg "$A $TT= \e[${IS_COLOR}m${IS_INFO_STR[$i]}\e[0m"
     done
     if [[ $IS_NEW_INSTALL ]]; then
         warn "首次安装请查看脚本帮助文档: $(msg_ul https://wangyan-good.github.io/v2ray/$IS_CORE-script/)"
