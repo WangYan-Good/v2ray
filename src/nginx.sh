@@ -5,7 +5,6 @@
 
 nginx_config() {
     # 配置文件名包含协议名，如 VLESS-gRPC-TLS-proxy.yourdie.com.conf
-    msg DEBUG "nginx_config: \$1='$1', HOST='$HOST'"
     IS_NGINX_SITE_FILE=$IS_NGINX_CONF/${1}-${HOST}.conf
     IS_SSL_CERT=$IS_NGINX_DIR/ssl/${HOST}/fullchain.pem
     IS_SSL_KEY=$IS_NGINX_DIR/ssl/${HOST}/privkey.pem
@@ -229,7 +228,6 @@ server {
         ;;
 
     *h2*)
-        msg DEBUG "Matched *h2* branch: PROTOCOL_LOWER='$PROTOCOL_LOWER', IS_NGINX_SITE_FILE='$IS_NGINX_SITE_FILE'"
         # 检测配置冲突
         [[ -f ${IS_NGINX_SITE_FILE} ]] && {
             msg WARNING "检测到已存在的 Nginx 配置：${IS_NGINX_SITE_FILE}"
@@ -496,7 +494,6 @@ nginx_certbot() {
                     msg OK "证书已存在且有效，剩余 ${DAYS_LEFT} 天"
                     msg info "证书路径：${CERT_FILE}"
                     msg info "过期时间：${CERT_EXPIRY}"
-                    msg DEBUG "IS_NGINX_DIR='$IS_NGINX_DIR', DOMAIN='$DOMAIN'"
                     # 检查软链接是否存在
                     if [[ ! -L $IS_NGINX_DIR/ssl/${DOMAIN} ]]; then
                         msg WARNING "证书软链接不存在，正在创建..."
