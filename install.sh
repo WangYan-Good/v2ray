@@ -993,7 +993,18 @@ main() {
     if [[ $DOMAIN_INPUT ]]; then
         echo
         msg WARNING "正在配置 ${YELLOW}$PROTOCOL_TYPE${NONE} > ${YELLOW}$DOMAIN_INPUT${NONE}..."
-        add $PROTOCOL_TYPE $DOMAIN_INPUT
+        # 根据协议类型传递参数
+        # TLS 协议：add protocol host [uuid] [path]
+        # 非 TLS 协议：add protocol auto auto auto host （auto 表示自动获取/随机）
+        HOST=$DOMAIN_INPUT
+        case $PROTOCOL_TYPE in
+        *-TLS | *-tls)
+            add $PROTOCOL_TYPE $DOMAIN_INPUT
+            ;;
+        *)
+            add $PROTOCOL_TYPE auto auto auto
+            ;;
+        esac
         echo
         msg OK "配置完成！使用 'v2ray info' 查看配置信息"
     else
