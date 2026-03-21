@@ -1260,10 +1260,7 @@ get() {
     file)
         IS_FILE_STR=$2
         [[ ! $IS_FILE_STR ]] && IS_FILE_STR='.json$'
-        # IS_ALL_JSON=("$(ls $IS_CONF_DIR | grep -E $IS_FILE_STR)")
-        msg "DEBUG: get file, IS_CONF_DIR='$IS_CONF_DIR', IS_FILE_STR='$IS_FILE_STR'" >&2
         readarray -t IS_ALL_JSON <<<"$(ls $IS_CONF_DIR | grep -E -i "$IS_FILE_STR" | sed '/dynamic-port-.*-link/d' | head -233)"
-        msg "DEBUG: IS_ALL_JSON count=${#IS_ALL_JSON[@]}, content='${IS_ALL_JSON[*]}'" >&2
         [[ ! $IS_ALL_JSON ]] && err "无法找到相关的配置文件: $2"
         [[ ${#IS_ALL_JSON[@]} -eq 1 ]] && IS_CONFIG_FILE=$IS_ALL_JSON && IS_AUTO_GET_CONFIG=1
         [[ ! $IS_CONFIG_FILE ]] && {
@@ -1272,9 +1269,7 @@ get() {
         }
         ;;
     info)
-        msg "DEBUG: get info called with \$1='$1', \$2='$2'" >&2
         get file $2
-        msg "DEBUG: IS_CONFIG_FILE='$IS_CONFIG_FILE'" >&2
         if [[ $IS_CONFIG_FILE ]]; then
             IS_JSON_STR=$(cat $IS_CONF_DIR/"$IS_CONFIG_FILE")
             IS_JSON_DATA_BASE=$(jq -r '(.inbounds[0].protocol//""),(.inbounds[0].port//""),(.inbounds[0].settings.clients[0].id//""),(.inbounds[0].settings.clients[0].password//""),(.inbounds[0].settings.method//""),(.inbounds[0].settings.address//""),(.inbounds[0].settings.port//""),(.inbounds[0].settings.detour.to//""),(.inbounds[0].settings.accounts[0].user//""),(.inbounds[0].settings.accounts[0].pass//"")' <<<$IS_JSON_STR)
@@ -1294,11 +1289,11 @@ get() {
             # host(3): grpc_host,ws_host,h2_host
             # reality(3): serverName,publicKey,privateKey
             IS_UP_VAR_SET=(IS_PROTOCOL PORT UUID TROJAN_PASSWORD SS_METHOD DOOR_ADDR DOOR_PORT IS_DYNAMIC_PORT IS_SOCKS_USER IS_SOCKS_PASS NET IS_SECURITY tcp_type KCP_SEED kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host IS_SERVERNAME IS_PUBLIC_KEY IS_PRIVATE_KEY)
-            # 使用 readarray 分别读取每个 jq 输出，确保空行不丢失
-            readarray -t BASE_ARR <<< "$IS_JSON_DATA_BASE"
-            readarray -t MORE_ARR <<< "$IS_JSON_DATA_MORE"
-            readarray -t HOST_ARR <<< "$IS_JSON_DATA_HOST"
-            readarray -t REALITY_ARR <<< "$IS_JSON_DATA_REALITY"
+            # jq 输出是逗号分隔，需要转换为换行后用 readarray 读取
+            IFS=',' read -r -a BASE_ARR <<< "$IS_JSON_DATA_BASE"
+            IFS=',' read -r -a MORE_ARR <<< "$IS_JSON_DATA_MORE"
+            IFS=',' read -r -a HOST_ARR <<< "$IS_JSON_DATA_HOST"
+            IFS=',' read -r -a REALITY_ARR <<< "$IS_JSON_DATA_REALITY"
             local -a ALL_JSON_OUTPUT=("${BASE_ARR[@]}" "${MORE_ARR[@]}" "${HOST_ARR[@]}" "${REALITY_ARR[@]}")
             [[ $IS_DEBUG ]] && msg "DEBUG: all_json_output count=${#ALL_JSON_OUTPUT[@]} (base:${#BASE_ARR[@]} more:${#MORE_ARR[@]} host:${#HOST_ARR[@]} reality:${#REALITY_ARR[@]})"
             for i in "${!ALL_JSON_OUTPUT[@]}"; do
@@ -1619,10 +1614,8 @@ get() {
 
 # show info
 info() {
-    msg "DEBUG: info() called with \$1='$1'" >&2
     # 总是从 JSON 文件读取配置信息，确保变量正确设置
     get info $1
-    msg "DEBUG: after get info, NET='$NET', HOST='$HOST', IS_PROTOCOL='$IS_PROTOCOL'" >&2
     # IS_COLOR=$(shuf -i 41-45 -n1)
     IS_COLOR=44
     case $NET in
