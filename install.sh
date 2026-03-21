@@ -274,8 +274,36 @@ download() {
 ## 获取服务器 IP
 ##
 get_ip() {
-    export "$(_wget -4 -qO- https://one.one.one.one/cdn-cgi/trace | grep IP=)" &>/dev/null
-    [[ -z $IP ]] && export "$(_wget -6 -qO- https://one.one.one.one/cdn-cgi/trace | grep IP=)" &>/dev/null
+    ##
+    ## 尝试多个 IP 获取服务
+    ##
+    local services=(
+        "https://one.one.one.one/cdn-cgi/trace"
+        "https://api.ip.sb/ip"
+        "https://ifconfig.me/ip"
+        "https://ipinfo.io/ip"
+        "https://icanhazip.com"
+    )
+
+    for service in "${services[@]}"; do
+        IP=$(_wget -4 -T 5 -qO- "$service" 2>/dev/null)
+        # 清理可能的空白字符
+        IP=$(echo "$IP" | tr -d '[:space:]')
+        [[ $IP && $IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && break
+        IP=
+    done
+
+    ##
+    ## 如果 IPv4 全部失败，尝试 IPv6
+    ##
+    [[ ! $IP ]] && {
+        for service in "${services[@]}"; do
+            IP=$(_wget -6 -T 5 -qO- "$service" 2>/dev/null)
+            IP=$(echo "$IP" | tr -d '[:space:]')
+            [[ $IP ]] && break
+            IP=
+        done
+    }
 }
 
 ##
