@@ -491,12 +491,15 @@ nginx_certbot() {
                     msg OK "证书已存在且有效，剩余 ${DAYS_LEFT} 天"
                     msg info "证书路径：${CERT_FILE}"
                     msg info "过期时间：${CERT_EXPIRY}"
+                    msg DEBUG "IS_NGINX_DIR='$IS_NGINX_DIR', DOMAIN='$DOMAIN'"
                     # 检查软链接是否存在
                     if [[ ! -L $IS_NGINX_DIR/ssl/${DOMAIN} ]]; then
                         msg WARNING "证书软链接不存在，正在创建..."
                         mkdir -p $IS_NGINX_DIR/ssl
                         ln -sf /etc/letsencrypt/live/${DOMAIN} $IS_NGINX_DIR/ssl/${DOMAIN}
                         msg OK "软链接创建成功"
+                    else
+                        msg OK "证书软链接已存在"
                     fi
                     # 启动或重载 Nginx
                     if pgrep -f "nginx: master" &>/dev/null; then
