@@ -1303,7 +1303,7 @@ get() {
             done
             [[ $IS_DEBUG ]] && msg "DEBUG: net='$NET', host='$HOST', grpc_host='$grpc_host'"
             for v in ${IS_UP_VAR_SET[@]}; do
-                [[ -z "${!v}" || "${!v}" == "null" ]] && unset $V
+                [[ -z "${!v}" || "${!v}" == "null" ]] && unset $v
             done
 
             # 合并变量（如果从 JSON 读取失败，使用备用方式）
