@@ -12,7 +12,10 @@ nginx_config() {
     URL_PATH=${3:-}
     PORT=${4:-}
 
-    case $1 in
+    # 转换为小写用于模式匹配
+    local PROTOCOL_LOWER=${1,,}
+
+    case $PROTOCOL_LOWER in
     new)
         # 创建目录结构
         mkdir -p $IS_NGINX_DIR $IS_NGINX_DIR/ssl $IS_NGINX_CONF
@@ -226,7 +229,7 @@ server {
         ;;
 
     *h2*)
-        msg DEBUG "Matched *h2* branch: \$1='$1', IS_NGINX_SITE_FILE='$IS_NGINX_SITE_FILE'"
+        msg DEBUG "Matched *h2* branch: PROTOCOL_LOWER='$PROTOCOL_LOWER', IS_NGINX_SITE_FILE='$IS_NGINX_SITE_FILE'"
         # 检测配置冲突
         [[ -f ${IS_NGINX_SITE_FILE} ]] && {
             msg WARNING "检测到已存在的 Nginx 配置：${IS_NGINX_SITE_FILE}"
