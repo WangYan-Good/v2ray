@@ -1316,6 +1316,16 @@ get() {
                 SS_PASSWORD=$(jq -r '.inbounds[0].settings.password // ""' <<<$IS_JSON_STR)
                 SS_METHOD=$(jq -r '.inbounds[0].settings.method // ""' <<<$IS_JSON_STR)
             }
+            # Socks 协议使用 accounts[0].user/pass，需要从 JSON 直接读取
+            [[ $IS_PROTOCOL == 'socks' ]] && {
+                IS_SOCKS_USER=$(jq -r '.inbounds[0].settings.accounts[0].user // ""' <<<$IS_JSON_STR)
+                IS_SOCKS_PASS=$(jq -r '.inbounds[0].settings.accounts[0].pass // ""' <<<$IS_JSON_STR)
+            }
+            # Dokodemo-Door 协议使用 settings.address/port，需要从 JSON 直接读取
+            [[ $IS_PROTOCOL == 'dokodemo-door' ]] && {
+                DOOR_ADDR=$(jq -r '.inbounds[0].settings.address // ""' <<<$IS_JSON_STR)
+                DOOR_PORT=$(jq -r '.inbounds[0].settings.port // ""' <<<$IS_JSON_STR)
+            }
             # grpc 的 serviceName 存储在 grpc_serviceName 变量中，需要赋值给 path
             [[ -z $URL_PATH && $GRPC_SERVICE_NAME ]] && URL_PATH="$GRPC_SERVICE_NAME"
             # 备用：如果 net 为空，尝试从 JSON 直接提取
