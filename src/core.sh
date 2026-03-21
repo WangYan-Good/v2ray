@@ -411,7 +411,7 @@ create() {
             if [[ $IS_CADDY ]]; then
                 create caddy $NET
             elif [[ $IS_NGINX ]]; then
-                create nginx $NET "" "$URL_PATH" "$PORT"
+                create nginx $IS_NEW_PROTOCOL "" "$URL_PATH" "$PORT"
             fi
         }
         # restart core

@@ -4,7 +4,8 @@
 # 支持多站点共存，共享 80/443 端口
 
 nginx_config() {
-    IS_NGINX_SITE_FILE=$IS_NGINX_CONF/${HOST}.conf
+    # 配置文件名包含协议名，如 VLESS-gRPC-TLS-proxy.yourdie.com.conf
+    IS_NGINX_SITE_FILE=$IS_NGINX_CONF/${1}-${HOST}.conf
     IS_SSL_CERT=$IS_NGINX_DIR/ssl/${HOST}/fullchain.pem
     IS_SSL_KEY=$IS_NGINX_DIR/ssl/${HOST}/privkey.pem
     URL_PATH=${3:-}
@@ -435,8 +436,10 @@ server {
         ;;
     
     del)
-        # 删除配置
-        rm -rf ${IS_NGINX_SITE_FILE} ${IS_NGINX_SITE_FILE}.add
+        # 删除配置 - 遍历所有协议前缀的配置文件
+        for conf in $IS_NGINX_CONF/*-${HOST}.conf $IS_NGINX_CONF/*-${HOST}.conf.add; do
+            [[ -f $conf ]] && rm -f $conf
+        done
         # 清理证书（可选，注释掉以保留证书）
         # rm -rf $IS_NGINX_DIR/ssl/${HOST}
         ;;
