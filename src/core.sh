@@ -1619,10 +1619,6 @@ info() {
     get info $1
     # IS_COLOR=$(shuf -i 41-45 -n1)
     IS_COLOR=44
-    # 调试：检查 NET 变量
-    [[ $IS_DEBUG ]] && msg "DEBUG: NET='$NET', host='$HOST', IS_PROTOCOL='$IS_PROTOCOL'"
-    [[ $IS_DEBUG ]] && msg "DEBUG: IS_CONFIG_FILE='$IS_CONFIG_FILE', IS_CONF_DIR='$IS_CONF_DIR'"
-    [[ $IS_DEBUG ]] && [[ -f $IS_CONF_DIR/"$IS_CONFIG_FILE" ]] && cat $IS_CONF_DIR/"$IS_CONFIG_FILE"
     case $NET in
     tcp | kcp | quic)
         IS_CAN_CHANGE=(0 1 5 7)
