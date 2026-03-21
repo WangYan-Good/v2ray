@@ -1309,6 +1309,13 @@ get() {
             [[ -z $HOST ]] && host="${grpc_host:-${ws_host:-${h2_host:-}}}"
             # 设置 IS_ADDR（服务器地址）
             get addr
+            # Trojan 协议使用 password 字段，需要赋值给 UUID
+            [[ $IS_PROTOCOL == 'trojan' && $TROJAN_PASSWORD ]] && UUID=$TROJAN_PASSWORD
+            # Shadowsocks 协议使用 settings.password 和 settings.method，需要从 JSON 直接读取
+            [[ $IS_PROTOCOL == 'shadowsocks' ]] && {
+                SS_PASSWORD=$(jq -r '.inbounds[0].settings.password // ""' <<<$IS_JSON_STR)
+                SS_METHOD=$(jq -r '.inbounds[0].settings.method // ""' <<<$IS_JSON_STR)
+            }
             # grpc 的 serviceName 存储在 grpc_serviceName 变量中，需要赋值给 path
             [[ -z $URL_PATH && $GRPC_SERVICE_NAME ]] && URL_PATH="$GRPC_SERVICE_NAME"
             # 备用：如果 net 为空，尝试从 JSON 直接提取
