@@ -1308,6 +1308,8 @@ get() {
 
             # 合并变量（如果从 JSON 读取失败，使用备用方式）
             [[ -z $HOST ]] && host="${grpc_host:-${ws_host:-${h2_host:-}}}"
+            # 设置 IS_ADDR（服务器地址）
+            get addr
             # grpc 的 serviceName 存储在 grpc_serviceName 变量中，需要赋值给 path
             [[ -z $URL_PATH && $GRPC_SERVICE_NAME ]] && URL_PATH="$GRPC_SERVICE_NAME"
             # 备用：如果 net 为空，尝试从 JSON 直接提取
