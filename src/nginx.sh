@@ -486,8 +486,8 @@ nginx_certbot() {
 
                 if [[ $DAYS_LEFT -gt 30 ]]; then
                     msg OK "证书已存在且有效，剩余 ${DAYS_LEFT} 天"
-                    msg info "证书路径：${cert_file}"
-                    msg info "过期时间：${cert_expiry}"
+                    msg info "证书路径：${CERT_FILE}"
+                    msg info "过期时间：${CERT_EXPIRY}"
                     # 检查软链接是否存在
                     if [[ ! -L $IS_NGINX_DIR/ssl/${DOMAIN} ]]; then
                         msg WARNING "证书软链接不存在，正在创建..."
