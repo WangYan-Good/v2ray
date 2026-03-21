@@ -1290,11 +1290,11 @@ get() {
             # host(3): grpc_host,ws_host,h2_host
             # reality(3): serverName,publicKey,privateKey
             IS_UP_VAR_SET=(IS_PROTOCOL PORT UUID TROJAN_PASSWORD SS_METHOD DOOR_ADDR DOOR_PORT IS_DYNAMIC_PORT IS_SOCKS_USER IS_SOCKS_PASS NET IS_SECURITY tcp_type KCP_SEED kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host IS_SERVERNAME IS_PUBLIC_KEY IS_PRIVATE_KEY)
-            # 使用 tr 将逗号分隔转换为换行分隔，然后 readarray 按行读取
-            readarray -t BASE_ARR <<< "$(tr ',' '\n' <<<"$IS_JSON_DATA_BASE")"
-            readarray -t MORE_ARR <<< "$(tr ',' '\n' <<<"$IS_JSON_DATA_MORE")"
-            readarray -t HOST_ARR <<< "$(tr ',' '\n' <<<"$IS_JSON_DATA_HOST")"
-            readarray -t REALITY_ARR <<< "$(tr ',' '\n' <<<"$IS_JSON_DATA_REALITY")"
+            # 使用 readarray 分别读取每个 jq 输出，确保空行不丢失
+            readarray -t BASE_ARR <<< "$IS_JSON_DATA_BASE"
+            readarray -t MORE_ARR <<< "$IS_JSON_DATA_MORE"
+            readarray -t HOST_ARR <<< "$IS_JSON_DATA_HOST"
+            readarray -t REALITY_ARR <<< "$IS_JSON_DATA_REALITY"
             local -a ALL_JSON_OUTPUT=("${BASE_ARR[@]}" "${MORE_ARR[@]}" "${HOST_ARR[@]}" "${REALITY_ARR[@]}")
             [[ $IS_DEBUG ]] && msg "DEBUG: all_json_output count=${#ALL_JSON_OUTPUT[@]} (base:${#BASE_ARR[@]} more:${#MORE_ARR[@]} host:${#HOST_ARR[@]} reality:${#REALITY_ARR[@]})"
             for i in "${!ALL_JSON_OUTPUT[@]}"; do
@@ -1619,6 +1619,8 @@ info() {
     get info $1
     # IS_COLOR=$(shuf -i 41-45 -n1)
     IS_COLOR=44
+    # 调试：检查 NET 变量
+    [[ $IS_DEBUG ]] && msg "DEBUG: NET='$NET', host='$HOST', IS_PROTOCOL='$IS_PROTOCOL'"
     case $NET in
     tcp | kcp | quic)
         IS_CAN_CHANGE=(0 1 5 7)
