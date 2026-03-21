@@ -1138,7 +1138,7 @@ add() {
             get dynamic-port-test
         fi
         [[ $IS_USE_PASS ]] && SS_PASSWORD=$IS_USE_PASS
-        [[ $IS_USE_HOST ]] && host=$IS_USE_HOST
+        [[ $IS_USE_HOST ]] && HOST=$IS_USE_HOST
         [[ $IS_USE_DOOR_ADDR ]] && DOOR_ADDR=$IS_USE_DOOR_ADDR
         [[ $IS_USE_SERVERNAME ]] && IS_SERVERNAME=$IS_USE_SERVERNAME
         [[ $IS_USE_SOCKS_USER ]] && IS_SOCKS_USER=$IS_USE_SOCKS_USER
