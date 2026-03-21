@@ -410,7 +410,7 @@ create() {
             if [[ $IS_CADDY ]]; then
                 create caddy $NET
             elif [[ $IS_NGINX ]]; then
-                create nginx $NET
+                create nginx $NET "" "$URL_PATH" "$PORT"
             fi
         }
         # restart core
@@ -445,9 +445,9 @@ create() {
         ;;
     nginx)
         load nginx.sh
-        [[ $IS_INSTALL_NGINX ]] && nginx_config new
+        [[ $IS_INSTALL_NGINX ]] && nginx_config new "" "$URL_PATH" "$PORT"
         [[ ! -d $IS_NGINX_CONF ]] && mkdir -p $IS_NGINX_CONF
-        if ! nginx_config $2; then
+        if ! nginx_config $2 "" "$URL_PATH" "$PORT"; then
             msg ERROR "Nginx 配置生成失败，证书申请未成功"
             msg WARNING "V2Ray 配置已生成，但 TLS 尚未启用"
             msg WARNING "你可以稍后手动申请证书并重载 Nginx"
@@ -591,7 +591,7 @@ change() {
                 manage restart caddy &
             elif [[ $IS_NGINX ]]; then
                 load nginx.sh
-                nginx_config $NET
+                nginx_config $NET "" "$URL_PATH" "$PORT"
                 nginx_reload
             fi
             info

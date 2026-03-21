@@ -7,6 +7,8 @@ nginx_config() {
     IS_NGINX_SITE_FILE=$IS_NGINX_CONF/${HOST}.conf
     IS_SSL_CERT=$IS_NGINX_DIR/ssl/${HOST}/fullchain.pem
     IS_SSL_KEY=$IS_NGINX_DIR/ssl/${HOST}/privkey.pem
+    URL_PATH=${3:-}
+    PORT=${4:-}
 
     case $1 in
     new)
@@ -192,8 +194,8 @@ server {
     # add_header Strict-Transport-Security "max-age=63072000" always;
 
     # WebSocket 反向代理配置
-    location ${path} {
-        proxy_pass http://127.0.0.1:${port};
+    location ${URL_PATH} {
+        proxy_pass http://127.0.0.1:${PORT};
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -294,8 +296,8 @@ server {
     resolver_timeout 2s;
 
     # H2 反向代理配置
-    location ${path} {
-        proxy_pass http://127.0.0.1:${port};
+    location ${URL_PATH} {
+        proxy_pass http://127.0.0.1:${PORT};
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -392,8 +394,8 @@ server {
     resolver_timeout 2s;
 
     # gRPC 反向代理配置
-    location /${path}/ {
-        grpc_pass grpc://127.0.0.1:${port};
+    location /${URL_PATH}/ {
+        grpc_pass grpc://127.0.0.1:${PORT};
         grpc_set_header Host \$host;
         grpc_set_header X-Real-IP \$remote_addr;
         grpc_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
