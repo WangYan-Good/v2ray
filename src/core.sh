@@ -1082,7 +1082,7 @@ add() {
     # prefer args.
     if [[ $2 ]]; then
         for v in IS_USE_PORT IS_USE_UUID IS_USE_HEADER_TYPE IS_USE_HOST IS_USE_PATH IS_USE_PASS IS_USE_METHOD IS_USE_DOOR_ADDR IS_USE_DOOR_PORT IS_USE_DYNAMIC_PORT_START IS_USE_DYNAMIC_PORT_END; do
-            [[ ${!v} == 'auto' ]] && unset $V
+            [[ ${!v} == 'auto' ]] && unset $v
         done
 
         if [[ $IS_USE_PORT ]]; then
