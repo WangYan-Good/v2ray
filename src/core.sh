@@ -1163,7 +1163,7 @@ add() {
             IS_INSTALL_CADDY=1
         fi
         # set host
-        [[ ! $HOST ]] && ask string host "请输入域名:"
+        [[ ! $HOST ]] && ask string HOST "请输入域名:"
         # test host dns
         get host-test
     else
