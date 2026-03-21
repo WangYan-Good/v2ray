@@ -406,7 +406,8 @@ create() {
             api add $IS_JSON_FILE $IS_DYNAMIC_PORT_LINK_FILE &>/dev/null
         fi
         # auto tls (caddy or nginx)
-        [[ $HOST && ! $IS_NO_AUTO_TLS ]] && {
+        # 只有 TLS 协议（WS/H2/gRPC）需要配置反向代理
+        [[ $HOST && ! $IS_NO_AUTO_TLS && $IS_USE_TLS ]] && {
             if [[ $IS_CADDY ]]; then
                 create caddy $NET
             elif [[ $IS_NGINX ]]; then
