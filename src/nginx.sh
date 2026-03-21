@@ -637,7 +637,7 @@ install_nginx_certbot() {
     # 检查是否已安装
     if [[ -f $IS_NGINX_BIN ]]; then
         msg WARNING "Nginx 已安装，跳过安装"
-        is_nginx=1
+        IS_NGINX=1
         return 0
     fi
     
@@ -683,8 +683,8 @@ install_nginx_certbot() {
         (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'systemctl reload nginx'") | crontab -
         msg WARNING "已添加证书自动续期定时任务"
     fi
-    
-    is_nginx=1
+
+    IS_NGINX=1
     _green "安装 Nginx + Certbot 成功.\n"
 }
 
