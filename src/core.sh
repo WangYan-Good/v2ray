@@ -610,7 +610,7 @@ change() {
     3)
         # new path
         IS_NEW_PATH=$3
-        [[ ! $PATH ]] && err "($IS_CONFIG_FILE) 不支持更改路径."
+        [[ ! $URL_PATH ]] && err "($IS_CONFIG_FILE) 不支持更改路径."
         [[ $IS_AUTO ]] && get_uuid && IS_NEW_PATH=/$TMP_UUID
         [[ ! $IS_NEW_PATH ]] && ask string IS_NEW_PATH "请输入新路径:"
         add $NET auto auto $IS_NEW_PATH
@@ -1055,7 +1055,7 @@ add() {
                 unset host IS_NO_AUTO_TLS
             else
                 [[ $IS_OLD_NET == 'grpc' ]] && {
-                    PATH=/$PATH
+                    URL_PATH=/$URL_PATH
                 }
             fi
             [[ ! $(grep -i trojan <<<$IS_NEW_PROTOCOL) ]] && IS_TROJAN=
@@ -1110,7 +1110,7 @@ add() {
             [[ ! $(is_test path $IS_USE_PATH) ]] && {
                 err "($IS_USE_PATH) 不是有效的路径. $IS_ERR_TIPS"
             }
-            PATH=$IS_USE_PATH
+            URL_PATH=$IS_USE_PATH
         fi
         if [[ $IS_USE_HEADER_TYPE || $IS_USE_METHOD ]]; then
             IS_TMP_USE_NAME=加密方式
@@ -1308,7 +1308,7 @@ get() {
             # 合并变量（如果从 JSON 读取失败，使用备用方式）
             [[ -z $HOST ]] && host="${grpc_host:-${ws_host:-${h2_host:-}}}"
             # grpc 的 serviceName 存储在 grpc_serviceName 变量中，需要赋值给 path
-            [[ -z $PATH && $GRPC_SERVICE_NAME ]] && PATH="$GRPC_SERVICE_NAME"
+            [[ -z $URL_PATH && $GRPC_SERVICE_NAME ]] && URL_PATH="$GRPC_SERVICE_NAME"
             # 备用：如果 net 为空，尝试从 JSON 直接提取
             [[ -z $NET ]] && NET=$(jq -r '.inbounds[0].streamSettings.network // ""' <<<$IS_JSON_STR)
             [[ $IS_DEBUG ]] && msg "DEBUG (backup): net='$NET'"
@@ -1428,21 +1428,21 @@ get() {
             ;;
         *ws* | *websocket)
             NET=ws
-            [[ ! $PATH ]] && PATH="/$UUID"
-            IS_STREAM='streamSettings:{network:"ws",security:'\"$IS_TLS\"',wsSettings:{path:'\"$PATH\"',headers:{Host:'\"$HOST\"'}}}'
+            [[ ! $URL_PATH ]] && URL_PATH="/$UUID"
+            IS_STREAM='streamSettings:{network:"ws",security:'\"$IS_TLS\"',wsSettings:{path:'\"$URL_PATH\"',headers:{Host:'\"$HOST\"'}}}'
             JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
             ;;
         *grpc* | *gun)
             NET=grpc
-            [[ ! $PATH ]] && PATH="grpc"
-            [[ $PATH == */* ]] && PATH=$(sed 's#/##g' <<<$PATH)
-            IS_STREAM='streamSettings:{network:"grpc",grpc_host:'\"$HOST\"',security:'\"$IS_TLS\"',grpcSettings:{serviceName:'\"$PATH\"'}}'
+            [[ ! $URL_PATH ]] && URL_PATH="grpc"
+            [[ $URL_PATH == */* ]] && URL_PATH=$(sed 's#/##g' <<<$URL_PATH)
+            IS_STREAM='streamSettings:{network:"grpc",grpc_host:'\"$HOST\"',security:'\"$IS_TLS\"',grpcSettings:{serviceName:'\"$URL_PATH\"'}}'
             JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
             ;;
         *h2* | *http*)
             NET=h2
-            [[ ! $PATH ]] && PATH="/$UUID"
-            IS_STREAM='streamSettings:{network:"h2",security:'\"$IS_TLS\"',httpSettings:{path:'\"$PATH\"',host:['\"$HOST\"']}}'
+            [[ ! $URL_PATH ]] && URL_PATH="/$UUID"
+            IS_STREAM='streamSettings:{network:"h2",security:'\"$IS_TLS\"',httpSettings:{path:'\"$URL_PATH\"',host:['\"$HOST\"']}}'
             JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
             ;;
         *reality*)
@@ -1646,13 +1646,13 @@ info() {
         IS_CAN_CHANGE=(0 1 2 3 5)
         IS_INFO_SHOW=(0 1 2 3 4 6 7 8)
         IS_URL_path=path
-        IS_DISPLAY_PATH=$PATH
+        IS_DISPLAY_PATH=$URL_PATH
         [[ $NET == 'grpc' ]] && {
-            IS_DISPLAY_PATH=$(sed 's#/##g' <<<$PATH)
+            IS_DISPLAY_PATH=$(sed 's#/##g' <<<$URL_PATH)
             IS_URL_path=serviceName
         }
         [[ $IS_PROTOCOL == 'vmess' ]] && {
-            IS_VMESS_URL=$(jq -c '{v:2,ps:'\"$NET-$HOST\"',add:'\"$IS_ADDR\"',port:'\"$IS_HTTPS_PORT\"',id:'\"$UUID\"',aid:"0",net:'\"$NET\"',host:'\"$HOST\"',path:'\"$PATH\"',tls:'\"tls\"'}' <<<{})
+            IS_VMESS_URL=$(jq -c '{v:2,ps:'\"$NET-$HOST\"',add:'\"$IS_ADDR\"',port:'\"$IS_HTTPS_PORT\"',id:'\"$UUID\"',aid:"0",net:'\"$NET\"',host:'\"$HOST\"',path:'\"$URL_PATH\"',tls:'\"tls\"'}' <<<{})
             IS_URL=vmess://$(echo -n $IS_VMESS_URL | base64 -w 0)
         } || {
             [[ $IS_TROJAN ]] && {
@@ -1708,8 +1708,8 @@ info() {
         msg "\e[4;${IS_COLOR}m${IS_URL}\e[0m"
     fi
     if [[ $IS_NO_AUTO_TLS ]]; then
-        IS_TMP_PATH=$PATH
-        [[ $NET == 'grpc' ]] && IS_TMP_PATH="/$PATH/*"
+        IS_TMP_PATH=$URL_PATH
+        [[ $NET == 'grpc' ]] && IS_TMP_PATH="/$URL_PATH/*"
         msg "------------- no-auto-tls INFO -------------"
         msg "端口(port): $PORT"
         msg "路径(path): $IS_TMP_PATH"
