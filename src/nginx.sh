@@ -5,6 +5,7 @@
 
 nginx_config() {
     # 配置文件名包含协议名，如 VLESS-gRPC-TLS-proxy.yourdie.com.conf
+    msg DEBUG "nginx_config: \$1='$1', HOST='$HOST'"
     IS_NGINX_SITE_FILE=$IS_NGINX_CONF/${1}-${HOST}.conf
     IS_SSL_CERT=$IS_NGINX_DIR/ssl/${HOST}/fullchain.pem
     IS_SSL_KEY=$IS_NGINX_DIR/ssl/${HOST}/privkey.pem
@@ -225,6 +226,7 @@ server {
         ;;
 
     *h2*)
+        msg DEBUG "Matched *h2* branch: \$1='$1', IS_NGINX_SITE_FILE='$IS_NGINX_SITE_FILE'"
         # 检测配置冲突
         [[ -f ${IS_NGINX_SITE_FILE} ]] && {
             msg WARNING "检测到已存在的 Nginx 配置：${IS_NGINX_SITE_FILE}"
