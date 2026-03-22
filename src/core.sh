@@ -1297,9 +1297,10 @@ get() {
             local -a ALL_JSON_OUTPUT=("${BASE_ARR[@]}" "${MORE_ARR[@]}" "${HOST_ARR[@]}" "${REALITY_ARR[@]}")
             [[ $IS_DEBUG ]] && msg "DEBUG: all_json_output count=${#ALL_JSON_OUTPUT[@]} (base:${#BASE_ARR[@]} more:${#MORE_ARR[@]} host:${#HOST_ARR[@]} reality:${#REALITY_ARR[@]})"
             for i in "${!ALL_JSON_OUTPUT[@]}"; do
-                [[ $IS_DEBUG ]] && msg "$i-${IS_UP_VAR_SET[$i]}: ${ALL_JSON_OUTPUT[$i]}"
+                [[ $IS_DEBUG ]] && msg "DEBUG: $i-${IS_UP_VAR_SET[$i]}: '${ALL_JSON_OUTPUT[$i]}'"
                 export ${IS_UP_VAR_SET[$i]}="${ALL_JSON_OUTPUT[$i]}"
             done
+            [[ $IS_DEBUG ]] && msg "DEBUG: After export - UUID='$UUID', TROJAN_PASSWORD='$TROJAN_PASSWORD', IS_PROTOCOL='$IS_PROTOCOL'"
             [[ $IS_DEBUG ]] && msg "DEBUG: net='$NET', host='$HOST', grpc_host='$grpc_host'"
             for v in ${IS_UP_VAR_SET[@]}; do
                 [[ -z "${!v}" || "${!v}" == "null" ]] && unset $v
@@ -1311,6 +1312,7 @@ get() {
             get addr
             # Trojan 协议使用 password 字段，需要赋值给 UUID
             [[ $IS_PROTOCOL == 'trojan' && $TROJAN_PASSWORD ]] && UUID=$TROJAN_PASSWORD
+            [[ $IS_DEBUG && $IS_PROTOCOL == 'trojan' ]] && msg "DEBUG: Trojan fix - UUID='$UUID', TROJAN_PASSWORD='$TROJAN_PASSWORD'"
             # Shadowsocks 协议使用 settings.password 和 settings.method，需要从 JSON 直接读取
             [[ $IS_PROTOCOL == 'shadowsocks' ]] && {
                 SS_PASSWORD=$(jq -r '.inbounds[0].settings.password // ""' <<<$IS_JSON_STR)
