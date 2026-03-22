@@ -1770,7 +1770,9 @@ info() {
     footer_msg
 }
 
-# footer msg
+##
+## footer msg
+##
 footer_msg() {
     [[ $IS_CORE_stop && ! $IS_NEW_JSON ]] && warn "$IS_CORE_name 当前处于停止状态."
     [[ $IS_CADDY_stop && $HOST ]] && warn "Caddy 当前处于停止状态."
