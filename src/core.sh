@@ -1296,14 +1296,6 @@ get() {
             IS_JSON_DATA_BASE=$(jq -r '(.inbounds[0].protocol//""),(.inbounds[0].port//""),(.inbounds[0].settings.clients[0].id//""),(.inbounds[0].settings.clients[0].password//""),(.inbounds[0].settings.method//""),(.inbounds[0].settings.address//""),(.inbounds[0].settings.port//""),(.inbounds[0].settings.detour.to//""),(.inbounds[0].settings.accounts[0].user//""),(.inbounds[0].settings.accounts[0].pass//"")' <<<$IS_JSON_STR)
             [[ $? != 0 ]] && err "无法读取此文件: $IS_CONFIG_FILE"
             IS_JSON_DATA_MORE=$(jq -r '(.inbounds[0].streamSettings.network//""),(.inbounds[0].streamSettings.security//""),(.inbounds[0].streamSettings.tcpSettings.header.type//""),(.inbounds[0].streamSettings.kcpSettings.seed//""),(.inbounds[0].streamSettings.kcpSettings.header.type//""),(.inbounds[0].streamSettings.quicSettings.header.type//""),(.inbounds[0].streamSettings.wsSettings.path//""),(.inbounds[0].streamSettings.httpSettings.path//""),(.inbounds[0].streamSettings.grpcSettings.serviceName//"")' <<<$IS_JSON_STR)
-            IS_JSON_DATA_HOST=$(jq -r '(.inbounds[0].streamSettings.grpc_host//""),(.inbounds[0].streamSettings.wsSettings.headers.Host//""),(.inbounds[0].streamSettings.httpSettings.host[0]//"")' <<<$IS_JSON_STR)
-            IS_JSON_DATA_REALITY=$(jq -r '(.inbounds[0].streamSettings.realitySettings.serverNames[0]//""),(.inbounds[0].streamSettings.realitySettings.publicKey//""),(.inbounds[0].streamSettings.realitySettings.privateKey//"")' <<<$IS_JSON_STR)
-                msg "DEBUG: IS_JSON_DATA_BASE=[$IS_JSON_DATA_BASE]"
-                msg "DEBUG: IS_JSON_DATA_MORE=[$IS_JSON_DATA_MORE]"
-                msg "DEBUG: IS_JSON_DATA_HOST=[$IS_JSON_DATA_HOST]"
-                msg "DEBUG: IS_JSON_DATA_REALITY=[$IS_JSON_DATA_REALITY]"
-            }
-            # 变量映射表 (按 jq 输出顺序): 0-9 base, 10-18 more, 19-21 host, 22-24 reality
             # base(10): protocol,port,uuid,password,method,address,port,detour,user,pass
             # more(9): network,security,tcp_type,kcp_seed,kcp_type,quic_type,ws_path,h2_path,grpc_serviceName
             # host(3): grpc_host,ws_host,h2_host
