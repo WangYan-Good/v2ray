@@ -824,7 +824,12 @@ del() {
 
 # uninstall
 uninstall() {
-    if [[ $IS_CADDY ]]; then
+    [[ $1 == "--quiet" ]] && IS_QUIET=1
+
+    if [[ $IS_QUIET ]]; then
+        # 静默卸载，默认只卸载 V2Ray
+        IS_DO_UNINSTALL=1
+    elif [[ $IS_CADDY ]]; then
         IS_TMP_LIST=("卸载 $IS_CORE_NAME" "卸载 ${IS_CORE_NAME} & Caddy")
         ask list IS_DO_UNINSTALL
     else
@@ -832,10 +837,10 @@ uninstall() {
     fi
     manage stop &>/dev/null
     manage disable &>/dev/null
-    rm -rf $IS_CORE_dir $IS_LOG_DIR $IS_SH_BIN /lib/systemd/system/$IS_CORE.service
+    rm -rf $IS_CORE_DIR $IS_LOG_DIR $IS_SH_BIN /lib/systemd/system/$IS_CORE.service
     sed -i "/$IS_CORE/d" /root/.bashrc
     # uninstall caddy; 2 is ask result
-    if [[ $REPLY == '2' ]]; then
+    if [[ $IS_DO_UNINSTALL == '2' ]]; then
         manage stop caddy &>/dev/null
         manage disable caddy &>/dev/null
         rm -rf $IS_CADDY_DIR $IS_CADDY_BIN /lib/systemd/system/caddy.service
