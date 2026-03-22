@@ -1314,10 +1314,10 @@ get() {
             [[ $? != 0 ]] && err "无法读取此文件: $IS_CONFIG_FILE"
             IS_JSON_DATA_MORE=$(jq -r '(.inbounds[0].streamSettings.network//""),(.inbounds[0].streamSettings.security//""),(.inbounds[0].streamSettings.tcpSettings.header.type//""),(.inbounds[0].streamSettings.kcpSettings.seed//""),(.inbounds[0].streamSettings.kcpSettings.header.type//""),(.inbounds[0].streamSettings.quicSettings.header.type//""),(.inbounds[0].streamSettings.wsSettings.path//""),(.inbounds[0].streamSettings.httpSettings.path//""),(.inbounds[0].streamSettings.grpcSettings.serviceName//"")' <<<$IS_JSON_STR)
             # base(10): protocol,port,uuid,password,method,address,port,detour,user,pass
-            # more(9): network,security,tcp_type,kcp_seed,kcp_type,quic_type,ws_path,h2_path,grpc_serviceName
+            # more(9): network,security,tcp_type,kcp_seed,kcp_type,quic_type,ws_path,h2_path,grpc_service_name
             # host(3): grpc_host,ws_host,h2_host
-            # reality(3): serverName,publicKey,privateKey
-            IS_UP_VAR_SET=(IS_PROTOCOL PORT UUID TROJAN_PASSWORD SS_METHOD DOOR_ADDR DOOR_PORT IS_DYNAMIC_PORT IS_SOCKS_USER IS_SOCKS_PASS NET IS_SECURITY tcp_type KCP_SEED kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host IS_SERVERNAME IS_PUBLIC_KEY IS_PRIVATE_KEY)
+            # reality(3): server_name,public_key,private_key
+            IS_UP_VAR_SET=(IS_PROTOCOL PORT UUID TROJAN_PASSWORD SS_METHOD DOOR_ADDR DOOR_PORT IS_DYNAMIC_PORT IS_SOCKS_USER IS_SOCKS_PASS NET IS_SECURITY TCP_TYPE KCP_SEED KCP_TYPE QUIC_TYPE WS_PATH H2_PATH GRPC_SERVICE_NAME GRPC_HOST WS_HOST H2_HOST IS_SERVERNAME IS_PUBLIC_KEY IS_PRIVATE_KEY)
             # jq 输出是逗号分隔，需要转换为换行后用 readarray 读取
             IFS=',' read -r -a BASE_ARR <<< "$IS_JSON_DATA_BASE"
             IFS=',' read -r -a MORE_ARR <<< "$IS_JSON_DATA_MORE"
@@ -1332,7 +1332,7 @@ get() {
             done
 
             # 合并变量（如果从 JSON 读取失败，使用备用方式）
-            [[ -z $HOST ]] && host="${grpc_host:-${ws_host:-${h2_host:-}}}"
+            [[ -z $HOST ]] && HOST="${GRPC_HOST:-${WS_HOST:-${H2_HOST:-}}}"
             # 设置 IS_ADDR（服务器地址）
             get addr
             # Trojan 协议使用 password 字段，需要赋值给 UUID
@@ -1352,12 +1352,12 @@ get() {
                 DOOR_ADDR=$(jq -r '.inbounds[0].settings.address // ""' <<<$IS_JSON_STR)
                 DOOR_PORT=$(jq -r '.inbounds[0].settings.port // ""' <<<$IS_JSON_STR)
             }
-            # grpc 的 serviceName 存储在 grpc_serviceName 变量中，需要赋值给 path
+            # grpc 的 serviceName 存储在 GRPC_SERVICE_NAME 变量中，需要赋值给 URL_PATH
             [[ -z $URL_PATH && $GRPC_SERVICE_NAME ]] && URL_PATH="$GRPC_SERVICE_NAME"
             # 备用：如果 net 为空，尝试从 JSON 直接提取
             [[ -z $NET ]] && NET=$(jq -r '.inbounds[0].streamSettings.network // ""' <<<$IS_JSON_STR)
             [[ -z $IS_HTTPS_PORT ]] && IS_HTTPS_PORT=443
-            HEADER_TYPE="${tcp_type:-}${kcp_type:-}${quic_type:-}"
+            HEADER_TYPE="${TCP_TYPE:-}${KCP_TYPE:-}${QUIC_TYPE:-}"
             # 判断是否为 reality 协议
             if [[ $IS_SECURITY == 'reality' ]]; then
                 NET=reality
