@@ -823,34 +823,43 @@ del() {
 }
 
 ##
-## 卸载脚本, 默认卸载 V2Ray, 如果安装了 Caddy 则会询问是否一起卸载.
+## 卸载脚本
+## 1. 卸载 v2ray 内核和相关组件
+## 2. 可选地卸载 Caddy 和 Nginx 的配置
 ##
 uninstall() {
-    [[ $1 == "--quiet" ]] && IS_QUIET=1
-
-    if [[ $IS_QUIET ]]; then
-        # 静默卸载，默认只卸载 V2Ray
-        IS_DO_UNINSTALL=1
-    elif [[ $IS_CADDY ]]; then
-        IS_TMP_LIST=("卸载 $IS_CORE_NAME" "卸载 ${IS_CORE_NAME} & Caddy")
-        ask list IS_DO_UNINSTALL
-    else
-        ask string y "是否卸载 ${IS_CORE_NAME}? [y]:"
-    fi
+    ##
+    ## 卸载 v2ray 和相关组件
+    ##
+    msg "正在卸载 $IS_CORE_NAME..."
     manage stop &>/dev/null
     manage disable &>/dev/null
     rm -rf $IS_CORE_DIR $IS_LOG_DIR $IS_SH_BIN /lib/systemd/system/$IS_CORE.service
     sed -i "/$IS_CORE/d" /root/.bashrc
-    # uninstall caddy; 2 is ask result
-    if [[ $IS_DO_UNINSTALL == *"Caddy"* ]]; then
-        manage stop caddy &>/dev/null
-        manage disable caddy &>/dev/null
-        rm -rf $IS_CADDY_DIR $IS_CADDY_BIN /lib/systemd/system/caddy.service
+    msg "$IS_CORE_NAME 已卸载."
+    
+    ##
+    ## 移除 caddy 配置
+    ##
+    if [[ $IS_CADDY ]]; then
+        msg "正在移除 Caddy 配置..."
+        load caddy.sh
+        caddy_config del
+        manage restart caddy &>/dev/null
+        msg "Caddy 配置已移除."
     fi
-    [[ $IS_INSTALL_SH ]] && return # reinstall
+
+    ##
+    ## 移除 nginx 配置
+    ##
+    if [[ $IS_NGINX ]]; then
+        msg "正在移除 Nginx 配置..."
+        load nginx.sh
+        nginx_config del
+        nginx_reload
+        msg "Nginx 配置已移除."
+    fi
     _green "\n卸载完成!"
-    msg "脚本哪里需要完善? 请反馈"
-    msg "反馈问题) $(msg_ul https://github.com/${IS_SH_REPO}/issues)\n"
 }
 
 # manage run status

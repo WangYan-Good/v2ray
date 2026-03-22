@@ -229,9 +229,14 @@ install_pkg() {
     fi
 }
 
-# 下载文件
+##
+## 下载文件
+##
 download() {
     case $1 in
+    ##
+    ## 核心文件下载链接，支持指定版本和自定义文件
+    ##
     core)
         LINK=https://github.com/${IS_CORE_REPO}/releases/latest/download/${IS_CORE}-linux-${IS_CORE_ARCH}.zip
         [[ $IS_CORE_VER ]] && LINK="https://github.com/${IS_CORE_REPO}/releases/download/${IS_CORE_VER}/${IS_CORE}-linux-${IS_CORE_ARCH}.zip"
@@ -239,12 +244,19 @@ download() {
         TMPFILE=$TMPCORE
         IS_OK=$IS_CORE_OK
         ;;
+    ##
+    ## download the latest code
+    ##
     sh)
         LINK=https://github.com/${IS_SH_REPO}/releases/latest/download/code.zip
         NAME="$IS_CORE_NAME 脚本"
         TMPFILE=$TMPSH
         IS_OK=$IS_SH_OK
         ;;
+    ##
+    ## jq is a lightweight and flexible command-line JSON processor akin to sed,awk,grep, and friends for JSON data. 
+    ## It's written in portable C and has zero runtime dependencies, allowing you to easily slice, filter, map, and transform structured data.
+    ##
     jq)
         LINK=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$IS_JQ_ARCH
         NAME="jq"
@@ -285,9 +297,15 @@ get_ip() {
         "https://icanhazip.com"
     )
 
+    ##
+    ## 依次尝试 IPv4 获取，如果成功则跳出循环
+    ##
     for service in "${services[@]}"; do
         IP=$(_wget -4 -T 5 -qO- "$service" 2>/dev/null)
-        # 清理可能的空白字符
+        
+        ##
+        ## 清理可能的空白字符
+        ##
         IP=$(echo "$IP" | tr -d '[:space:]')
         [[ $IP && $IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && break
         IP=
@@ -416,8 +434,10 @@ pass_args() {
         -h | --help)
             show_help
             ;;
+        ##
+        ## 卸载 v2ray 和相关组件
+        ##
         --uninstall)
-            
             ##
             ## 执行卸载
             ##
