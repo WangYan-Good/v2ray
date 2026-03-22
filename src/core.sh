@@ -836,13 +836,12 @@ uninstall() {
     manage disable &>/dev/null
     rm -rf $IS_CORE_DIR $IS_LOG_DIR $IS_SH_BIN /lib/systemd/system/$IS_CORE.service
     sed -i "/$IS_CORE/d" /root/.bashrc
-    msg "$IS_CORE_NAME 已卸载."
+    msg OK "$IS_CORE_NAME 已卸载."
     
     ##
     ## 移除 caddy 配置
     ##
     if [[ -d $IS_CADDY_CONF ]]; then
-        msg "正在移除 Caddy 配置..."
         if [[ -f $IS_SH_DIR/src/caddy.sh ]]; then
             # 脚本存在，使用 caddy_config 函数
             load caddy.sh
@@ -853,14 +852,13 @@ uninstall() {
             rm -rf $IS_CADDY_CONF/*.conf
             manage restart caddy &>/dev/null
         fi
-        msg "Caddy 配置已移除."
+        msg OK "Caddy 配置已移除."
     fi
 
     ##
     ## 移除 nginx 配置
     ##
     if [[ -d $IS_NGINX_CONF ]]; then
-        msg "正在移除 Nginx 配置..."
         if [[ -f $IS_SH_DIR/src/nginx.sh ]]; then
             # 脚本存在，使用 nginx_config 函数
             load nginx.sh
@@ -876,7 +874,7 @@ uninstall() {
                 $IS_NGINX_BIN -t &>/dev/null && $IS_NGINX_BIN -s reload &>/dev/null
             fi
         fi
-        msg "Nginx 配置已移除."
+        msg OK "Nginx 配置已移除."
     fi
     _green "\n卸载完成!"
 }
