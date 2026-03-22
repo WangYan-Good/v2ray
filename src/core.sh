@@ -309,12 +309,16 @@ ask() {
     while :; do
         echo -ne $IS_OPT_INPUT_MSG
         read REPLY
+        
+        # 如果用户没输入，IS_EMPTY_EXIT 为 1 就退出
         [[ ! $REPLY && $IS_EMPTY_EXIT ]] && exit
+
+        # 如果用户没输入，IS_EMPTY_EXIT 为 0，就是用默认参数，跳出循环
         [[ ! $REPLY && $IS_DEFAULT_ARG ]] && export $IS_ASK_SET=$IS_DEFAULT_ARG && break
-        [[ "$REPLY" == "${IS_STR}2${IS_GET}3${IS_OPT}3" && $IS_ASK_SET == 'IS_MAIN_PICK' ]] && {
-            msg "\n${IS_GET}2${IS_STR}3${IS_MSG}3b${IS_TMP}o${IS_OPT}y\n" && exit
-        }
+
+        # 如果是列表，用户输入数字，转换成对应的选项
         if [[ ! $IS_TMP_LIST ]]; then
+            # 检查 port 是否有效
             [[ $(grep port <<<$IS_ASK_SET) ]] && {
                 [[ ! $(is_test port "$REPLY") ]] && {
                     msg "$IS_ERR 请输入正确的端口, 可选(1-65535)"
@@ -325,16 +329,22 @@ ask() {
                     continue
                 fi
             }
+
+            # 检查 path 是否有效
             [[ $(grep path <<<$IS_ASK_SET) && ! $(is_test path "$REPLY") ]] && {
                 [[ ! $TMP_UUID ]] && get_uuid
                 msg "$IS_ERR 请输入正确的路径, 例如: /$TMP_UUID"
                 continue
             }
+
+            # 检查 uuid 是否有效
             [[ $(grep uuid <<<$IS_ASK_SET) && ! $(is_test uuid "$REPLY") ]] && {
                 [[ ! $TMP_UUID ]] && get_uuid
                 msg "$IS_ERR 请输入正确的 UUID, 例如: $TMP_UUID"
                 continue
             }
+
+            # 检查是否需要 y 确认
             [[ $(grep ^y$ <<<$IS_ASK_SET) ]] && {
                 [[ $(grep -i ^y$ <<<"$REPLY") ]] && break
                 msg "请输入 (y)"

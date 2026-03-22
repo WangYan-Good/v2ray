@@ -434,39 +434,6 @@ pass_args() {
         -h | --help)
             show_help
             ;;
-        ##
-        ## 卸载 v2ray 和相关组件
-        ##
-        --uninstall)
-            ##
-            ## 执行卸载
-            ##
-            if [[ -f /usr/local/bin/v2ray ]]; then
-                v2ray uninstall
-            else
-                ##
-                ## 直接删除文件
-                ##
-                rm -rf /etc/v2ray /var/log/v2ray /usr/local/bin/v2ray
-                sed -i '/v2ray/d' /root/.bashrc
-                
-                ##
-                ## 如果选择了卸载 caddy/nginx
-                ##
-                if [[ -f /usr/local/bin/caddy ]]; then
-                    systemctl stop caddy &>/dev/null
-                    systemctl disable caddy &>/dev/null
-                    rm -rf /etc/caddy /usr/local/bin/caddy /lib/systemd/system/caddy.service
-                fi
-                if [[ -f /usr/sbin/nginx ]]; then
-                    systemctl stop nginx &>/dev/null
-                    systemctl disable nginx &>/dev/null
-                    rm -rf /etc/nginx /lib/systemd/system/nginx.service
-                fi
-                msg OK "卸载完成!"
-            fi
-            exit
-            ;;
         *)
             echo -e "\n${is_err} ($@) 为未知参数...\n"
             show_help
