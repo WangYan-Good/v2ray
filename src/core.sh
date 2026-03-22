@@ -1259,14 +1259,19 @@ get() {
         ;;
     file)
         IS_FILE_STR=$2
-        [[ ! $IS_FILE_STR ]] && IS_FILE_STR='.json$'
-        readarray -t IS_ALL_JSON <<<"$(ls $IS_CONF_DIR | grep -E -i "$IS_FILE_STR" | sed '/dynamic-port-.*-link/d' | head -233)"
-        [[ ! $IS_ALL_JSON ]] && err "无法找到相关的配置文件: $2"
-        [[ ${#IS_ALL_JSON[@]} -eq 1 ]] && IS_CONFIG_FILE=$IS_ALL_JSON && IS_AUTO_GET_CONFIG=1
-        [[ ! $IS_CONFIG_FILE ]] && {
-            [[ $IS_DONT_AUTO_EXIT ]] && return
-            ask get_config_file
-        }
+        # 如果是完整文件名，直接使用
+        if [[ $IS_FILE_STR == *.json ]]; then
+            IS_CONFIG_FILE=$IS_FILE_STR
+        else
+            [[ ! $IS_FILE_STR ]] && IS_FILE_STR='.json$'
+            readarray -t IS_ALL_JSON <<<"$(ls $IS_CONF_DIR | grep -E -i "$IS_FILE_STR" | sed '/dynamic-port-.*-link/d' | head -233)"
+            [[ ! $IS_ALL_JSON ]] && err "无法找到相关的配置文件：$2"
+            [[ ${#IS_ALL_JSON[@]} -eq 1 ]] && IS_CONFIG_FILE=$IS_ALL_JSON && IS_AUTO_GET_CONFIG=1
+            [[ ! $IS_CONFIG_FILE ]] && {
+                [[ $IS_DONT_AUTO_EXIT ]] && return
+                ask get_config_file
+            }
+        fi
         ;;
     info)
         get file $2
@@ -1277,7 +1282,6 @@ get() {
             IS_JSON_DATA_MORE=$(jq -r '(.inbounds[0].streamSettings.network//""),(.inbounds[0].streamSettings.security//""),(.inbounds[0].streamSettings.tcpSettings.header.type//""),(.inbounds[0].streamSettings.kcpSettings.seed//""),(.inbounds[0].streamSettings.kcpSettings.header.type//""),(.inbounds[0].streamSettings.quicSettings.header.type//""),(.inbounds[0].streamSettings.wsSettings.path//""),(.inbounds[0].streamSettings.httpSettings.path//""),(.inbounds[0].streamSettings.grpcSettings.serviceName//"")' <<<$IS_JSON_STR)
             IS_JSON_DATA_HOST=$(jq -r '(.inbounds[0].streamSettings.grpc_host//""),(.inbounds[0].streamSettings.wsSettings.headers.Host//""),(.inbounds[0].streamSettings.httpSettings.host[0]//"")' <<<$IS_JSON_STR)
             IS_JSON_DATA_REALITY=$(jq -r '(.inbounds[0].streamSettings.realitySettings.serverNames[0]//""),(.inbounds[0].streamSettings.realitySettings.publicKey//""),(.inbounds[0].streamSettings.realitySettings.privateKey//"")' <<<$IS_JSON_STR)
-            [[ $IS_DEBUG ]] && {
                 msg "DEBUG: IS_JSON_DATA_BASE=[$IS_JSON_DATA_BASE]"
                 msg "DEBUG: IS_JSON_DATA_MORE=[$IS_JSON_DATA_MORE]"
                 msg "DEBUG: IS_JSON_DATA_HOST=[$IS_JSON_DATA_HOST]"
@@ -1295,13 +1299,9 @@ get() {
             IFS=',' read -r -a HOST_ARR <<< "$IS_JSON_DATA_HOST"
             IFS=',' read -r -a REALITY_ARR <<< "$IS_JSON_DATA_REALITY"
             local -a ALL_JSON_OUTPUT=("${BASE_ARR[@]}" "${MORE_ARR[@]}" "${HOST_ARR[@]}" "${REALITY_ARR[@]}")
-            [[ $IS_DEBUG ]] && msg "DEBUG: all_json_output count=${#ALL_JSON_OUTPUT[@]} (base:${#BASE_ARR[@]} more:${#MORE_ARR[@]} host:${#HOST_ARR[@]} reality:${#REALITY_ARR[@]})"
             for i in "${!ALL_JSON_OUTPUT[@]}"; do
-                [[ $IS_DEBUG ]] && msg "DEBUG: $i-${IS_UP_VAR_SET[$i]}: '${ALL_JSON_OUTPUT[$i]}'"
                 export ${IS_UP_VAR_SET[$i]}="${ALL_JSON_OUTPUT[$i]}"
             done
-            [[ $IS_DEBUG ]] && msg "DEBUG: After export - UUID='$UUID', TROJAN_PASSWORD='$TROJAN_PASSWORD', IS_PROTOCOL='$IS_PROTOCOL'"
-            [[ $IS_DEBUG ]] && msg "DEBUG: net='$NET', host='$HOST', grpc_host='$grpc_host'"
             for v in ${IS_UP_VAR_SET[@]}; do
                 [[ -z "${!v}" || "${!v}" == "null" ]] && unset $v
             done
@@ -1312,7 +1312,6 @@ get() {
             get addr
             # Trojan 协议使用 password 字段，需要赋值给 UUID
             [[ $IS_PROTOCOL == 'trojan' && $TROJAN_PASSWORD ]] && UUID=$TROJAN_PASSWORD
-            [[ $IS_DEBUG && $IS_PROTOCOL == 'trojan' ]] && msg "DEBUG: Trojan fix - UUID='$UUID', TROJAN_PASSWORD='$TROJAN_PASSWORD'"
             # Shadowsocks 协议使用 settings.password 和 settings.method，需要从 JSON 直接读取
             [[ $IS_PROTOCOL == 'shadowsocks' ]] && {
                 SS_PASSWORD=$(jq -r '.inbounds[0].settings.password // ""' <<<$IS_JSON_STR)
@@ -1332,7 +1331,6 @@ get() {
             [[ -z $URL_PATH && $GRPC_SERVICE_NAME ]] && URL_PATH="$GRPC_SERVICE_NAME"
             # 备用：如果 net 为空，尝试从 JSON 直接提取
             [[ -z $NET ]] && NET=$(jq -r '.inbounds[0].streamSettings.network // ""' <<<$IS_JSON_STR)
-            [[ $IS_DEBUG ]] && msg "DEBUG (backup): net='$NET'"
             [[ -z $IS_HTTPS_PORT ]] && IS_HTTPS_PORT=443
             HEADER_TYPE="${tcp_type:-}${kcp_type:-}${quic_type:-}"
             # 判断是否为 reality 协议
@@ -1982,7 +1980,6 @@ main() {
         dns_set ${@:2}
         ;;
     debug)
-        IS_DEBUG=1
         get info $2
         warn "如果需要复制; 请把 *uuid, *password, *host, *key 的值改写, 以避免泄露."
         ;;
