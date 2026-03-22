@@ -1860,8 +1860,8 @@ update() {
 
 # main menu; if no prefer args.
 is_main_menu() {
-    msg "\n------------- $IS_CORE_name script $IS_SH_VER by $AUTHOR -------------"
-    msg "$IS_CORE_ver: $IS_CORE_status"
+    msg "\n------------- $IS_CORE_NAME script $IS_SH_VER by $AUTHOR -------------"
+    msg "$IS_CORE_VER: $IS_CORE_STATUS"
     IS_MAIN_START=1
     ask mainmenu
     case $REPLY in
