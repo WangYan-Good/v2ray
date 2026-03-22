@@ -822,7 +822,9 @@ del() {
     [[ $IS_DONT_AUTO_EXIT ]] && unset IS_CONFIG_FILE
 }
 
-# uninstall
+##
+## 卸载脚本, 默认卸载 V2Ray, 如果安装了 Caddy 则会询问是否一起卸载.
+##
 uninstall() {
     [[ $1 == "--quiet" ]] && IS_QUIET=1
 
@@ -840,7 +842,7 @@ uninstall() {
     rm -rf $IS_CORE_DIR $IS_LOG_DIR $IS_SH_BIN /lib/systemd/system/$IS_CORE.service
     sed -i "/$IS_CORE/d" /root/.bashrc
     # uninstall caddy; 2 is ask result
-    if [[ $IS_DO_UNINSTALL == '2' ]]; then
+    if [[ $IS_DO_UNINSTALL == *"Caddy"* ]]; then
         manage stop caddy &>/dev/null
         manage disable caddy &>/dev/null
         rm -rf $IS_CADDY_DIR $IS_CADDY_BIN /lib/systemd/system/caddy.service
