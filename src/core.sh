@@ -841,22 +841,41 @@ uninstall() {
     ##
     ## 移除 caddy 配置
     ##
-    if [[ $IS_CADDY ]]; then
+    if [[ -d $IS_CADDY_CONF ]]; then
         msg "正在移除 Caddy 配置..."
-        load caddy.sh
-        caddy_config del
-        manage restart caddy &>/dev/null
+        if [[ -f $IS_SH_DIR/src/caddy.sh ]]; then
+            # 脚本存在，使用 caddy_config 函数
+            load caddy.sh
+            caddy_config del
+            manage restart caddy &>/dev/null
+        else
+            # 脚本不存在，直接删除配置
+            rm -rf $IS_CADDY_CONF/*.conf
+            manage restart caddy &>/dev/null
+        fi
         msg "Caddy 配置已移除."
     fi
 
     ##
     ## 移除 nginx 配置
     ##
-    if [[ $IS_NGINX ]]; then
+    if [[ -d $IS_NGINX_CONF ]]; then
         msg "正在移除 Nginx 配置..."
-        load nginx.sh
-        nginx_config del
-        nginx_reload
+        if [[ -f $IS_SH_DIR/src/nginx.sh ]]; then
+            # 脚本存在，使用 nginx_config 函数
+            load nginx.sh
+            nginx_config del
+            if [[ -f $IS_NGINX_BIN ]]; then
+                $IS_NGINX_BIN -t &>/dev/null && $IS_NGINX_BIN -s reload &>/dev/null
+            fi
+        else
+            # 脚本不存在，直接删除配置
+            rm -rf $IS_NGINX_CONF/*.conf $IS_NGINX_CONF/*.conf.add
+            rm -rf $IS_NGINX_DIR/ssl/*
+            if [[ -f $IS_NGINX_BIN ]]; then
+                $IS_NGINX_BIN -t &>/dev/null && $IS_NGINX_BIN -s reload &>/dev/null
+            fi
+        fi
         msg "Nginx 配置已移除."
     fi
     _green "\n卸载完成!"
