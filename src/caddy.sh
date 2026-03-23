@@ -52,7 +52,7 @@ EOF
         }
         cat >${IS_CADDY_SITE_FILE} <<<"
 ${HOST}:${IS_HTTPS_PORT} {
-    reverse_proxy ${PATH} 127.0.0.1:${PORT}
+    reverse_proxy ${URL_PATH} 127.0.0.1:${PORT}
     import ${IS_CADDY_SITE_FILE}.add
 }"
         ;;
@@ -90,7 +90,7 @@ ${HOST}:${IS_HTTPS_PORT} {
         }
         cat >${IS_CADDY_SITE_FILE} <<<"
 ${HOST}:${IS_HTTPS_PORT} {
-    reverse_proxy ${PATH} h2c://127.0.0.1:${PORT}
+    reverse_proxy ${URL_PATH} h2c://127.0.0.1:${PORT}
     import ${IS_CADDY_SITE_FILE}.add
 }"
         ;;
@@ -128,9 +128,15 @@ ${HOST}:${IS_HTTPS_PORT} {
         }
         cat >${IS_CADDY_SITE_FILE} <<<"
 ${HOST}:${IS_HTTPS_PORT} {
-    reverse_proxy /${PATH}/* h2c://127.0.0.1:${PORT}
+    reverse_proxy /${URL_PATH}/* h2c://127.0.0.1:${PORT}
     import ${IS_CADDY_SITE_FILE}.add
 }"
+        ;;
+    del)
+        # 删除配置 - 遍历所有协议前缀的配置文件
+        for conf in $IS_CADDY_CONF/${HOST}.conf $IS_CADDY_CONF/${HOST}.conf.add; do
+            [[ -f $conf ]] && rm -f $conf
+        done
         ;;
     proxy)
         
@@ -140,7 +146,8 @@ reverse_proxy https://$PROXY_SITE {
 }"
         ;;
     esac
-    [[ $1 != "new" && $1 != 'proxy' ]] && {
+    [[ $1 != "new" && $1 != 'proxy' && $1 != 'del' ]] && {
         [[ ! -f ${IS_CADDY_SITE_FILE}.add ]] && echo "# see https://wangyan-good.github.io/v2ray/caddy-auto-tls/" >${IS_CADDY_SITE_FILE}.add
     }
+    return 0
 }

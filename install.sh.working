@@ -338,7 +338,7 @@ check_status() {
     ##
     ## 依赖包安装失败
     ##
-    [[ ! -f $IS_PKG_OK ]] && {
+    [[ ! -f "$IS_PKG_OK" ]] && {
         msg ERROR "安装依赖包失败"
         msg ERROR "请尝试手动安装依赖包: $CMD update -y; $CMD install -y $IS_PKG"
         IS_FAIL=1
@@ -350,15 +350,15 @@ check_status() {
     ## 如果 IS_FAIL 被设置，后续安装过程将被中断，并提示用户检查下载问题
     ##
     if [[ $IS_WGET ]]; then
-        [[ ! -f $IS_CORE_OK ]] && {
+        [[ ! -f "$IS_CORE_OK" ]] && {
             msg ERROR "下载 ${IS_CORE_NAME} 失败"
             IS_FAIL=1
         }
-        [[ ! -f $IS_SH_OK ]] && {
+        [[ ! -f "$IS_SH_OK" ]] && {
             msg ERROR "下载 ${IS_CORE_NAME} 脚本失败"
             IS_FAIL=1
         }
-        [[ ! -f $IS_JQ_OK ]] && {
+        [[ ! -f "$IS_JQ_OK" ]] && {
             msg ERROR "下载 jq 失败"
             IS_FAIL=1
         }

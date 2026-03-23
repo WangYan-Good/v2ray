@@ -452,6 +452,7 @@ server {
     if [[ $1 != "new" && $1 != 'proxy' && $1 != 'del' ]]; then
         [[ ! -f ${IS_NGINX_SITE_FILE}.add ]] && echo "# 伪装网站配置" >${IS_NGINX_SITE_FILE}.add
     fi
+    return 0
 }
 
 # 使用 Certbot 申请/续期证书

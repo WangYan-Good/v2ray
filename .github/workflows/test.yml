@@ -1,0 +1,34 @@
+name: Test
+
+on:
+  push:
+    branches: [ main, fix, dev ]
+  pull_request:
+    branches: [ main, fix, dev ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install bats
+      run: |
+        git clone https://github.com/bats-core/bats-core.git /tmp/bats
+        cd /tmp/bats && ./install.sh /usr/local
+    
+    - name: Run unit tests
+      run: bats tests/unit/
+    
+    - name: Run integration tests
+      run: bats tests/integration/
+    
+    - name: Generate coverage report
+      run: |
+        echo "Test coverage report"
+        echo "===================="
+        echo "Unit tests: ${#UNIT_TESTS[@]} tests"
+        echo "Integration tests: ${#INTEGRATION_TESTS[@]} tests"
+        echo ""
+        echo "Note: Full coverage reporting requires bashcov or similar tool"
