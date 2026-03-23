@@ -1327,12 +1327,14 @@ get() {
             # more(9): network,security,tcp_type,kcp_seed,kcp_type,quic_type,ws_path,h2_path,grpc_service_name
             # host(3): grpc_host,ws_host,h2_host
             # reality(3): server_name,public_key,private_key
+            IS_JSON_DATA_HOST=$(jq -r '(.inbounds[0].streamSettings.grpc_host//""),(.inbounds[0].streamSettings.wsSettings.headers.Host//""),(.inbounds[0].streamSettings.httpSettings.host[0]//"")' <<<$IS_JSON_STR)
+            IS_JSON_DATA_REALITY=$(jq -r '(.inbounds[0].streamSettings.realitySettings.serverNames[0]//""),(.inbounds[0].streamSettings.realitySettings.publicKey//""),(.inbounds[0].streamSettings.realitySettings.privateKey//"")' <<<$IS_JSON_STR)
             IS_UP_VAR_SET=(IS_PROTOCOL PORT UUID TROJAN_PASSWORD SS_METHOD DOOR_ADDR DOOR_PORT IS_DYNAMIC_PORT IS_SOCKS_USER IS_SOCKS_PASS NET IS_SECURITY TCP_TYPE KCP_SEED KCP_TYPE QUIC_TYPE WS_PATH H2_PATH GRPC_SERVICE_NAME GRPC_HOST WS_HOST H2_HOST IS_SERVERNAME IS_PUBLIC_KEY IS_PRIVATE_KEY)
-            # jq 输出是逗号分隔，需要转换为换行后用 readarray 读取
-            IFS=',' read -r -a BASE_ARR <<< "$IS_JSON_DATA_BASE"
-            IFS=',' read -r -a MORE_ARR <<< "$IS_JSON_DATA_MORE"
-            IFS=',' read -r -a HOST_ARR <<< "$IS_JSON_DATA_HOST"
-            IFS=',' read -r -a REALITY_ARR <<< "$IS_JSON_DATA_REALITY"
+            # jq 输出是换行分隔，使用 readarray 读取
+            readarray -t BASE_ARR <<< "$IS_JSON_DATA_BASE"
+            readarray -t MORE_ARR <<< "$IS_JSON_DATA_MORE"
+            readarray -t HOST_ARR <<< "$IS_JSON_DATA_HOST"
+            readarray -t REALITY_ARR <<< "$IS_JSON_DATA_REALITY"
             local -a ALL_JSON_OUTPUT=("${BASE_ARR[@]}" "${MORE_ARR[@]}" "${HOST_ARR[@]}" "${REALITY_ARR[@]}")
             for i in "${!ALL_JSON_OUTPUT[@]}"; do
                 export ${IS_UP_VAR_SET[$i]}="${ALL_JSON_OUTPUT[$i]}"
