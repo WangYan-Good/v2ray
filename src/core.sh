@@ -449,10 +449,12 @@ create() {
             ;;
         esac
         IS_SNIFFING=$(generate_sniffing)
-        IS_NEW_JSON=$(jq '{inbounds:[{tag:'\"$IS_CONFIG_NAME\"',port:'"$PORT"','"$IS_LISTEN"',protocol:'\"$IS_PROTOCOL\"',"$JSON_STR,$IS_SNIFFING"}]}' <<<{})
+        IS_NEW_JSON=$(jq --argjson settings "{$JSON_STR}" --argjson sniffing "$IS_SNIFFING" \
+            '{inbounds:[{tag:'\"$IS_CONFIG_NAME\"',port:'"$PORT"','"$IS_LISTEN"',protocol:'\"$IS_PROTOCOL\"', $settings, $sniffing}]}' <<<{})
         if [[ $IS_DYNAMIC_PORT ]]; then
             [[ ! $IS_DYNAMIC_PORT_RANGE ]] && get dynamic-port
-            IS_NEW_DYNAMIC_PORT_JSON=$(jq '{inbounds:[{tag:'\"$IS_CONFIG_NAME-link.json\"',port:'\"$IS_DYNAMIC_PORT_RANGE\"','"$IS_LISTEN"',protocol:"vmess",'"$IS_STREAM"','"$IS_SNIFFING"',allocate:{strategy:"random"}}]}' <<<{})
+            IS_NEW_DYNAMIC_PORT_JSON=$(jq --argjson stream "$IS_STREAM" --argjson sniffing "$IS_SNIFFING" \
+                '{inbounds:[{tag:'\"$IS_CONFIG_NAME-link.json\"',port:'\"$IS_DYNAMIC_PORT_RANGE\"','"$IS_LISTEN"',protocol:"vmess", streamSettings: $stream, $sniffing, allocate:{strategy:"random"}}]}' <<<{})
         fi
         [[ $IS_TEST_JSON ]] && return # tmp test
         # only show json, dont save to file.
