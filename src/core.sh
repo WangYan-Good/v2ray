@@ -449,7 +449,7 @@ create() {
             ;;
         esac
         IS_SNIFFING=$(generate_sniffing)
-        IS_NEW_JSON=$(jq --argjson settings "{$JSON_STR}" --argjson sniffing "$IS_SNIFFING" \
+        IS_NEW_JSON=$(jq --argjson settings "$JSON_STR" --argjson sniffing "$IS_SNIFFING" \
             '{inbounds:[{tag:'\"$IS_CONFIG_NAME\"',port:'"$PORT"','"$IS_LISTEN"',protocol:'\"$IS_PROTOCOL\"', $settings, $sniffing}]}' <<<{})
         if [[ $IS_DYNAMIC_PORT ]]; then
             [[ ! $IS_DYNAMIC_PORT_RANGE ]] && get dynamic-port
@@ -1594,7 +1594,7 @@ get() {
                     }
                 }
             }')
-            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '$server + $stream')
             ;;
         *kcp* | *mkcp)
             NET=kcp
@@ -1609,7 +1609,7 @@ get() {
                     }
                 }
             }')
-            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '$server + $stream')
             ;;
         *quic*)
             NET=quic
@@ -1622,7 +1622,7 @@ get() {
                     }
                 }
             }')
-            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '$server + $stream')
             ;;
         *ws* | *websocket)
             NET=ws
@@ -1637,7 +1637,7 @@ get() {
                     }
                 }
             }')
-            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '$server + $stream')
             ;;
         *grpc* | *gun)
             NET=grpc
@@ -1651,7 +1651,7 @@ get() {
                     serviceName: $path
                 }
             }')
-            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '$server + $stream')
             ;;
         *h2* | *http*)
             NET=h2
@@ -1664,7 +1664,7 @@ get() {
                     host: [$host]
                 }
             }')
-            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '$server + $stream')
             ;;
         *reality*)
             NET=reality
@@ -1694,7 +1694,7 @@ get() {
                     }
                 }')
             fi
-            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '$server + $stream')
             ;;
         *)
             err "无法识别传输协议: $IS_CONFIG_FILE"
