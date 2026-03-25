@@ -1,4 +1,8 @@
 #!/bin/bash
+# JQ 路径定义
+JQ="/tmp/jq"
+[[ -x "$JQ" ]] || JQ="jq"
+
 IS_CADDY_CONF=$IS_CADDY_DIR/$AUTHOR
 IS_NGINX_CONF=$IS_NGINX_DIR/v2ray
 
@@ -1330,11 +1334,11 @@ get() {
             IS_JSON_DATA_HOST=$(jq -r '(.inbounds[0].streamSettings.grpc_host//""),(.inbounds[0].streamSettings.wsSettings.headers.Host//""),(.inbounds[0].streamSettings.httpSettings.host[0]//"")' <<<$IS_JSON_STR)
             IS_JSON_DATA_REALITY=$(jq -r '(.inbounds[0].streamSettings.realitySettings.serverNames[0]//""),(.inbounds[0].streamSettings.realitySettings.publicKey//""),(.inbounds[0].streamSettings.realitySettings.privateKey//"")' <<<$IS_JSON_STR)
             IS_UP_VAR_SET=(IS_PROTOCOL PORT UUID TROJAN_PASSWORD SS_METHOD DOOR_ADDR DOOR_PORT IS_DYNAMIC_PORT IS_SOCKS_USER IS_SOCKS_PASS NET IS_SECURITY TCP_TYPE KCP_SEED KCP_TYPE QUIC_TYPE WS_PATH H2_PATH GRPC_SERVICE_NAME GRPC_HOST WS_HOST H2_HOST IS_SERVERNAME IS_PUBLIC_KEY IS_PRIVATE_KEY)
-            # jq 输出是换行分隔，使用 readarray 读取
-            readarray -t BASE_ARR <<< "$IS_JSON_DATA_BASE"
-            readarray -t MORE_ARR <<< "$IS_JSON_DATA_MORE"
-            readarray -t HOST_ARR <<< "$IS_JSON_DATA_HOST"
-            readarray -t REALITY_ARR <<< "$IS_JSON_DATA_REALITY"
+            # jq 输出是逗号分隔，需要转换为换行后用 readarray 读取
+            IFS=',' read -r -a BASE_ARR <<< "$IS_JSON_DATA_BASE"
+            IFS=',' read -r -a MORE_ARR <<< "$IS_JSON_DATA_MORE"
+            IFS=',' read -r -a HOST_ARR <<< "$IS_JSON_DATA_HOST"
+            IFS=',' read -r -a REALITY_ARR <<< "$IS_JSON_DATA_REALITY"
             local -a ALL_JSON_OUTPUT=("${BASE_ARR[@]}" "${MORE_ARR[@]}" "${HOST_ARR[@]}" "${REALITY_ARR[@]}")
             for i in "${!ALL_JSON_OUTPUT[@]}"; do
                 export ${IS_UP_VAR_SET[$i]}="${ALL_JSON_OUTPUT[$i]}"
@@ -1366,6 +1370,9 @@ get() {
             }
             # grpc 的 serviceName 存储在 GRPC_SERVICE_NAME 变量中，需要赋值给 URL_PATH
             [[ -z $URL_PATH && $GRPC_SERVICE_NAME ]] && URL_PATH="$GRPC_SERVICE_NAME"
+            # 修复：从 WS_PATH 和 H2_PATH 设置 URL_PATH
+            [[ -z $URL_PATH && $WS_PATH ]] && URL_PATH="$WS_PATH"
+            [[ -z $URL_PATH && $H2_PATH ]] && URL_PATH="$H2_PATH"
             # 备用：如果 net 为空，尝试从 JSON 直接提取
             [[ -z $NET ]] && NET=$(jq -r '.inbounds[0].streamSettings.network // ""' <<<$IS_JSON_STR)
             [[ -z $IS_HTTPS_PORT ]] && IS_HTTPS_PORT=443
@@ -1407,26 +1414,26 @@ get() {
         vmess*)
             IS_PROTOCOL=vmess
             if [[ $IS_DYNAMIC_PORT ]]; then
-                IS_SERVER_ID_JSON='settings:{clients:[{id:'\"$UUID\"'}],detour:{to:'\"$IS_CONFIG_NAME-link.json\"'}}'
+                IS_SERVER_ID_JSON="settings:{clients:[{id:\"$UUID\"}],detour:{to:\"$IS_CONFIG_NAME-link.json\"}}"
             else
-                IS_SERVER_ID_JSON='settings:{clients:[{id:'\"$UUID\"'}]}'
+                IS_SERVER_ID_JSON="settings:{clients:[{id:\"$UUID\"}]}"
             fi
-            IS_CLIENT_ID_JSON='settings:{vnext:[{address:'\"$IS_ADDR\"',port:'"$PORT"',users:[{id:'\"$UUID\"'}]}]}'
+            IS_CLIENT_ID_JSON="settings:{vnext:[{address:\"$IS_ADDR\",port:\"$PORT\",users:[{id:\"$UUID\"}]}]}"
             ;;
         vless*)
             IS_PROTOCOL=vless
-            IS_SERVER_ID_JSON='settings:{clients:[{id:'\"$UUID\"'}],decryption:"none"}'
-            IS_CLIENT_ID_JSON='settings:{vnext:[{address:'\"$IS_ADDR\"',port:'"$PORT"',users:[{id:'\"$UUID\"',encryption:"none"}]}]}'
+            IS_SERVER_ID_JSON="settings:{clients:[{id:\"$UUID\"}],decryption:\"none\"}"
+            IS_CLIENT_ID_JSON="settings:{vnext:[{address:\"$IS_ADDR\",port:\"$PORT\",users:[{id:\"$UUID\",encryption:\"none\"}]}]}"
             if [[ $IS_REALITY ]]; then
-                IS_SERVER_ID_JSON='settings:{clients:[{id:'\"$UUID\"',flow:"xtls-rprx-vision"}],decryption:"none"}'
-                IS_CLIENT_ID_JSON='settings:{vnext:[{address:'\"$IS_ADDR\"',port:'"$PORT"',users:[{id:'\"$UUID\"',encryption:"none",flow:"xtls-rprx-vision"}]}]}'
+                IS_SERVER_ID_JSON="settings:{clients:[{id:\"$UUID\",flow:\"xtls-rprx-vision\"}],decryption:\"none\"}"
+                IS_CLIENT_ID_JSON="settings:{vnext:[{address:\"$IS_ADDR\",port:\"$PORT\",users:[{id:\"$UUID\",encryption:\"none\",flow:\"xtls-rprx-vision\"}]}]}"
             fi
             ;;
         trojan*)
             IS_PROTOCOL=trojan
             [[ ! $TROJAN_PASSWORD ]] && TROJAN_PASSWORD=$UUID
-            IS_SERVER_ID_JSON='settings:{clients:[{password:'\"$TROJAN_PASSWORD\"'}]}'
-            IS_CLIENT_ID_JSON='settings:{servers:[{address:'\"$IS_ADDR\"',port:'"$PORT"',password:'\"$TROJAN_PASSWORD\"'}]}'
+            IS_SERVER_ID_JSON="settings:{clients:[{password:\"$TROJAN_PASSWORD\"}]}"
+            IS_CLIENT_ID_JSON="settings:{servers:[{address:\"$IS_ADDR\",port:\"$PORT\",password:\"$TROJAN_PASSWORD\"}]}"
             IS_TROJAN=1
             ;;
         shadowsocks*)
@@ -1437,25 +1444,25 @@ get() {
                 SS_PASSWORD=$UUID
                 [[ $(grep 2022 <<<$SS_METHOD) ]] && SS_PASSWORD=$(get ss2022)
             }
-            IS_CLIENT_ID_JSON='settings:{servers:[{address:'\"$IS_ADDR\"',port:'"$PORT"',method:'\"$SS_METHOD\"',password:'\"$SS_PASSWORD\"',}]}'
-            JSON_STR='settings:{method:'\"$SS_METHOD\"',password:'\"$SS_PASSWORD\"',network:"tcp,udp"}'
+            IS_CLIENT_ID_JSON="settings:{servers:[{address:\"$IS_ADDR\",port:\"$PORT\",method:\"$SS_METHOD\",password:\"$SS_PASSWORD\",}]}"
+            JSON_STR="settings:{method:\"$SS_METHOD\",password:\"$SS_PASSWORD\",network:\"tcp,udp\"}"
             ;;
         dokodemo-door*)
             IS_PROTOCOL=dokodemo-door
             NET=door
-            JSON_STR='settings:{port:'"$DOOR_PORT"',address:'\"$DOOR_ADDR\"',network:"tcp,udp"}'
+            JSON_STR="settings:{port:\"$DOOR_PORT\",address:\"$DOOR_ADDR\",network:\"tcp,udp\"}"
             ;;
         *http*)
             IS_PROTOCOL=http
             NET=http
-            JSON_STR='settings:{"timeout": 233}'
+            JSON_STR="settings:{\"timeout\": 233}"
             ;;
         *socks*)
             IS_PROTOCOL=socks
             NET=socks
             [[ ! $IS_SOCKS_USER ]] && IS_SOCKS_USER=admin
             [[ ! $IS_SOCKS_PASS ]] && IS_SOCKS_PASS=$UUID
-            JSON_STR='settings:{auth:"password",accounts:[{user:'\"$IS_SOCKS_USER\"',pass:'\"$IS_SOCKS_PASS\"'}],udp:true,ip:"0.0.0.0"}'
+            JSON_STR="settings:{auth:\"password\",accounts:[{user:\"$IS_SOCKS_USER\",pass:\"$IS_SOCKS_PASS\"}],udp:true,ip:\"0.0.0.0\"}"
             ;;
         *)
             err "无法识别协议: $IS_CONFIG_FILE"
@@ -1466,50 +1473,50 @@ get() {
         *tcp*)
             NET=tcp
             [[ ! $HEADER_TYPE ]] && HEADER_TYPE=none
-            IS_STREAM='streamSettings:{network:"tcp",tcpSettings:{header:{type:'\"$HEADER_TYPE\"'}}}'
-            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
+            IS_STREAM="streamSettings:{network:\"tcp\",tcpSettings:{header:{type:\"$HEADER_TYPE\"}}}"
+            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
             ;;
         *kcp* | *mkcp)
             NET=kcp
             [[ ! $HEADER_TYPE ]] && HEADER_TYPE=$IS_RANDOM_HEADER_TYPE
             [[ ! $IS_NO_KCP_SEED && ! $KCP_SEED ]] && KCP_SEED=$UUID
-            IS_STREAM='streamSettings:{network:"kcp",kcpSettings:{seed:'\"$KCP_SEED\"',header:{type:'\"$HEADER_TYPE\"'}}}'
-            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
+            IS_STREAM="streamSettings:{network:\"kcp\",kcpSettings:{seed:\"$KCP_SEED\",header:{type:\"$HEADER_TYPE\"}}}"
+            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
             ;;
         *quic*)
             NET=quic
             [[ ! $HEADER_TYPE ]] && HEADER_TYPE=$IS_RANDOM_HEADER_TYPE
-            IS_STREAM='streamSettings:{network:"quic",quicSettings:{header:{type:'\"$HEADER_TYPE\"'}}}'
-            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
+            IS_STREAM="streamSettings:{network:\"quic\",quicSettings:{header:{type:\"$HEADER_TYPE\"}}}"
+            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
             ;;
         *ws* | *websocket)
             NET=ws
             [[ ! $URL_PATH ]] && URL_PATH="/$UUID"
-            IS_STREAM='streamSettings:{network:"ws",security:'\"$IS_TLS\"',wsSettings:{path:'\"$URL_PATH\"',headers:{Host:'\"$HOST\"'}}}'
-            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
+            IS_STREAM="streamSettings:{network:\"ws\",security:\"$IS_TLS\",wsSettings:{path:\"$URL_PATH\",headers:{Host:\"$HOST\"}}}"
+            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
             ;;
         *grpc* | *gun)
             NET=grpc
             [[ ! $URL_PATH ]] && URL_PATH="grpc"
             [[ $URL_PATH == */* ]] && URL_PATH=$(sed 's#/##g' <<<$URL_PATH)
-            IS_STREAM='streamSettings:{network:"grpc",grpc_host:'\"$HOST\"',security:'\"$IS_TLS\"',grpcSettings:{serviceName:'\"$URL_PATH\"'}}'
-            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
+            IS_STREAM="streamSettings:{network:\"grpc\",grpc_host:\"$HOST\",security:\"$IS_TLS\",grpcSettings:{serviceName:\"$URL_PATH\"}}"
+            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
             ;;
         *h2* | *http*)
             NET=h2
             [[ ! $URL_PATH ]] && URL_PATH="/$UUID"
-            IS_STREAM='streamSettings:{network:"h2",security:'\"$IS_TLS\"',httpSettings:{path:'\"$URL_PATH\"',host:['\"$HOST\"']}}'
-            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
+            IS_STREAM="streamSettings:{network:\"h2\",security:\"$IS_TLS\",httpSettings:{path:\"$URL_PATH\",host:[\"$HOST\"]}}"
+            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
             ;;
         *reality*)
             NET=reality
             [[ ! $IS_SERVERNAME ]] && IS_SERVERNAME=$IS_RANDOM_SERVERNAME
             [[ ! $IS_PRIVATE_KEY ]] && get_pbk
-            IS_STREAM='streamSettings:{network:"tcp",security:"reality",realitySettings:{dest:'\"${IS_SERVERNAME}\:443\"',serverNames:['\"${IS_SERVERNAME}\"',""],publicKey:'\"$IS_PUBLIC_KEY\"',privateKey:'\"$IS_PRIVATE_KEY\"',shortIds:[""]}}'
+            IS_STREAM="streamSettings:{network:\"tcp\",security:\"reality\",realitySettings:{dest:\"${IS_SERVERNAME}\:443\",serverNames:[\"${IS_SERVERNAME}\",\"\"],publicKey:\"$IS_PUBLIC_KEY\",privateKey:\"$IS_PRIVATE_KEY\",shortIds:[\"\"]}}"
             if [[ $IS_CLIENT ]]; then
-                IS_STREAM='streamSettings:{network:"tcp",security:"reality",realitySettings:{serverName:'\"${IS_SERVERNAME}\"',"fingerprint": "ios",publicKey:'\"$IS_PUBLIC_KEY\"',"shortId": "","spiderX": "/"}}'
+                IS_STREAM="streamSettings:{network:\"tcp\",security:\"reality\",realitySettings:{serverName:\"${IS_SERVERNAME}\",\"fingerprint\": \"ios\",publicKey:\"$IS_PUBLIC_KEY\",\"shortId\": \"\",\"spiderX\": \"/\"}}"
             fi
-            JSON_STR=''"$IS_SERVER_ID_JSON"','"$IS_STREAM"''
+            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
             ;;
         *)
             err "无法识别传输协议: $IS_CONFIG_FILE"
