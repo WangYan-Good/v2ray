@@ -3,6 +3,65 @@
 JQ="/tmp/jq"
 [[ -x "$JQ" ]] || JQ="jq"
 
+# ========================================
+# JSON 生成辅助函数（Phase 9 修复）
+# ========================================
+
+# 生成协议设置 JSON
+generate_protocol_settings() {
+    local protocol="$1"
+    local uuid="$2"
+    local password="$3"
+    
+    case "$protocol" in
+        vmess|vless)
+            $JQ -n --arg id "$uuid" '{
+                clients: [{ id: $id }]
+            }'
+            ;;
+        trojan|shadowsocks)
+            $JQ -n --arg pwd "$password" '{
+                clients: [{ password: $pwd }]
+            }'
+            ;;
+    esac
+}
+
+# 生成客户端设置 JSON
+generate_client_settings() {
+    local protocol="$1"
+    local uuid="$2"
+    local password="$3"
+    
+    generate_protocol_settings "$protocol" "$uuid" "$password"
+}
+
+# 生成传输层设置 JSON
+generate_stream_settings() {
+    local network="$1"
+    local security="$2"
+    local host="$3"
+    local path="$4"
+    
+    $JQ -n \
+        --arg net "$network" \
+        --arg sec "$security" \
+        --arg h "$host" \
+        --arg p "$path" \
+        '{
+            network: $net,
+            security: $sec
+        }'
+}
+
+# 生成嗅探配置 JSON
+generate_sniffing() {
+    $JQ -n '{
+        enabled: true,
+        destOverride: ["http", "tls"]
+    }'
+}
+
 IS_CADDY_CONF=$IS_CADDY_DIR/$AUTHOR
 IS_NGINX_CONF=$IS_NGINX_DIR/v2ray
 
@@ -389,8 +448,8 @@ create() {
             IS_LISTEN='"listen": "0.0.0.0"'
             ;;
         esac
-        IS_SNIFFING='sniffing:{enabled:true,destOverride:["http","tls"]}'
-        IS_NEW_JSON=$(jq '{inbounds:[{tag:'\"$IS_CONFIG_NAME\"',port:'"$PORT"','"$IS_LISTEN"',protocol:'\"$IS_PROTOCOL\"','"$JSON_STR"','"$IS_SNIFFING"'}]}' <<<{})
+        IS_SNIFFING=$(generate_sniffing)
+        IS_NEW_JSON=$(jq '{inbounds:[{tag:'\"$IS_CONFIG_NAME\"',port:'"$PORT"','"$IS_LISTEN"',protocol:'\"$IS_PROTOCOL\"',"$JSON_STR,$IS_SNIFFING"}]}' <<<{})
         if [[ $IS_DYNAMIC_PORT ]]; then
             [[ ! $IS_DYNAMIC_PORT_RANGE ]] && get dynamic-port
             IS_NEW_DYNAMIC_PORT_JSON=$(jq '{inbounds:[{tag:'\"$IS_CONFIG_NAME-link.json\"',port:'\"$IS_DYNAMIC_PORT_RANGE\"','"$IS_LISTEN"',protocol:"vmess",'"$IS_STREAM"','"$IS_SNIFFING"',allocate:{strategy:"random"}}]}' <<<{})
@@ -399,9 +458,9 @@ create() {
         # only show json, dont save to file.
         [[ $IS_GEN ]] && {
             msg
-            jq <<<$IS_NEW_JSON
+            $JQ <<<$IS_NEW_JSON
             msg
-            [[ $IS_NEW_DYNAMIC_PORT_JSON ]] && jq <<<$IS_NEW_DYNAMIC_PORT_JSON && msg
+            [[ $IS_NEW_DYNAMIC_PORT_JSON ]] && $JQ <<<$IS_NEW_DYNAMIC_PORT_JSON && msg
             return
         }
         # del old file
@@ -442,10 +501,10 @@ create() {
             IS_ROUTE='routing:{rules:[{type:"field",outboundTag:"direct",ip:["geoip:cn","geoip:private"]},{type:"field",outboundTag:"direct",domain:["geosite:cn","geosite:geolocation-cn"]}]}'
             IS_INBOUNDS='inbounds:[{port:2333,listen:"127.0.0.1",protocol:"socks",settings:{udp:true},sniffing:{enabled:true,destOverride:["http","tls"]}}]'
             IS_OUTBOUNDS='outbounds:[{tag:'\"$IS_CONFIG_NAME\"',protocol:'\"$IS_PROTOCOL\"','"$IS_CLIENT_ID_JSON"','"$IS_STREAM"'},{tag:"direct",protocol:"freedom"}]'
-            IS_NEW_JSON=$(jq '{'$IS_DNS,$IS_ROUTE,$IS_INBOUNDS,$IS_OUTBOUNDS'}' <<<{})
+            IS_NEW_JSON=$($JQ '{'$IS_DNS,$IS_ROUTE,$IS_INBOUNDS,$IS_OUTBOUNDS'}' <<<{})
         fi
         msg
-        jq <<<$IS_NEW_JSON
+        $JQ <<<$IS_NEW_JSON
         msg
         ;;
     caddy)
@@ -1414,26 +1473,56 @@ get() {
         vmess*)
             IS_PROTOCOL=vmess
             if [[ $IS_DYNAMIC_PORT ]]; then
-                IS_SERVER_ID_JSON="settings:{clients:[{id:\"$UUID\"}],detour:{to:\"$IS_CONFIG_NAME-link.json\"}}"
+                IS_SERVER_ID_JSON=$(generate_protocol_settings "vmess" "$UUID" "" | $JQ '. + {detour: {to: "'$IS_CONFIG_NAME-link.json'"}}')
             else
-                IS_SERVER_ID_JSON="settings:{clients:[{id:\"$UUID\"}]}"
+                IS_SERVER_ID_JSON=$(generate_protocol_settings "vmess" "$UUID" "")
             fi
-            IS_CLIENT_ID_JSON="settings:{vnext:[{address:\"$IS_ADDR\",port:\"$PORT\",users:[{id:\"$UUID\"}]}]}"
+            IS_CLIENT_ID_JSON=$($JQ -n --arg addr "$IS_ADDR" --argjson port "$PORT" --arg id "$UUID" '{
+                vnext: [{
+                    address: $addr,
+                    port: ($port | tonumber),
+                    users: [{ id: $id }]
+                }]
+            }')
             ;;
         vless*)
             IS_PROTOCOL=vless
-            IS_SERVER_ID_JSON="settings:{clients:[{id:\"$UUID\"}],decryption:\"none\"}"
-            IS_CLIENT_ID_JSON="settings:{vnext:[{address:\"$IS_ADDR\",port:\"$PORT\",users:[{id:\"$UUID\",encryption:\"none\"}]}]}"
+            IS_SERVER_ID_JSON=$($JQ -n --arg id "$UUID" '{
+                clients: [{ id: $id }],
+                decryption: "none"
+            }')
+            IS_CLIENT_ID_JSON=$($JQ -n --arg addr "$IS_ADDR" --argjson port "$PORT" --arg id "$UUID" '{
+                vnext: [{
+                    address: $addr,
+                    port: ($port | tonumber),
+                    users: [{ id: $id, encryption: "none" }]
+                }]
+            }')
             if [[ $IS_REALITY ]]; then
-                IS_SERVER_ID_JSON="settings:{clients:[{id:\"$UUID\",flow:\"xtls-rprx-vision\"}],decryption:\"none\"}"
-                IS_CLIENT_ID_JSON="settings:{vnext:[{address:\"$IS_ADDR\",port:\"$PORT\",users:[{id:\"$UUID\",encryption:\"none\",flow:\"xtls-rprx-vision\"}]}]}"
+                IS_SERVER_ID_JSON=$($JQ -n --arg id "$UUID" '{
+                    clients: [{ id: $id, flow: "xtls-rprx-vision" }],
+                    decryption: "none"
+                }')
+                IS_CLIENT_ID_JSON=$($JQ -n --arg addr "$IS_ADDR" --argjson port "$PORT" --arg id "$UUID" '{
+                    vnext: [{
+                        address: $addr,
+                        port: ($port | tonumber),
+                        users: [{ id: $id, encryption: "none", flow: "xtls-rprx-vision" }]
+                    }]
+                }')
             fi
             ;;
         trojan*)
             IS_PROTOCOL=trojan
             [[ ! $TROJAN_PASSWORD ]] && TROJAN_PASSWORD=$UUID
-            IS_SERVER_ID_JSON="settings:{clients:[{password:\"$TROJAN_PASSWORD\"}]}"
-            IS_CLIENT_ID_JSON="settings:{servers:[{address:\"$IS_ADDR\",port:\"$PORT\",password:\"$TROJAN_PASSWORD\"}]}"
+            IS_SERVER_ID_JSON=$(generate_protocol_settings "trojan" "" "$TROJAN_PASSWORD")
+            IS_CLIENT_ID_JSON=$($JQ -n --arg addr "$IS_ADDR" --argjson port "$PORT" --arg pwd "$TROJAN_PASSWORD" '{
+                servers: [{
+                    address: $addr,
+                    port: ($port | tonumber),
+                    password: $pwd
+                }]
+            }')
             IS_TROJAN=1
             ;;
         shadowsocks*)
@@ -1444,25 +1533,47 @@ get() {
                 SS_PASSWORD=$UUID
                 [[ $(grep 2022 <<<$SS_METHOD) ]] && SS_PASSWORD=$(get ss2022)
             }
-            IS_CLIENT_ID_JSON="settings:{servers:[{address:\"$IS_ADDR\",port:\"$PORT\",method:\"$SS_METHOD\",password:\"$SS_PASSWORD\",}]}"
-            JSON_STR="settings:{method:\"$SS_METHOD\",password:\"$SS_PASSWORD\",network:\"tcp,udp\"}"
+            IS_CLIENT_ID_JSON=$($JQ -n --arg addr "$IS_ADDR" --argjson port "$PORT" --arg method "$SS_METHOD" --arg pwd "$SS_PASSWORD" '{
+                servers: [{
+                    address: $addr,
+                    port: ($port | tonumber),
+                    method: $method,
+                    password: $pwd
+                }]
+            }')
+            JSON_STR=$($JQ -n --arg method "$SS_METHOD" --arg pwd "$SS_PASSWORD" '{
+                method: $method,
+                password: $pwd,
+                network: "tcp,udp"
+            }')
             ;;
         dokodemo-door*)
             IS_PROTOCOL=dokodemo-door
             NET=door
-            JSON_STR="settings:{port:\"$DOOR_PORT\",address:\"$DOOR_ADDR\",network:\"tcp,udp\"}"
+            JSON_STR=$($JQ -n --argjson port "$DOOR_PORT" --arg addr "$DOOR_ADDR" '{
+                port: ($port | tonumber),
+                address: $addr,
+                network: "tcp,udp"
+            }')
             ;;
         *http*)
             IS_PROTOCOL=http
             NET=http
-            JSON_STR="settings:{\"timeout\": 233}"
+            JSON_STR=$($JQ -n '{
+                timeout: 233
+            }')
             ;;
         *socks*)
             IS_PROTOCOL=socks
             NET=socks
             [[ ! $IS_SOCKS_USER ]] && IS_SOCKS_USER=admin
             [[ ! $IS_SOCKS_PASS ]] && IS_SOCKS_PASS=$UUID
-            JSON_STR="settings:{auth:\"password\",accounts:[{user:\"$IS_SOCKS_USER\",pass:\"$IS_SOCKS_PASS\"}],udp:true,ip:\"0.0.0.0\"}"
+            JSON_STR=$($JQ -n --arg user "$IS_SOCKS_USER" --arg pass "$IS_SOCKS_PASS" '{
+                auth: "password",
+                accounts: [{ user: $user, pass: $pass }],
+                udp: true,
+                ip: "0.0.0.0"
+            }')
             ;;
         *)
             err "无法识别协议: $IS_CONFIG_FILE"
@@ -1473,50 +1584,115 @@ get() {
         *tcp*)
             NET=tcp
             [[ ! $HEADER_TYPE ]] && HEADER_TYPE=none
-            IS_STREAM="streamSettings:{network:\"tcp\",tcpSettings:{header:{type:\"$HEADER_TYPE\"}}}"
-            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
+            IS_STREAM=$($JQ -n --arg net "tcp" --arg type "$HEADER_TYPE" '{
+                network: $net,
+                tcpSettings: {
+                    header: {
+                        type: $type
+                    }
+                }
+            }')
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
             ;;
         *kcp* | *mkcp)
             NET=kcp
             [[ ! $HEADER_TYPE ]] && HEADER_TYPE=$IS_RANDOM_HEADER_TYPE
             [[ ! $IS_NO_KCP_SEED && ! $KCP_SEED ]] && KCP_SEED=$UUID
-            IS_STREAM="streamSettings:{network:\"kcp\",kcpSettings:{seed:\"$KCP_SEED\",header:{type:\"$HEADER_TYPE\"}}}"
-            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
+            IS_STREAM=$($JQ -n --arg net "kcp" --arg seed "$KCP_SEED" --arg type "$HEADER_TYPE" '{
+                network: $net,
+                kcpSettings: {
+                    seed: $seed,
+                    header: {
+                        type: $type
+                    }
+                }
+            }')
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
             ;;
         *quic*)
             NET=quic
             [[ ! $HEADER_TYPE ]] && HEADER_TYPE=$IS_RANDOM_HEADER_TYPE
-            IS_STREAM="streamSettings:{network:\"quic\",quicSettings:{header:{type:\"$HEADER_TYPE\"}}}"
-            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
+            IS_STREAM=$($JQ -n --arg net "quic" --arg type "$HEADER_TYPE" '{
+                network: $net,
+                quicSettings: {
+                    header: {
+                        type: $type
+                    }
+                }
+            }')
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
             ;;
         *ws* | *websocket)
             NET=ws
             [[ ! $URL_PATH ]] && URL_PATH="/$UUID"
-            IS_STREAM="streamSettings:{network:\"ws\",security:\"$IS_TLS\",wsSettings:{path:\"$URL_PATH\",headers:{Host:\"$HOST\"}}}"
-            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
+            IS_STREAM=$($JQ -n --arg net "ws" --arg sec "$IS_TLS" --arg path "$URL_PATH" --arg host "$HOST" '{
+                network: $net,
+                security: $sec,
+                wsSettings: {
+                    path: $path,
+                    headers: {
+                        Host: $host
+                    }
+                }
+            }')
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
             ;;
         *grpc* | *gun)
             NET=grpc
             [[ ! $URL_PATH ]] && URL_PATH="grpc"
             [[ $URL_PATH == */* ]] && URL_PATH=$(sed 's#/##g' <<<$URL_PATH)
-            IS_STREAM="streamSettings:{network:\"grpc\",grpc_host:\"$HOST\",security:\"$IS_TLS\",grpcSettings:{serviceName:\"$URL_PATH\"}}"
-            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
+            IS_STREAM=$($JQ -n --arg net "grpc" --arg host "$HOST" --arg sec "$IS_TLS" --arg path "$URL_PATH" '{
+                network: $net,
+                grpc_host: $host,
+                security: $sec,
+                grpcSettings: {
+                    serviceName: $path
+                }
+            }')
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
             ;;
         *h2* | *http*)
             NET=h2
             [[ ! $URL_PATH ]] && URL_PATH="/$UUID"
-            IS_STREAM="streamSettings:{network:\"h2\",security:\"$IS_TLS\",httpSettings:{path:\"$URL_PATH\",host:[\"$HOST\"]}}"
-            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
+            IS_STREAM=$($JQ -n --arg net "h2" --arg sec "$IS_TLS" --arg path "$URL_PATH" --arg host "$HOST" '{
+                network: $net,
+                security: $sec,
+                httpSettings: {
+                    path: $path,
+                    host: [$host]
+                }
+            }')
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
             ;;
         *reality*)
             NET=reality
             [[ ! $IS_SERVERNAME ]] && IS_SERVERNAME=$IS_RANDOM_SERVERNAME
             [[ ! $IS_PRIVATE_KEY ]] && get_pbk
-            IS_STREAM="streamSettings:{network:\"tcp\",security:\"reality\",realitySettings:{dest:\"${IS_SERVERNAME}\:443\",serverNames:[\"${IS_SERVERNAME}\",\"\"],publicKey:\"$IS_PUBLIC_KEY\",privateKey:\"$IS_PRIVATE_KEY\",shortIds:[\"\"]}}"
+            IS_STREAM=$($JQ -n --arg net "tcp" --arg sec "reality" --arg dest "${IS_SERVERNAME}:443" --arg servername "$IS_SERVERNAME" --arg pubkey "$IS_PUBLIC_KEY" --arg privkey "$IS_PRIVATE_KEY" '{
+                network: $net,
+                security: $sec,
+                realitySettings: {
+                    dest: $dest,
+                    serverNames: [$servername, ""],
+                    publicKey: $pubkey,
+                    privateKey: $privkey,
+                    shortIds: [""]
+                }
+            }')
             if [[ $IS_CLIENT ]]; then
-                IS_STREAM="streamSettings:{network:\"tcp\",security:\"reality\",realitySettings:{serverName:\"${IS_SERVERNAME}\",\"fingerprint\": \"ios\",publicKey:\"$IS_PUBLIC_KEY\",\"shortId\": \"\",\"spiderX\": \"/\"}}"
+                IS_STREAM=$($JQ -n --arg net "tcp" --arg sec "reality" --arg servername "$IS_SERVERNAME" --arg pubkey "$IS_PUBLIC_KEY" '{
+                    network: $net,
+                    security: $sec,
+                    realitySettings: {
+                        serverName: $servername,
+                        fingerprint: "ios",
+                        publicKey: $pubkey,
+                        shortId: "",
+                        spiderX: "/"
+                    }
+                }')
             fi
-            JSON_STR="\"$IS_SERVER_ID_JSON\",\"$IS_STREAM\""
+            JSON_STR=$($JQ -n --argjson server "$IS_SERVER_ID_JSON" --argjson stream "$IS_STREAM" '"\($server),\($stream)"')
             ;;
         *)
             err "无法识别传输协议: $IS_CONFIG_FILE"
