@@ -497,7 +497,7 @@ create() {
         IS_CLIENT=1
         get info $2
         [[ ! $IS_CLIENT_ID_JSON ]] && err "($IS_CONFIG_NAME) 不支持生成客户端配置."
-        IS_NEW_JSON=$(jq '{outbounds:[{tag:'\"$IS_CONFIG_NAME\"',protocol:'\"$IS_PROTOCOL\"','"$IS_CLIENT_ID_JSON"','"$IS_STREAM"'}]}' <<<{})
+        IS_NEW_JSON=$($JQ '{outbounds:[{tag:'\"$IS_CONFIG_NAME\"',protocol:'\"$IS_PROTOCOL\"','"$IS_CLIENT_ID_JSON"','"$IS_STREAM"'}]}' <<<{})
         if [[ $IS_FULL_CLIENT ]]; then
             IS_DNS='dns:{servers:[{address:"223.5.5.5",domain:["geosite:cn","geosite:geolocation-cn"],expectIPs:["geoip:cn"]},"1.1.1.1","8.8.8.8"]}'
             IS_ROUTE='routing:{rules:[{type:"field",outboundTag:"direct",ip:["geoip:cn","geoip:private"]},{type:"field",outboundTag:"direct",domain:["geosite:cn","geosite:geolocation-cn"]}]}'
@@ -546,7 +546,7 @@ create() {
         IS_ROUTING='routing:{domainStrategy:"IPIfNonMatch",rules:[{type:"field",inboundTag:["api"],outboundTag:"api"},'"$IS_BAN_BT"','"$IS_BAN_CN"','"$IS_OPENAI"',{type:"field",ip:["geoip:private"],outboundTag:"block"}]}'
         IS_INBOUNDS='inbounds:[{tag:"api",port:'"$TMP_PORT"',listen:"127.0.0.1",protocol:"dokodemo-door",settings:{address:"127.0.0.1"}}]'
         IS_OUTBOUNDS='outbounds:[{tag:"direct",protocol:"freedom"},{tag:"block",protocol:"blackhole"}]'
-        IS_SERVER_CONFIG_JSON=$(jq '{'"$IS_LOG"','"$IS_DNS"','"$IS_API"','"$IS_STATS"','"$IS_POLICY"','"$IS_ROUTING"','"$IS_INBOUNDS"','"$IS_OUTBOUNDS"'}' <<<{})
+        IS_SERVER_CONFIG_JSON=$($JQ '{'"$IS_LOG"','"$IS_DNS"','"$IS_API"','"$IS_STATS"','"$IS_POLICY"','"$IS_ROUTING"','"$IS_INBOUNDS"','"$IS_OUTBOUNDS"'}' <<<{})
         cat <<<$IS_SERVER_CONFIG_JSON >$IS_CONFIG_JSON
         manage restart &
         ;;
@@ -1034,7 +1034,7 @@ api() {
     esac
     [[ ! $IS_API_DO ]] && IS_API_DO=$1
     [[ ! $IS_API_PORT ]] && {
-        IS_API_PORT=$(jq '.inbounds[] | select(.tag == "api") | .PORT' $IS_CONFIG_JSON)
+        IS_API_PORT=$($JQ '.inbounds[] | select(.tag == "api") | .port' $IS_CONFIG_JSON)
         [[ $? != 0 ]] && {
             warn "读取 API 端口失败, 无法使用 API 操作."
             return
@@ -1385,17 +1385,17 @@ get() {
         get file $2
         if [[ $IS_CONFIG_FILE ]]; then
             IS_JSON_STR=$(cat $IS_CONF_DIR/"$IS_CONFIG_FILE")
-            IS_JSON_DATA_BASE=$(jq -r '(.inbounds[0].protocol//""),(.inbounds[0].port//""),(.inbounds[0].settings.clients[0].id//""),(.inbounds[0].settings.clients[0].password//""),(.inbounds[0].settings.method//""),(.inbounds[0].settings.address//""),(.inbounds[0].settings.port//""),(.inbounds[0].settings.detour.to//""),(.inbounds[0].settings.accounts[0].user//""),(.inbounds[0].settings.accounts[0].pass//"")' <<<$IS_JSON_STR)
+            IS_JSON_DATA_BASE=$($JQ -r '[.inbounds[0].protocol//"",.inbounds[0].port//"",.inbounds[0].settings.clients[0].id//"",.inbounds[0].settings.clients[0].password//"",.inbounds[0].settings.method//"",.inbounds[0].settings.address//"",.inbounds[0].settings.port//"",.inbounds[0].settings.detour.to//"",.inbounds[0].settings.accounts[0].user//"",.inbounds[0].settings.accounts[0].pass//""] | join(",")' <<<$IS_JSON_STR)
             [[ $? != 0 ]] && err "无法读取此文件: $IS_CONFIG_FILE"
-            IS_JSON_DATA_MORE=$(jq -r '(.inbounds[0].streamSettings.network//""),(.inbounds[0].streamSettings.security//""),(.inbounds[0].streamSettings.tcpSettings.header.type//""),(.inbounds[0].streamSettings.kcpSettings.seed//""),(.inbounds[0].streamSettings.kcpSettings.header.type//""),(.inbounds[0].streamSettings.quicSettings.header.type//""),(.inbounds[0].streamSettings.wsSettings.path//""),(.inbounds[0].streamSettings.httpSettings.path//""),(.inbounds[0].streamSettings.grpcSettings.serviceName//"")' <<<$IS_JSON_STR)
+            IS_JSON_DATA_MORE=$($JQ -r '[.inbounds[0].streamSettings.network//"",.inbounds[0].streamSettings.security//"",.inbounds[0].streamSettings.tcpSettings.header.type//"",.inbounds[0].streamSettings.kcpSettings.seed//"",.inbounds[0].streamSettings.kcpSettings.header.type//"",.inbounds[0].streamSettings.quicSettings.header.type//"",.inbounds[0].streamSettings.wsSettings.path//"",.inbounds[0].streamSettings.httpSettings.path//"",.inbounds[0].streamSettings.grpcSettings.serviceName//""] | join(",")' <<<$IS_JSON_STR)
             # base(10): protocol,port,uuid,password,method,address,port,detour,user,pass
             # more(9): network,security,tcp_type,kcp_seed,kcp_type,quic_type,ws_path,h2_path,grpc_service_name
             # host(3): grpc_host,ws_host,h2_host
             # reality(3): server_name,public_key,private_key
-            IS_JSON_DATA_HOST=$(jq -r '(.inbounds[0].streamSettings.grpc_host//""),(.inbounds[0].streamSettings.wsSettings.headers.Host//""),(.inbounds[0].streamSettings.httpSettings.host[0]//"")' <<<$IS_JSON_STR)
-            IS_JSON_DATA_REALITY=$(jq -r '(.inbounds[0].streamSettings.realitySettings.serverNames[0]//""),(.inbounds[0].streamSettings.realitySettings.publicKey//""),(.inbounds[0].streamSettings.realitySettings.privateKey//"")' <<<$IS_JSON_STR)
+            IS_JSON_DATA_HOST=$($JQ -r '[.inbounds[0].streamSettings.grpc_host//"",.inbounds[0].streamSettings.wsSettings.headers.Host//"",.inbounds[0].streamSettings.httpSettings.host[0]//""] | join(",")' <<<$IS_JSON_STR)
+            IS_JSON_DATA_REALITY=$($JQ -r '[.inbounds[0].streamSettings.realitySettings.serverNames[0]//"",.inbounds[0].streamSettings.realitySettings.publicKey//"",.inbounds[0].streamSettings.realitySettings.privateKey//""] | join(",")' <<<$IS_JSON_STR)
             IS_UP_VAR_SET=(IS_PROTOCOL PORT UUID TROJAN_PASSWORD SS_METHOD DOOR_ADDR DOOR_PORT IS_DYNAMIC_PORT IS_SOCKS_USER IS_SOCKS_PASS NET IS_SECURITY TCP_TYPE KCP_SEED KCP_TYPE QUIC_TYPE WS_PATH H2_PATH GRPC_SERVICE_NAME GRPC_HOST WS_HOST H2_HOST IS_SERVERNAME IS_PUBLIC_KEY IS_PRIVATE_KEY)
-            # jq 输出是逗号分隔，需要转换为换行后用 readarray 读取
+            # jq 输出是逗号分隔，使用 IFS=',' 读取
             IFS=',' read -r -a BASE_ARR <<< "$IS_JSON_DATA_BASE"
             IFS=',' read -r -a MORE_ARR <<< "$IS_JSON_DATA_MORE"
             IFS=',' read -r -a HOST_ARR <<< "$IS_JSON_DATA_HOST"
@@ -1416,18 +1416,18 @@ get() {
             [[ $IS_PROTOCOL == 'trojan' && $TROJAN_PASSWORD ]] && UUID=$TROJAN_PASSWORD
             # Shadowsocks 协议使用 settings.password 和 settings.method，需要从 JSON 直接读取
             [[ $IS_PROTOCOL == 'shadowsocks' ]] && {
-                SS_PASSWORD=$(jq -r '.inbounds[0].settings.password // ""' <<<$IS_JSON_STR)
-                SS_METHOD=$(jq -r '.inbounds[0].settings.method // ""' <<<$IS_JSON_STR)
+                SS_PASSWORD=$($JQ -r '.inbounds[0].settings.password // ""' <<<$IS_JSON_STR)
+                SS_METHOD=$($JQ -r '.inbounds[0].settings.method // ""' <<<$IS_JSON_STR)
             }
             # Socks 协议使用 accounts[0].user/pass，需要从 JSON 直接读取
             [[ $IS_PROTOCOL == 'socks' ]] && {
-                IS_SOCKS_USER=$(jq -r '.inbounds[0].settings.accounts[0].user // ""' <<<$IS_JSON_STR)
-                IS_SOCKS_PASS=$(jq -r '.inbounds[0].settings.accounts[0].pass // ""' <<<$IS_JSON_STR)
+                IS_SOCKS_USER=$($JQ -r '.inbounds[0].settings.accounts[0].user // ""' <<<$IS_JSON_STR)
+                IS_SOCKS_PASS=$($JQ -r '.inbounds[0].settings.accounts[0].pass // ""' <<<$IS_JSON_STR)
             }
             # Dokodemo-Door 协议使用 settings.address/port，需要从 JSON 直接读取
             [[ $IS_PROTOCOL == 'dokodemo-door' ]] && {
-                DOOR_ADDR=$(jq -r '.inbounds[0].settings.address // ""' <<<$IS_JSON_STR)
-                DOOR_PORT=$(jq -r '.inbounds[0].settings.port // ""' <<<$IS_JSON_STR)
+                DOOR_ADDR=$($JQ -r '.inbounds[0].settings.address // ""' <<<$IS_JSON_STR)
+                DOOR_PORT=$($JQ -r '.inbounds[0].settings.port // ""' <<<$IS_JSON_STR)
             }
             # grpc 的 serviceName 存储在 GRPC_SERVICE_NAME 变量中，需要赋值给 URL_PATH
             [[ -z $URL_PATH && $GRPC_SERVICE_NAME ]] && URL_PATH="$GRPC_SERVICE_NAME"
@@ -1435,7 +1435,7 @@ get() {
             [[ -z $URL_PATH && $WS_PATH ]] && URL_PATH="$WS_PATH"
             [[ -z $URL_PATH && $H2_PATH ]] && URL_PATH="$H2_PATH"
             # 备用：如果 net 为空，尝试从 JSON 直接提取
-            [[ -z $NET ]] && NET=$(jq -r '.inbounds[0].streamSettings.network // ""' <<<$IS_JSON_STR)
+            [[ -z $NET ]] && NET=$($JQ -r '.inbounds[0].streamSettings.network // ""' <<<$IS_JSON_STR)
             [[ -z $IS_HTTPS_PORT ]] && IS_HTTPS_PORT=443
             HEADER_TYPE="${TCP_TYPE:-}${KCP_TYPE:-}${QUIC_TYPE:-}"
             # 判断是否为 reality 协议
@@ -1449,7 +1449,7 @@ get() {
             IS_CONFIG_NAME=$IS_CONFIG_FILE
             if [[ $IS_DYNAMIC_PORT ]]; then
                 IS_DYNAMIC_PORT_FILE=$IS_CONF_DIR/$IS_DYNAMIC_PORT
-                IS_DYNAMIC_PORT_RANGE=$(jq -r '.inbounds[0].port' $IS_DYNAMIC_PORT_FILE)
+                IS_DYNAMIC_PORT_RANGE=$($JQ -r '.inbounds[0].port' $IS_DYNAMIC_PORT_FILE)
                 [[ $? != 0 ]] && err "无法读取动态端口文件: $IS_DYNAMIC_PORT"
             fi
             if [[ $IS_CADDY && $HOST && -f $IS_CADDY_CONF/$HOST.conf ]]; then
@@ -1861,7 +1861,7 @@ info() {
     tcp | kcp | quic)
         IS_CAN_CHANGE=(0 1 5 7)
         IS_INFO_SHOW=(0 1 2 3 4 5)
-        IS_VMESS_URL=$(jq -c '{v:2,ps:'\"${NET}-$IS_ADDR\"',add:'\"$IS_ADDR\"',port:'\"$PORT\"',id:'\"$UUID\"',aid:"0",net:'\"$NET\"',type:'\"$HEADER_TYPE\"',path:'\"$KCP_SEED\"'}' <<<{})
+        IS_VMESS_URL=$($JQ -c '{v:2,ps:'\"${NET}-$IS_ADDR\"',add:'\"$IS_ADDR\"',port:'\"$PORT\"',id:'\"$UUID\"',aid:"0",net:'\"$NET\"',type:'\"$HEADER_TYPE\"',path:'\"$KCP_SEED\"'}' <<<{})
         IS_URL=vmess://$(echo -n $IS_VMESS_URL | base64 -w 0)
         IS_TMP_PORT=$PORT
         [[ $IS_DYNAMIC_PORT ]] && {
@@ -1891,7 +1891,7 @@ info() {
             IS_URL_path=serviceName
         }
         [[ $IS_PROTOCOL == 'vmess' ]] && {
-            IS_VMESS_URL=$(jq -c '{v:2,ps:'\"$NET-$HOST\"',add:'\"$IS_ADDR\"',port:'\"$IS_HTTPS_PORT\"',id:'\"$UUID\"',aid:"0",net:'\"$NET\"',host:'\"$HOST\"',path:'\"$URL_PATH\"',tls:'\"tls\"'}' <<<{})
+            IS_VMESS_URL=$($JQ -c '{v:2,ps:'\"$NET-$HOST\"',add:'\"$IS_ADDR\"',port:'\"$IS_HTTPS_PORT\"',id:'\"$UUID\"',aid:"0",net:'\"$NET\"',host:'\"$HOST\"',path:'\"$URL_PATH\"',tls:'\"tls\"'}' <<<{})
             IS_URL=vmess://$(echo -n $IS_VMESS_URL | base64 -w 0)
         } || {
             [[ $IS_TROJAN ]] && {
