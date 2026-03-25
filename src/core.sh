@@ -1385,25 +1385,35 @@ get() {
         get file $2
         if [[ $IS_CONFIG_FILE ]]; then
             IS_JSON_STR=$(cat $IS_CONF_DIR/"$IS_CONFIG_FILE")
-            IS_JSON_DATA_BASE=$($JQ -r '[.inbounds[0].protocol//"",.inbounds[0].port//"",.inbounds[0].settings.clients[0].id//"",.inbounds[0].settings.clients[0].password//"",.inbounds[0].settings.method//"",.inbounds[0].settings.address//"",.inbounds[0].settings.port//"",.inbounds[0].settings.detour.to//"",.inbounds[0].settings.accounts[0].user//"",.inbounds[0].settings.accounts[0].pass//""] | join(",")' <<<$IS_JSON_STR)
+            # 直接提取每个字段，避免逗号分隔时空字段被跳过的问题
+            IS_PROTOCOL=$($JQ -r '.inbounds[0].protocol // ""' <<<$IS_JSON_STR)
+            PORT=$($JQ -r '.inbounds[0].port // ""' <<<$IS_JSON_STR)
+            UUID=$($JQ -r '.inbounds[0].settings.clients[0].id // ""' <<<$IS_JSON_STR)
+            TROJAN_PASSWORD=$($JQ -r '.inbounds[0].settings.clients[0].password // ""' <<<$IS_JSON_STR)
+            SS_METHOD=$($JQ -r '.inbounds[0].settings.method // ""' <<<$IS_JSON_STR)
+            DOOR_ADDR=$($JQ -r '.inbounds[0].settings.address // ""' <<<$IS_JSON_STR)
+            DOOR_PORT=$($JQ -r '.inbounds[0].settings.port // ""' <<<$IS_JSON_STR)
+            IS_DYNAMIC_PORT=$($JQ -r '.inbounds[0].settings.detour.to // ""' <<<$IS_JSON_STR)
+            IS_SOCKS_USER=$($JQ -r '.inbounds[0].settings.accounts[0].user // ""' <<<$IS_JSON_STR)
+            IS_SOCKS_PASS=$($JQ -r '.inbounds[0].settings.accounts[0].pass // ""' <<<$IS_JSON_STR)
+            NET=$($JQ -r '.inbounds[0].streamSettings.network // ""' <<<$IS_JSON_STR)
+            IS_SECURITY=$($JQ -r '.inbounds[0].streamSettings.security // ""' <<<$IS_JSON_STR)
+            TCP_TYPE=$($JQ -r '.inbounds[0].streamSettings.tcpSettings.header.type // ""' <<<$IS_JSON_STR)
+            KCP_SEED=$($JQ -r '.inbounds[0].streamSettings.kcpSettings.seed // ""' <<<$IS_JSON_STR)
+            KCP_TYPE=$($JQ -r '.inbounds[0].streamSettings.kcpSettings.header.type // ""' <<<$IS_JSON_STR)
+            QUIC_TYPE=$($JQ -r '.inbounds[0].streamSettings.quicSettings.header.type // ""' <<<$IS_JSON_STR)
+            WS_PATH=$($JQ -r '.inbounds[0].streamSettings.wsSettings.path // ""' <<<$IS_JSON_STR)
+            H2_PATH=$($JQ -r '.inbounds[0].streamSettings.httpSettings.path // ""' <<<$IS_JSON_STR)
+            GRPC_SERVICE_NAME=$($JQ -r '.inbounds[0].streamSettings.grpcSettings.serviceName // ""' <<<$IS_JSON_STR)
+            GRPC_HOST=$($JQ -r '.inbounds[0].streamSettings.grpc_host // ""' <<<$IS_JSON_STR)
+            WS_HOST=$($JQ -r '.inbounds[0].streamSettings.wsSettings.headers.Host // ""' <<<$IS_JSON_STR)
+            H2_HOST=$($JQ -r '.inbounds[0].streamSettings.httpSettings.host[0] // ""' <<<$IS_JSON_STR)
+            IS_SERVERNAME=$($JQ -r '.inbounds[0].streamSettings.realitySettings.serverNames[0] // ""' <<<$IS_JSON_STR)
+            IS_PUBLIC_KEY=$($JQ -r '.inbounds[0].streamSettings.realitySettings.publicKey // ""' <<<$IS_JSON_STR)
+            IS_PRIVATE_KEY=$($JQ -r '.inbounds[0].streamSettings.realitySettings.privateKey // ""' <<<$IS_JSON_STR)
             [[ $? != 0 ]] && err "无法读取此文件: $IS_CONFIG_FILE"
-            IS_JSON_DATA_MORE=$($JQ -r '[.inbounds[0].streamSettings.network//"",.inbounds[0].streamSettings.security//"",.inbounds[0].streamSettings.tcpSettings.header.type//"",.inbounds[0].streamSettings.kcpSettings.seed//"",.inbounds[0].streamSettings.kcpSettings.header.type//"",.inbounds[0].streamSettings.quicSettings.header.type//"",.inbounds[0].streamSettings.wsSettings.path//"",.inbounds[0].streamSettings.httpSettings.path//"",.inbounds[0].streamSettings.grpcSettings.serviceName//""] | join(",")' <<<$IS_JSON_STR)
-            # base(10): protocol,port,uuid,password,method,address,port,detour,user,pass
-            # more(9): network,security,tcp_type,kcp_seed,kcp_type,quic_type,ws_path,h2_path,grpc_service_name
-            # host(3): grpc_host,ws_host,h2_host
-            # reality(3): server_name,public_key,private_key
-            IS_JSON_DATA_HOST=$($JQ -r '[.inbounds[0].streamSettings.grpc_host//"",.inbounds[0].streamSettings.wsSettings.headers.Host//"",.inbounds[0].streamSettings.httpSettings.host[0]//""] | join(",")' <<<$IS_JSON_STR)
-            IS_JSON_DATA_REALITY=$($JQ -r '[.inbounds[0].streamSettings.realitySettings.serverNames[0]//"",.inbounds[0].streamSettings.realitySettings.publicKey//"",.inbounds[0].streamSettings.realitySettings.privateKey//""] | join(",")' <<<$IS_JSON_STR)
+            # 清理空值和 "null" 值
             IS_UP_VAR_SET=(IS_PROTOCOL PORT UUID TROJAN_PASSWORD SS_METHOD DOOR_ADDR DOOR_PORT IS_DYNAMIC_PORT IS_SOCKS_USER IS_SOCKS_PASS NET IS_SECURITY TCP_TYPE KCP_SEED KCP_TYPE QUIC_TYPE WS_PATH H2_PATH GRPC_SERVICE_NAME GRPC_HOST WS_HOST H2_HOST IS_SERVERNAME IS_PUBLIC_KEY IS_PRIVATE_KEY)
-            # jq 输出是逗号分隔，使用 IFS=',' 读取
-            IFS=',' read -r -a BASE_ARR <<< "$IS_JSON_DATA_BASE"
-            IFS=',' read -r -a MORE_ARR <<< "$IS_JSON_DATA_MORE"
-            IFS=',' read -r -a HOST_ARR <<< "$IS_JSON_DATA_HOST"
-            IFS=',' read -r -a REALITY_ARR <<< "$IS_JSON_DATA_REALITY"
-            local -a ALL_JSON_OUTPUT=("${BASE_ARR[@]}" "${MORE_ARR[@]}" "${HOST_ARR[@]}" "${REALITY_ARR[@]}")
-            for i in "${!ALL_JSON_OUTPUT[@]}"; do
-                export ${IS_UP_VAR_SET[$i]}="${ALL_JSON_OUTPUT[$i]}"
-            done
             for v in ${IS_UP_VAR_SET[@]}; do
                 [[ -z "${!v}" || "${!v}" == "null" ]] && unset $v
             done
