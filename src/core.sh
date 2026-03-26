@@ -178,6 +178,8 @@ msg_ul() {
 
 # pause
 pause() {
+    # 非交互式模式：在自动化测试或脚本模式下跳过暂停
+    [[ $V2RAY_NON_INTERACTIVE || $IS_DONT_AUTO_EXIT || $IS_GEN ]] && return
     echo
     echo -ne "按 $(_green Enter 回车键) 继续, 或按 $(_red Ctrl + C) 取消."
     read -rs -d $'\n'
@@ -1442,15 +1444,22 @@ get() {
                 DOOR_ADDR=$($JQ -r '.inbounds[0].settings.address // ""' <<<$IS_JSON_STR)
                 DOOR_PORT=$($JQ -r '.inbounds[0].settings.port // ""' <<<$IS_JSON_STR)
             }
+            # 根据网络类型设置 URL_PATH（按优先级处理）
             # grpc 的 serviceName 存储在 GRPC_SERVICE_NAME 变量中，需要赋值给 URL_PATH
-            [[ -z $URL_PATH && $GRPC_SERVICE_NAME ]] && URL_PATH="$GRPC_SERVICE_NAME"
+            [[ $NET == 'grpc' && $GRPC_SERVICE_NAME ]] && URL_PATH="$GRPC_SERVICE_NAME"
             # 修复：从 WS_PATH 和 H2_PATH 设置 URL_PATH
-            [[ -z $URL_PATH && $WS_PATH ]] && URL_PATH="$WS_PATH"
-            [[ -z $URL_PATH && $H2_PATH ]] && URL_PATH="$H2_PATH"
+            [[ $NET == 'ws' && $WS_PATH ]] && URL_PATH="$WS_PATH"
+            [[ $NET == 'h2' && $H2_PATH ]] && URL_PATH="$H2_PATH"
+            # 备用：如果 NET 为空但仍需设置 URL_PATH（用于其他场景）
+            [[ -z $URL_PATH ]] && {
+                [[ $GRPC_SERVICE_NAME ]] && URL_PATH="$GRPC_SERVICE_NAME"
+                [[ -z $URL_PATH && $WS_PATH ]] && URL_PATH="$WS_PATH"
+                [[ -z $URL_PATH && $H2_PATH ]] && URL_PATH="$H2_PATH"
+            }
             # 备用：如果 net 为空，尝试从 JSON 直接提取
             [[ -z $NET ]] && NET=$($JQ -r '.inbounds[0].streamSettings.network // ""' <<<$IS_JSON_STR)
             [[ -z $IS_HTTPS_PORT ]] && IS_HTTPS_PORT=443
-            HEADER_TYPE="${TCP_TYPE:-}${KCP_TYPE:-}${QUIC_TYPE:-}"
+            HEADER_TYPE="${TCP_TYPE:-}${KCP_TYPE:-${QUIC_TYPE:-}}"
             # 判断是否为 reality 协议
             if [[ $IS_SECURITY == 'reality' ]]; then
                 NET=reality
