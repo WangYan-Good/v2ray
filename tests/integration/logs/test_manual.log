@@ -1,5 +1,0 @@
-TEST: [SYN-002] 辅助函数定义检查
-[0;32m✓ PASS[0m: 函数 generate_protocol_settings 已定义
-[0;32m✓ PASS[0m: 函数 generate_client_settings 已定义
-[0;32m✓ PASS[0m: 函数 generate_stream_settings 已定义
-[0;32m✓ PASS[0m: 函数 generate_sniffing 已定义
