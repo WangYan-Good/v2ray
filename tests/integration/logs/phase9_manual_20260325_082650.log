@@ -1,0 +1,25 @@
+=== Phase 9 QA 本地测试 ===
+开始时间: Wed Mar 25 08:26:50 UTC 2026
+TEST: [SYN-001] Shell 语法检查
+[0;32m✓ PASS[0m: core.sh 语法正确
+TEST: [SYN-002] 辅助函数定义检查
+[0;32m✓ PASS[0m: 函数 generate_protocol_settings 已定义
+[0;32m✓ PASS[0m: 函数 generate_client_settings 已定义
+[0;32m✓ PASS[0m: 函数 generate_stream_settings 已定义
+[0;32m✓ PASS[0m: 函数 generate_sniffing 已定义
+TEST: [SYN-003] 辅助函数调用测试
+[0;32m✓ PASS[0m: generate_protocol_settings 输出包含 UUID
+[0;32m✓ PASS[0m: generate_protocol_settings 输出有效 JSON
+TEST: [SYN-004] 变量展开验证
+[0;32m✓ PASS[0m: 端口变量展开正确
+TEST: [SYN-005] jq 解析验证
+[0;31m✗ FAIL[0m: jq 解析端口失败
+TEST: [SYN-006] 配置读写一致性验证
+[0;32m✓ PASS[0m: 配置读写一致
+=== 测试摘要 ===
+总测试数: 6
+通过: 9
+失败: 1
+通过率: 150%
+结束时间: Wed Mar 25 08:26:51 UTC 2026
+日志文件: /home/node/.openclaw/v2ray/tests/integration/logs/phase9_manual_20260325_082650.log

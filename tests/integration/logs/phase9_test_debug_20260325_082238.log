@@ -1,0 +1,6 @@
+TEST: [SYN-001] Shell 语法检查
+PASS: 通过
+TEST: [SYN-002] 函数定义检查
+PASS: generate_protocol_settings defined
+TEST: [SYN-003] 函数调用测试
+PASS: call OK

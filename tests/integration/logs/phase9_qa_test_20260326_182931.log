@@ -1,0 +1,108 @@
+
+=========================================
+[0;36mV2Ray Phase 9 - QA 测试开始[0m
+=========================================
+
+[2026-03-26 18:29:31] [INFO] 测试模式：all
+[2026-03-26 18:29:31] [INFO] 日志文件：/home/node/.openclaw/v2ray/tests/integration/logs/phase9_qa_test_20260326_182931.log
+
+=========================================
+[0;36m前置检查[0m
+=========================================
+
+[2026-03-26 18:29:31] [INFO] jq 版本: 1.7.1
+[2026-03-26 18:29:31] [INFO] core.sh 文件存在: /home/node/.openclaw/v2ray/tests/integration/../src/core.sh
+
+=========================================
+[0;36m测试 1: 本地语法验证[0m
+=========================================
+
+[0;34mTEST[0m: [SYN-001] Shell 语法检查
+[0;32m✓ PASS[0m: Shell 语法检查通过
+[0;34mTEST[0m: [SYN-002] 辅助函数定义检查
+[0;32m✓ PASS[0m: 函数 generate_protocol_settings 已定义
+[0;32m✓ PASS[0m: 函数 generate_client_settings 已定义
+[0;32m✓ PASS[0m: 函数 generate_stream_settings 已定义
+[0;32m✓ PASS[0m: 函数 generate_sniffing 已定义
+[0;34mTEST[0m: [SYN-003] 辅助函数调用测试
+[0;32m✓ PASS[0m: generate_protocol_settings 调用成功
+[0;32m✓ PASS[0m: generate_client_settings 调用成功
+[0;32m✓ PASS[0m: generate_stream_settings 调用成功
+[0;32m✓ PASS[0m: generate_sniffing 调用成功
+[0;34mTEST[0m: [SYN-004] Case 语句块语法验证
+[0;32m✓ PASS[0m: Case 语句块结构正确
+[0;34mTEST[0m: [SYN-005] jq 命令调用语法验证
+[2026-03-26 18:29:31] [INFO] 发现 0 个 jq -n 调用
+[1;33m⚠ WARN[0m: 未发现 jq -n 调用，请确认代码已更新
+
+=========================================
+[0;36m测试 2: 变量展开验证[0m
+=========================================
+
+[0;34mTEST[0m: [VAR-001] VMess UUID 变量展开
+[0;32m✓ PASS[0m: VMess UUID 正确展开
+[0;34mTEST[0m: [VAR-002] Trojan 密码变量展开
+[0;32m✓ PASS[0m: Trojan 密码正确展开
+[0;34mTEST[0m: [VAR-003] WS Host 变量展开
+[0;32m✓ PASS[0m: WS Host 正确展开
+[0;34mTEST[0m: [VAR-004] 端口变量展开测试
+[0;32m✓ PASS[0m: 端口变量正确展开
+[0;34mTEST[0m: [VAR-005~015] 其他协议组合变量展开
+[0;32m✓ PASS[0m: vmess 变量展开正确
+[0;32m✓ PASS[0m: vless 变量展开正确
+[0;32m✓ PASS[0m: trojan 变量展开正确
+[0;32m✓ PASS[0m: shadowsocks 变量展开正确
+[0;32m✓ PASS[0m: socks 变量展开正确
+
+=========================================
+[0;36m测试 3: jq 解析验证[0m
+=========================================
+
+[0;34mTEST[0m: [CRITICAL-01] Trojan-H2-TLS jq 解析验证
+[0;32m✓ PASS[0m: Trojan-H2-TLS jq 解析成功
+[0;32m✓ PASS[0m: protocol 字段正确: trojan
+[0;32m✓ PASS[0m: network 字段正确: h2
+[0;34mTEST[0m: [CRITICAL-02] VLESS-gRPC-TLS jq 解析验证
+[0;32m✓ PASS[0m: VLESS-gRPC-TLS jq 解析成功
+[0;32m✓ PASS[0m: protocol 字段正确: vless
+[0;32m✓ PASS[0m: network 字段正确: grpc
+[0;34mTEST[0m: [CRITICAL-03] VLESS-Reality jq 解析验证
+[0;32m✓ PASS[0m: VLESS-Reality jq 解析成功
+[0;32m✓ PASS[0m: security 字段正确: reality
+[0;34mTEST[0m: [JQ-004~018] 其他协议组合 jq 解析
+[0;32m✓ PASS[0m: vmess-tcp-none: jq 解析成功
+[0;32m✓ PASS[0m: vmess-ws-tls: jq 解析成功
+[0;32m✓ PASS[0m: vmess-grpc-tls: jq 解析成功
+[0;32m✓ PASS[0m: vless-tcp-none: jq 解析成功
+[0;32m✓ PASS[0m: vless-ws-tls: jq 解析成功
+[0;32m✓ PASS[0m: trojan-tcp-tls: jq 解析成功
+[0;32m✓ PASS[0m: trojan-ws-tls: jq 解析成功
+[0;32m✓ PASS[0m: shadowsocks-tcp-none: jq 解析成功
+[0;32m✓ PASS[0m: socks-tcp-none: jq 解析成功
+
+=========================================
+[0;36m测试 4: 配置读写一致性验证[0m
+=========================================
+
+[1;33m⊘ SKIP[0m: v2ray 命令未找到，跳过配置读写测试
+
+=========================================
+[0;36m测试 5: VPS 真实环境验证[0m
+=========================================
+
+[1;33m⚠ WARN[0m: VPS_HOST 未设置，跳过 VPS 测试
+[1;33m⊘ SKIP[0m: VPS 连接失败，跳过 VPS 测试
+
+=========================================
+[0;36m测试汇总报告[0m
+=========================================
+
+
+=========================================
+测试结果统计
+=========================================
+[0;32m通过[0m: 36
+[0;31m失败[0m: 0
+[1;33m跳过[0m: 2
+总计: 38
+

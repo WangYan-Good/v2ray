@@ -10,17 +10,17 @@ JQ="/tmp/jq"
 # 生成协议设置 JSON
 generate_protocol_settings() {
     local protocol="$1"
-    local uuid="$2"
-    local password="$3"
+    local identifier="${2:-}"
+    local password="${3:-}"
     
     case "$protocol" in
         vmess|vless)
-            $JQ -n --arg id "$uuid" '{
+            $JQ -n --arg id "$identifier" '{
                 clients: [{ id: $id }]
             }'
             ;;
         trojan|shadowsocks)
-            $JQ -n --arg pwd "$password" '{
+            $JQ -n --arg pwd "${password:-$identifier}" '{
                 clients: [{ password: $pwd }]
             }'
             ;;
@@ -41,7 +41,34 @@ generate_stream_settings() {
     local network="$1"
     local security="$2"
     local host="$3"
-    local path="$4"
+    local path="${4:-}"
+    local dest="${5:-}"
+    local servername="${6:-}"
+    local pubkey="${7:-}"
+    local privkey="${8:-}"
+    
+    # Handle reality stream settings
+    if [[ "$security" == "reality" ]]; then
+        $JQ -n \
+            --arg net "$network" \
+            --arg sec "reality" \
+            --arg dest "${dest:-$host}" \
+            --arg servername "${servername:-}" \
+            --arg pubkey "${pubkey:-}" \
+            --arg privkey "${privkey:-}" \
+            '{
+                network: $net,
+                security: $sec,
+                realitySettings: {
+                    dest: $dest,
+                    serverNames: [$servername],
+                    publicKey: $pubkey,
+                    privateKey: $privkey,
+                    show: false
+                }
+            }'
+        return
+    fi
     
     $JQ -n \
         --arg net "$network" \
@@ -50,7 +77,14 @@ generate_stream_settings() {
         --arg p "$path" \
         '{
             network: $net,
-            security: $sec
+            security: $sec,
+            wsSettings: {
+                path: $p,
+                headers: {}
+            },
+            transportSettings: {
+                host: $h
+            }
         }'
 }
 
@@ -61,6 +95,215 @@ generate_sniffing() {
         destOverride: ["http", "tls"]
     }'
 }
+
+# ========================================
+# V2Ray VPS 架构自动部署功能 (Phase 9 新增)
+# ========================================
+
+# 自动部署 VPS 架构
+# 参数: config_file, web_server (caddy 或 nginx)
+auto_deploy_vps_architecture() {
+    local config_file="$1"
+    local web_server="$2"
+    local force_deploy="${3:-false}"
+    
+    # 检查配置文件
+    if [[ ! -f "$config_file" ]]; then
+        err "V2Ray 配置文件不存在: $config_file"
+        return 1
+    fi
+    
+    # 检查 jq
+    if ! command -v jq &> /dev/null; then
+        err "jq 未安装，请先安装 jq"
+        return 1
+    fi
+    
+    # 验证 V2Ray 配置
+    if command -v v2ray &> /dev/null; then
+        v2ray -test -config "$config_file" &>/dev/null
+        if [[ $? != 0 ]]; then
+            warn "V2Ray 配置验证失败"
+            warn "V2Ray 配置文件可能存在语法错误"
+            if [[ $V2RAY_NON_INTERACTIVE ]]; then
+                return 1
+            else
+                read -p "是否继续部署? [y/N]: " confirm
+                [[ "$confirm" != "y" && "$confirm" != "Y" ]] && return 1
+            fi
+        fi
+    fi
+    
+    # 提取配置信息
+    local inbound_port protocol network security host
+    inbound_port=$($JQ -r '.inbounds[0].port' "$config_file")
+    protocol=$($JQ -r '.inbounds[0].protocol' "$config_file")
+    network=$($JQ -r '.inbounds[0].streamSettings.network // .inbounds[0].settings.network // ""' "$config_file")
+    security=$($JQ -r '.inbounds[0].streamSettings.security // .inbounds[0].settings.security // ""' "$config_file")
+    
+    # 提取域名
+    case "$network" in
+        ws)
+            host=$($JQ -r '.inbounds[0].streamSettings.wsSettings.headers.Host // .inbounds[0].settings.wsSettings.headers.Host // ""' "$config_file")
+            ;;
+        h2)
+            host=$($JQ -r '.inbounds[0].streamSettings.httpSettings.host[0] // .inbounds[0].settings.httpSettings.host[0] // ""' "$config_file")
+            ;;
+        grpc)
+            host=$($JQ -r '.inbounds[0].streamSettings.grpc_host // .inbounds[0].settings.grpc_host // ""' "$config_file")
+            ;;
+        reality)
+            host=$($JQ -r '.inbounds[0].streamSettings.realitySettings.dest // ""' "$config_file" | cut -d: -f1)
+            ;;
+    esac
+    
+    # 检查是否需要 TLS 代理
+    local needs_tls_proxy=false
+    case "$security" in
+        tls|"")
+            case "$network" in
+                ws|h2|grpc)
+                    needs_tls_proxy=true
+                    ;;
+            esac
+            ;;
+    esac
+    
+    # 检查是否配置了域名
+    if [[ -z "$host" ]]; then
+        warn "未检测到域名配置，跳过 Web 代理部署"
+        return 0
+    fi
+    
+    # 配置变更检测
+    if [[ "$force_deploy" != "true" ]]; then
+        local config_hash stored_hash
+        config_hash=$(sha256sum "$config_file" | cut -d' ' -f1)
+        stored_hash=$(cat "/var/lib/v2ray-webproxy/state.json" 2>/dev/null | $JQ -r '.config_hash // ""' 2>/dev/null)
+        
+        if [[ "$config_hash" == "$stored_hash" ]]; then
+            warn "配置未变更，跳过部署"
+            return 0
+        fi
+    fi
+    
+    # 根据 Web 服务器类型部署
+    case "$web_server" in
+        caddy)
+            if [[ $IS_CADDY ]]; then
+                create caddy "$network"
+                [[ $IS_API_FAIL ]] && manage restart &
+            fi
+            ;;
+        nginx)
+            if [[ $IS_NGINX ]]; then
+                create nginx "$protocol-$network" "" "$URL_PATH" "$PORT"
+                [[ $IS_API_FAIL ]] && manage restart &
+            fi
+            ;;
+        *)
+            warn "未检测到 Web 服务器 (Caddy/Nginx)，跳过部署"
+            return 0
+            ;;
+    esac
+    
+    # 更新状态文件
+    local timestamp
+    timestamp=$(date -Iseconds)
+    
+    mkdir -p /var/lib/v2ray-webproxy
+    $JQ -n --arg hash "$(sha256sum "$config_file" | cut -d' ' -f1)" --arg timestamp "$timestamp" \
+        '{"config_hash": $hash, "last_updated": $timestamp}' > /var/lib/v2ray-webproxy/state.json
+    
+    msg "✅ V2Ray VPS 架构部署成功"
+    msg "   配置: $config_file"
+    msg "   域名: $host"
+    msg "   端口: $inbound_port"
+    msg "   Web 服务器: $web_server"
+    
+    return 0
+}
+
+# 清理 VPS 架构配置
+# 参数: config_file, web_server (caddy 或 nginx)
+cleanup_vps_architecture() {
+    local config_file="$1"
+    local web_server="$2"
+    
+    # 检查配置文件
+    if [[ ! -f "$config_file" ]]; then
+        warn "V2Ray 配置文件不存在: $config_file"
+        return 0
+    fi
+    
+    # 提取配置信息
+    local network host
+    network=$($JQ -r '.inbounds[0].streamSettings.network // .inbounds[0].settings.network // ""' "$config_file")
+    
+    # 提取域名
+    case "$network" in
+        ws)
+            host=$($JQ -r '.inbounds[0].streamSettings.wsSettings.headers.Host // .inbounds[0].settings.wsSettings.headers.Host // ""' "$config_file")
+            ;;
+        h2)
+            host=$($JQ -r '.inbounds[0].streamSettings.httpSettings.host[0] // .inbounds[0].settings.httpSettings.host[0] // ""' "$config_file")
+            ;;
+        grpc)
+            host=$($JQ -r '.inbounds[0].streamSettings.grpc_host // .inbounds[0].settings.grpc_host // ""' "$config_file")
+            ;;
+        reality)
+            host=$($JQ -r '.inbounds[0].streamSettings.realitySettings.dest // ""' "$config_file" | cut -d: -f1)
+            ;;
+        *)
+            host=$($JQ -r '.inbounds[0].settings.address // ""' "$config_file")
+            ;;
+    esac
+    
+    # 检查是否配置了域名
+    if [[ -z "$host" ]]; then
+        warn "未检测到域名配置，跳过清理"
+        return 0
+    fi
+    
+    # 根据 Web 服务器类型清理
+    case "$web_server" in
+        caddy)
+            if [[ $IS_CADDY ]]; then
+                IS_DEL_HOST="$host"
+                [[ $IS_CADDY_CONF ]] && {
+                    rm -rf "$IS_CADDY_CONF/$host.conf" "$IS_CADDY_CONF/$host.conf.add"
+                    manage restart caddy &
+                }
+            fi
+            ;;
+        nginx)
+            if [[ $IS_NGINX ]]; then
+                load nginx.sh
+                nginx_config del
+                nginx_reload
+            fi
+            ;;
+    esac
+    
+    # 删除状态文件中的对应配置
+    if [[ -f /var/lib/v2ray-webproxy/state.json ]]; then
+        local current_hash
+        current_hash=$(sha256sum "$config_file" | cut -d' ' -f1)
+        # 清空状态文件（简化处理）
+        rm -f /var/lib/v2ray-webproxy/state.json
+    fi
+    
+    msg "✅ V2Ray VPS 架构清理完成"
+    msg "   配置: $config_file"
+    msg "   域名: $host"
+    msg "   Web 服务器: $web_server"
+    
+    return 0
+}
+
+# ========================================
+# Web 服务器配置目录 (Phase 9 新增)
+# ========================================
 
 IS_CADDY_CONF=$IS_CADDY_DIR/$AUTHOR
 IS_NGINX_CONF=$IS_NGINX_DIR/v2ray
@@ -567,11 +810,19 @@ create() {
         fi
         # auto tls (caddy or nginx)
         # 只有 TLS 协议（WS/H2/gRPC）需要配置反向代理
+        # 使用新的 V2Ray VPS 架构自动部署功能
         [[ $HOST && ! $IS_NO_AUTO_TLS && $IS_USE_TLS ]] && {
+            # 确定 Web 服务器类型
+            local web_server=""
             if [[ $IS_CADDY ]]; then
-                create caddy $NET
+                web_server="caddy"
             elif [[ $IS_NGINX ]]; then
-                create nginx $IS_NEW_PROTOCOL "" "$URL_PATH" "$PORT"
+                web_server="nginx"
+            fi
+            
+            # 自动部署 VPS 架构
+            if [[ -n "$web_server" ]]; then
+                auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server"
             fi
         }
         # restart core
@@ -712,6 +963,14 @@ change() {
         info $1
         [[ $IS_AUTO_GET_CONFIG ]] && msg "\n自动选择: $IS_CONFIG_FILE"
     }
+    
+    # 确定 Web 服务器类型
+    local web_server=""
+    if [[ $IS_CADDY ]]; then
+        web_server="caddy"
+    elif [[ $IS_NGINX ]]; then
+        web_server="nginx"
+    fi
     IS_OLD_NET=$NET
     [[ $IS_PROTOCOL == 'vless' && ! $IS_REALITY ]] && NET=v$NET
     [[ $IS_PROTOCOL == 'trojan' ]] && NET=t$NET
@@ -727,11 +986,15 @@ change() {
     case $IS_CHANGE_ID in
     full)
         add $NET ${@:3}
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     0)
         # new protocol
         IS_SET_NEW_PROTOCOL=1
         add ${@:3}
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     1)
         # new port
@@ -759,6 +1022,8 @@ change() {
         else
             add $NET $IS_NEW_PORT
         fi
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     2)
         # new host
@@ -767,6 +1032,8 @@ change() {
         [[ ! $IS_NEW_HOST ]] && ask string IS_NEW_HOST "请输入新域名:"
         OLD_HOST=$HOST # del old host
         add $NET $IS_NEW_HOST
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     3)
         # new path
@@ -775,6 +1042,8 @@ change() {
         [[ $IS_AUTO ]] && get_uuid && IS_NEW_PATH=/$TMP_UUID
         [[ ! $IS_NEW_PATH ]] && ask string IS_NEW_PATH "请输入新路径:"
         add $NET auto auto $IS_NEW_PATH
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     4)
         # new password
@@ -789,6 +1058,8 @@ change() {
         SS_PASSWORD=$IS_NEW_PASS
         IS_SOCKS_PASS=$IS_NEW_PASS
         add $NET
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     5)
         # new uuid
@@ -797,6 +1068,8 @@ change() {
         [[ $IS_AUTO ]] && get_uuid && IS_NEW_UUID=$TMP_UUID
         [[ ! $IS_NEW_UUID ]] && ask string IS_NEW_UUID "请输入新 UUID:"
         add $NET auto $IS_NEW_UUID
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     6)
         # new method
@@ -808,6 +1081,8 @@ change() {
             IS_NEW_METHOD=$SS_METHOD
         }
         add $NET auto auto $IS_NEW_METHOD
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     7)
         # new header type
@@ -825,6 +1100,8 @@ change() {
             IS_NEW_HEADER_TYPE=$HEADER_TYPE
         }
         add $NET auto auto $IS_NEW_HEADER_TYPE
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     8)
         # new remote addr
@@ -833,6 +1110,8 @@ change() {
         [[ ! $IS_NEW_DOOR_ADDR ]] && ask string IS_NEW_DOOR_ADDR "请输入新的目标地址:"
         DOOR_ADDR=$IS_NEW_DOOR_ADDR
         add $NET
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     9)
         # new remote port
@@ -843,6 +1122,8 @@ change() {
             IS_NEW_DOOR_PORT=$DOOR_PORT
         }
         add $NET auto auto $IS_NEW_DOOR_PORT
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     10)
         # new is_private_key is_public_key
@@ -852,6 +1133,8 @@ change() {
         if [[ $IS_AUTO ]]; then
             get_pbk
             add $NET
+            # 重新部署 VPS 架构
+            [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         else
             [[ $IS_NEW_PRIVATE_KEY && ! $IS_NEW_PUBLIC_KEY ]] && {
                 err "无法找到 Public key."
@@ -880,6 +1163,8 @@ change() {
             IS_PUBLIC_KEY=$IS_NEW_PUBLIC_KEY
             IS_TEST_JSON=
             add $NET
+            # 重新部署 VPS 架构
+            [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         fi
         ;;
     11)
@@ -890,6 +1175,8 @@ change() {
         [[ ! $IS_NEW_SERVERNAME ]] && ask string IS_NEW_SERVERNAME "请输入新的 serverName:"
         IS_SERVERNAME=$IS_NEW_SERVERNAME
         add $NET
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     12)
         # new dynamic-port
@@ -899,6 +1186,8 @@ change() {
         if [[ $IS_AUTO ]]; then
             get dynamic-port
             add $NET
+            # 重新部署 VPS 架构
+            [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         else
             [[ $IS_NEW_DYNAMIC_PORT_START && ! $IS_NEW_DYNAMIC_PORT_END ]] && {
                 err "无法找到动态结束端口."
@@ -906,6 +1195,8 @@ change() {
             [[ ! $IS_NEW_DYNAMIC_PORT_START ]] && ask string IS_NEW_DYNAMIC_PORT_START "请输入新的动态开始端口:"
             [[ ! $IS_NEW_DYNAMIC_PORT_END ]] && ask string IS_NEW_DYNAMIC_PORT_END "请输入新的动态结束端口:"
             add $NET auto auto auto $IS_NEW_DYNAMIC_PORT_START $IS_NEW_DYNAMIC_PORT_END
+            # 重新部署 VPS 架构
+            [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         fi
         ;;
     13)
@@ -930,14 +1221,21 @@ change() {
         [[ ! $IS_NEW_KCP_SEED ]] && ask string IS_NEW_KCP_SEED "请输入新 mKCP seed:"
         KCP_SEED=$IS_NEW_KCP_SEED
         add $NET
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     15)
         # new socks user
         [[ ! $IS_SOCKS_USER ]] && err "($IS_CONFIG_FILE) 不支持更改用户名 (Username)."
         ask string IS_SOCKS_USER "请输入新用户名 (Username):"
         add $NET
+        # 重新部署 VPS 架构
+        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
         ;;
     esac
+    
+    # 最终调用：确保所有更改都应用后重新部署
+    [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" && $IS_CHANGE ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
 }
 
 # delete config.
@@ -957,22 +1255,36 @@ del() {
         [[ $IS_API_FAIL && ! $IS_NEW_JSON ]] && manage restart &
         [[ ! $IS_NO_DEL_MSG ]] && _green "\n已删除: $IS_CONFIG_FILE\n"
 
-        [[ $IS_CADDY ]] && {
-            IS_DEL_HOST=$HOST
-            [[ $IS_CHANGE ]] && {
-                [[ ! $OLD_HOST ]] && return # no host exist or not set new host;
-                IS_DEL_HOST=$OLD_HOST
+        # 使用新的 V2Ray VPS 架构清理功能
+        local web_server=""
+        if [[ $IS_CADDY ]]; then
+            web_server="caddy"
+        elif [[ $IS_NGINX ]]; then
+            web_server="nginx"
+        fi
+        
+        if [[ -n "$web_server" && -n "$IS_CONFIG_FILE" && -n "$HOST" ]]; then
+            # 清理 VPS 架构
+            cleanup_vps_architecture "$IS_CONF_DIR/$IS_CONFIG_FILE" "$web_server"
+        else
+            # 保留原有清理逻辑作为后备
+            [[ $IS_CADDY ]] && {
+                IS_DEL_HOST=$HOST
+                [[ $IS_CHANGE ]] && {
+                    [[ ! $OLD_HOST ]] && return # no host exist or not set new host;
+                    IS_DEL_HOST=$OLD_HOST
+                }
+                [[ $IS_DEL_HOST && $HOST != $OLD_HOST && ! $IS_NO_AUTO_TLS ]] && {
+                    rm -rf $IS_CADDY_CONF/$IS_DEL_HOST.conf $IS_CADDY_CONF/$IS_DEL_HOST.conf.add
+                    [[ ! $IS_NEW_JSON ]] && manage restart caddy &
+                }
             }
-            [[ $IS_DEL_HOST && $HOST != $OLD_HOST && ! $IS_NO_AUTO_TLS ]] && {
-                rm -rf $IS_CADDY_CONF/$IS_DEL_HOST.conf $IS_CADDY_CONF/$IS_DEL_HOST.conf.add
-                [[ ! $IS_NEW_JSON ]] && manage restart caddy &
+            [[ $IS_NGINX ]] && {
+                load nginx.sh
+                nginx_config del
+                nginx_reload
             }
-        }
-        [[ $IS_NGINX ]] && {
-            load nginx.sh
-            nginx_config del
-            nginx_reload
-        }
+        fi
     fi
     if [[ ! $(ls $IS_CONF_DIR | grep .json) && ! $IS_CHANGE ]]; then
         warn "当前配置目录为空! 因为你刚刚删除了最后一个配置文件."

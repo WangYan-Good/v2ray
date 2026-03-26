@@ -1,6 +1,6 @@
 # V2Ray QA Phase 8 - 重新验证测试报告
 
-**测试日期**: 2026-03-25 06:07:50 UTC
+**测试日期**: 2026-03-26 18:20:14 UTC
 **测试环境**: Linux d687556d97e2 5.14.0-427.13.1.el9_4.x86_64 #1 SMP PREEMPT_DYNAMIC Wed Apr 10 10:29:16 EDT 2024 x86_64 GNU/Linux
 **测试脚本**: /home/node/.openclaw/v2ray/tests/integration/qa_phase8_full_test.sh
 
@@ -51,8 +51,7 @@ bash -n core.sh
 ### 核心协议测试
 
 | 协议 | 传输 | 安全 | 状态 |
-|------|------|------|------|
-| VMess | TCP | TLS | ✅ 通过 |
+|------|------|------|------|| VMess | TCP | TLS | ✅ 通过 |
 | VMess | WS | TLS | ✅ 通过 |
 | VMess | gRPC | TLS | ✅ 通过 |
 | VLESS | TCP | TLS | ✅ 通过 |
@@ -119,6 +118,6 @@ Phase 7 的 29 处 Shell 引用错误修复已验证成功。
 
 ---
 
-**报告生成时间**: 2026-03-25 06:07:50 UTC
+**报告生成时间**: 2026-03-26 18:20:14 UTC
 **测试执行者**: Xiaolan (QA Subagent - Phase 8)
 

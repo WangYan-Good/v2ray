@@ -1,0 +1,27 @@
+
+=========================================
+[0;36mV2Ray Phase 9 - QA 测试开始[0m
+=========================================
+
+[2026-03-26 18:25:27] [INFO] 测试模式：all
+[2026-03-26 18:25:27] [INFO] 日志文件：/home/node/.openclaw/v2ray/tests/integration/logs/phase9_qa_test_20260326_182527.log
+
+=========================================
+[0;36m前置检查[0m
+=========================================
+
+[2026-03-26 18:25:27] [INFO] jq 版本: 1.7.1
+[2026-03-26 18:25:27] [INFO] core.sh 文件存在: /home/node/.openclaw/v2ray/tests/integration/../src/core.sh
+
+=========================================
+[0;36m测试 1: 本地语法验证[0m
+=========================================
+
+[0;34mTEST[0m: [SYN-001] Shell 语法检查
+[0;32m✓ PASS[0m: Shell 语法检查通过
+[0;34mTEST[0m: [SYN-002] 辅助函数定义检查
+[0;32m✓ PASS[0m: 函数 generate_protocol_settings 已定义
+[0;32m✓ PASS[0m: 函数 generate_client_settings 已定义
+[0;32m✓ PASS[0m: 函数 generate_stream_settings 已定义
+[0;32m✓ PASS[0m: 函数 generate_sniffing 已定义
+[0;34mTEST[0m: [SYN-003] 辅助函数调用测试

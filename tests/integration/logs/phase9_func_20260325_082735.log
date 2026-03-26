@@ -1,0 +1,24 @@
+=== Phase 9 FUNC 本地功能测试 ===
+开始时间: Wed Mar 25 08:27:35 UTC 2026
+TEST: [FUNC-001] VMess 配置生成
+[0;32m✓ PASS[0m: VMess 配置生成成功
+TEST: [FUNC-002] Trojan 配置生成
+[0;32m✓ PASS[0m: Trojan 配置生成成功
+TEST: [FUNC-003] VLESS 配置生成
+[0;32m✓ PASS[0m: VLESS 配置生成成功
+TEST: [FUNC-004] Shadowsocks 配置生成
+[0;32m✓ PASS[0m: Shadowsocks 配置生成成功
+TEST: [FUNC-005] H2 流配置生成
+[0;32m✓ PASS[0m: H2 流配置生成成功
+TEST: [FUNC-006] gRPC 流配置生成
+[0;32m✓ PASS[0m: gRPC 流配置生成成功
+TEST: [FUNC-007] WS 流配置生成
+[0;32m✓ PASS[0m: WS 流配置生成成功
+TEST: [FUNC-008] 完整配置生成 (VMess+TCP)
+[0;32m✓ PASS[0m: 完整配置包含 inbounds
+=== FUNC 测试摘要 ===
+总测试数: 8
+通过: 8
+失败: 0
+通过率: 100%
+日志文件: /home/node/.openclaw/v2ray/tests/integration/logs/phase9_func_20260325_082735.log
