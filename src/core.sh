@@ -1398,18 +1398,25 @@ get() {
             IS_DYNAMIC_PORT=$($JQ -r '.inbounds[0].settings.detour.to // ""' <<<$IS_JSON_STR)
             IS_SOCKS_USER=$($JQ -r '.inbounds[0].settings.accounts[0].user // ""' <<<$IS_JSON_STR)
             IS_SOCKS_PASS=$($JQ -r '.inbounds[0].settings.accounts[0].pass // ""' <<<$IS_JSON_STR)
-            NET=$($JQ -r '.inbounds[0].streamSettings.network // ""' <<<$IS_JSON_STR)
-            IS_SECURITY=$($JQ -r '.inbounds[0].streamSettings.security // ""' <<<$IS_JSON_STR)
+            # 🔧 Phase 9 VPS 测试修复：添加备用路径支持（兼容旧配置结构）
+            # 优先尝试标准路径 (streamSettings)，如果为空则尝试备用路径 (settings)
+            NET=$($JQ -r '.inbounds[0].streamSettings.network // .inbounds[0].settings.network // ""' <<<$IS_JSON_STR)
+            IS_SECURITY=$($JQ -r '.inbounds[0].streamSettings.security // .inbounds[0].settings.security // ""' <<<$IS_JSON_STR)
             TCP_TYPE=$($JQ -r '.inbounds[0].streamSettings.tcpSettings.header.type // ""' <<<$IS_JSON_STR)
             KCP_SEED=$($JQ -r '.inbounds[0].streamSettings.kcpSettings.seed // ""' <<<$IS_JSON_STR)
             KCP_TYPE=$($JQ -r '.inbounds[0].streamSettings.kcpSettings.header.type // ""' <<<$IS_JSON_STR)
             QUIC_TYPE=$($JQ -r '.inbounds[0].streamSettings.quicSettings.header.type // ""' <<<$IS_JSON_STR)
-            WS_PATH=$($JQ -r '.inbounds[0].streamSettings.wsSettings.path // ""' <<<$IS_JSON_STR)
-            H2_PATH=$($JQ -r '.inbounds[0].streamSettings.httpSettings.path // ""' <<<$IS_JSON_STR)
-            GRPC_SERVICE_NAME=$($JQ -r '.inbounds[0].streamSettings.grpcSettings.serviceName // ""' <<<$IS_JSON_STR)
-            GRPC_HOST=$($JQ -r '.inbounds[0].streamSettings.grpc_host // ""' <<<$IS_JSON_STR)
-            WS_HOST=$($JQ -r '.inbounds[0].streamSettings.wsSettings.headers.Host // ""' <<<$IS_JSON_STR)
-            H2_HOST=$($JQ -r '.inbounds[0].streamSettings.httpSettings.host[0] // ""' <<<$IS_JSON_STR)
+            WS_PATH=$($JQ -r '.inbounds[0].streamSettings.wsSettings.path // .inbounds[0].settings.wsSettings.path // ""' <<<$IS_JSON_STR)
+            H2_PATH=$($JQ -r '.inbounds[0].streamSettings.httpSettings.path // .inbounds[0].settings.httpSettings.path // ""' <<<$IS_JSON_STR)
+            GRPC_SERVICE_NAME=$($JQ -r '.inbounds[0].streamSettings.grpcSettings.serviceName // .inbounds[0].settings.grpcSettings.serviceName // ""' <<<$IS_JSON_STR)
+            GRPC_HOST=$($JQ -r '.inbounds[0].streamSettings.grpc_host // .inbounds[0].settings.grpc_host // ""' <<<$IS_JSON_STR)
+            WS_HOST=$($JQ -r '.inbounds[0].streamSettings.wsSettings.headers.Host // .inbounds[0].settings.wsSettings.headers.Host // ""' <<<$IS_JSON_STR)
+            H2_HOST=$($JQ -r '.inbounds[0].streamSettings.httpSettings.host[0] // .inbounds[0].settings.httpSettings.host[0] // ""' <<<$IS_JSON_STR)
+            # 🔧 Phase 9 紧急修复：添加 H2 字段提取验证
+            [[ $NET == 'h2' ]] && {
+                [[ -z $H2_PATH ]] && echo "⚠️  警告: H2 配置中 path 字段未找到" >&2
+                [[ -z $H2_HOST ]] && echo "⚠️  警告: H2 配置中 host 字段未找到" >&2
+            }
             IS_SERVERNAME=$($JQ -r '.inbounds[0].streamSettings.realitySettings.serverNames[0] // ""' <<<$IS_JSON_STR)
             IS_PUBLIC_KEY=$($JQ -r '.inbounds[0].streamSettings.realitySettings.publicKey // ""' <<<$IS_JSON_STR)
             IS_PRIVATE_KEY=$($JQ -r '.inbounds[0].streamSettings.realitySettings.privateKey // ""' <<<$IS_JSON_STR)
@@ -1422,6 +1429,12 @@ get() {
 
             # 合并变量（如果从 JSON 读取失败，使用备用方式）
             [[ -z $HOST ]] && HOST="${GRPC_HOST:-${WS_HOST:-${H2_HOST:-}}}"
+            # 🔧 Phase 9 紧急修复：增强 HOST 提取逻辑
+            if [[ -z $HOST ]]; then
+                # 标准路径已尝试，尝试从原始 JSON 直接提取（备用方案）
+                HOST=$($JQ -r '.inbounds[0].streamSettings.httpSettings.host[0] // ""' <<<$IS_JSON_STR)
+                [[ -z $HOST ]] && HOST=$($JQ -r '.inbounds[0].streamSettings.wsSettings.headers.Host // ""' <<<$IS_JSON_STR)
+            fi
             # 设置 IS_ADDR（服务器地址）
             get addr
             # Trojan 协议使用 password 字段，需要赋值给 UUID
@@ -1450,14 +1463,24 @@ get() {
             # 修复：从 WS_PATH 和 H2_PATH 设置 URL_PATH
             [[ $NET == 'ws' && $WS_PATH ]] && URL_PATH="$WS_PATH"
             [[ $NET == 'h2' && $H2_PATH ]] && URL_PATH="$H2_PATH"
-            # 备用：如果 NET 为空但仍需设置 URL_PATH（用于其他场景）
-            [[ -z $URL_PATH ]] && {
-                [[ $GRPC_SERVICE_NAME ]] && URL_PATH="$GRPC_SERVICE_NAME"
-                [[ -z $URL_PATH && $WS_PATH ]] && URL_PATH="$WS_PATH"
-                [[ -z $URL_PATH && $H2_PATH ]] && URL_PATH="$H2_PATH"
-            }
-            # 备用：如果 net 为空，尝试从 JSON 直接提取
-            [[ -z $NET ]] && NET=$($JQ -r '.inbounds[0].streamSettings.network // ""' <<<$IS_JSON_STR)
+            # 🔧 Phase 9 紧急修复：增强备用逻辑，支持多种 H2 配置结构（兼容旧配置）
+            if [[ -z $URL_PATH ]]; then
+                # 尝试从 streamSettings 提取（标准路径）
+                URL_PATH=$($JQ -r '.inbounds[0].streamSettings.httpSettings.path // ""' <<<$IS_JSON_STR)
+
+                # 如果仍为空，尝试从 settings 提取（旧配置兼容）
+                [[ -z $URL_PATH ]] && URL_PATH=$($JQ -r '.inbounds[0].settings.httpSettings.path // ""' <<<$IS_JSON_STR)
+
+                # 如果仍为空，尝试其他可能的路径
+                [[ -z $URL_PATH ]] && URL_PATH=$($JQ -r '.inbounds[0].streamSettings.httpSettings.h2Settings.path // ""' <<<$IS_JSON_STR)
+                [[ -z $URL_PATH ]] && URL_PATH=$($JQ -r '.inbounds[0].settings.httpSettings.h2Settings.path // ""' <<<$IS_JSON_STR)
+
+                # 如果仍为空，尝试 grpc serviceName（备用方案）
+                [[ -z $URL_PATH ]] && URL_PATH=$($JQ -r '.inbounds[0].streamSettings.grpcSettings.serviceName // ""' <<<$IS_JSON_STR)
+                [[ -z $URL_PATH ]] && URL_PATH=$($JQ -r '.inbounds[0].settings.grpcSettings.serviceName // ""' <<<$IS_JSON_STR)
+            fi
+            # 备用：如果 net 为空，尝试从 JSON 直接提取（同时检查 streamSettings 和 settings）
+            [[ -z $NET ]] && NET=$($JQ -r '.inbounds[0].streamSettings.network // .inbounds[0].settings.network // ""' <<<$IS_JSON_STR)
             [[ -z $IS_HTTPS_PORT ]] && IS_HTTPS_PORT=443
             HEADER_TYPE="${TCP_TYPE:-}${KCP_TYPE:-${QUIC_TYPE:-}}"
             # 判断是否为 reality 协议
