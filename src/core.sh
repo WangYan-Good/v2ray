@@ -1423,7 +1423,10 @@ get() {
             # 设置 IS_ADDR（服务器地址）
             get addr
             # Trojan 协议使用 password 字段，需要赋值给 UUID
-            [[ $IS_PROTOCOL == 'trojan' && $TROJAN_PASSWORD ]] && UUID=$TROJAN_PASSWORD
+            [[ $IS_PROTOCOL == 'trojan' && $TROJAN_PASSWORD ]] && {
+                UUID=$TROJAN_PASSWORD
+                IS_TROJAN=1
+            }
             # Shadowsocks 协议使用 settings.password 和 settings.method，需要从 JSON 直接读取
             [[ $IS_PROTOCOL == 'shadowsocks' ]] && {
                 SS_PASSWORD=$($JQ -r '.inbounds[0].settings.password // ""' <<<$IS_JSON_STR)
