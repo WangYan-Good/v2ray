@@ -186,6 +186,45 @@ pause() {
     echo
 }
 
+# ask_batch - 批量模式下的询问函数（直接返回默认值或跳过）
+ask_batch() {
+    # 交互模式下使用原始 ask 函数
+    [[ ! $V2RAY_NON_INTERACTIVE ]] && {
+        ask "$@"
+        return
+    }
+
+    # 批量模式：直接返回或使用默认值
+    case $1 in
+    set_ss_method|set_header_type|set_protocol)
+        # 使用默认值
+        [[ $IS_DEFAULT_ARG ]] && export $IS_ASK_SET=$IS_DEFAULT_ARG
+        ;;
+    string)
+        # 字符串输入：在批量模式下如果有值就直接使用，否则跳过
+        [[ ${!2} ]] && return
+        ;;
+    get_config_file)
+        # 如果已经有配置文件，直接使用
+        [[ $IS_CONFIG_FILE ]] && return
+        # 批量模式下跳过自动选择配置文件
+        [[ $IS_DONT_AUTO_EXIT ]] && return
+        ;;
+    set_change_list)
+        # 批量模式下跳过更改列表选择
+        return
+        ;;
+    list)
+        # 批量模式下跳过列表选择
+        [[ $IS_DONT_AUTO_EXIT ]] && return
+        ;;
+    mainmenu)
+        # 批量模式下退出主菜单
+        exit 0
+        ;;
+    esac
+}
+
 get_uuid() {
     TMP_UUID=$(cat /proc/sys/kernel/random/uuid)
 }
@@ -306,7 +345,51 @@ is_port_used() {
 ##
 ## ask input a string or pick a option for list.
 ##
+# ask
 ask() {
+    # 批量模式：直接使用默认值或跳过交互
+    if [[ $V2RAY_NON_INTERACTIVE ]]; then
+        case $1 in
+        set_ss_method|set_header_type|set_protocol)
+            # 使用默认值
+            [[ $IS_DEFAULT_ARG ]] && export $IS_ASK_SET=$IS_DEFAULT_ARG
+            return
+            ;;
+        string)
+            # 字符串输入：在批量模式下如果有值就直接使用，否则跳过
+            [[ ${!2} ]] && return
+            # 批量模式下为字符串输入提供默认值
+            [[ $IS_DEFAULT_ARG ]] && export $IS_ASK_SET=$IS_DEFAULT_ARG
+            return
+            ;;
+        get_config_file)
+            # 如果已经有配置文件，直接使用
+            [[ $IS_CONFIG_FILE ]] && return
+            # 批量模式下跳过自动选择配置文件
+            [[ $IS_DONT_AUTO_EXIT ]] && return
+            # 如果只有一个配置文件，自动选择
+            [[ ${#IS_ALL_JSON[@]} -eq 1 && $IS_AUTO_GET_CONFIG != 1 ]] && {
+                IS_CONFIG_FILE=${IS_ALL_JSON[0]}
+                IS_AUTO_GET_CONFIG=1
+                return
+            }
+            ;;
+        set_change_list)
+            # 批量模式下跳过更改列表选择
+            return
+            ;;
+        list)
+            # 批量模式下跳过列表选择
+            [[ $IS_DONT_AUTO_EXIT ]] && return
+            ;;
+        mainmenu)
+            # 批量模式下退出主菜单
+            exit 0
+            ;;
+        esac
+    fi
+
+    # 交互模式：继续正常的 ask 逻辑
     case $1 in
     set_ss_method)
         IS_TMP_LIST=(${SS_METHOD_LIST[@]})
@@ -1001,7 +1084,8 @@ manage() {
                 warn "($IS_DO_MSG) $IS_DO_NAME_MSG 失败"
                 _yellow "检测到运行失败, 自动执行测试运行."
                 get test-run
-                _yellow "测试结束, 请按 Enter 退出."
+                # 批量模式下跳过等待用户输入
+                [[ ! $V2RAY_NON_INTERACTIVE ]] && _yellow "测试结束, 请按 Enter 退出."
             }
         fi
     }
@@ -1267,8 +1351,11 @@ add() {
                 warn "端口 (80 或 443) 已经被占用, 你也可以考虑使用 no-auto-tls"
                 msg "\e[41m no-auto-tls 帮助(help)\e[0m: $(msg_ul https://wangyan-good.github.io/v2ray/no-auto-tls/)\n"
                 msg "\n Caddy 将使用非标准端口实现自动配置 TLS, HTTP:$IS_HTTP_PORT HTTPS:$IS_HTTPS_PORT\n"
-                msg "请确定是否继续???"
-                pause
+                # 批量模式下自动确认，交互模式下等待用户确认
+                if [[ ! $V2RAY_NON_INTERACTIVE ]]; then
+                    msg "请确定是否继续???"
+                    pause
+                fi
             }
             IS_INSTALL_CADDY=1
         fi
