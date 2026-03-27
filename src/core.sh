@@ -302,6 +302,25 @@ cleanup_vps_architecture() {
 }
 
 # ========================================
+# VPS 架构重新部署辅助函数 (Bug 修复新增)
+# ========================================
+
+# 重新部署 VPS 架构（带错误处理）
+# 参数: error_message（可选，默认为 "VPS 架构部署失败"）
+# 返回: 0 成功, 1 失败
+redeploy_vps_architecture() {
+    local error_message="${1:-VPS 架构部署失败}"
+
+    if [[ -n "$IS_JSON_FILE" && -f "$IS_JSON_FILE" && -n "$web_server" ]]; then
+        if ! auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"; then
+            err "$error_message"
+            return 1
+        fi
+    fi
+    return 0
+}
+
+# ========================================
 # Web 服务器配置目录 (Phase 9 新增)
 # ========================================
 
@@ -1104,9 +1123,14 @@ change() {
         TROJAN_PASSWORD=$IS_NEW_PASS
         SS_PASSWORD=$IS_NEW_PASS
         IS_SOCKS_PASS=$IS_NEW_PASS
-        add $NET
+        if ! add $NET; then
+            err "修改密码失败"
+            return 1
+        fi
         # 重新部署 VPS 架构
-        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+        if ! redeploy_vps_architecture "修改密码后 VPS 架构部署失败"; then
+            return 1
+        fi
         ;;
     5)
         # new uuid
@@ -1114,9 +1138,14 @@ change() {
         [[ ! $UUID ]] && err "($IS_CONFIG_FILE) 不支持更改 UUID."
         [[ $IS_AUTO ]] && get_uuid && IS_NEW_UUID=$TMP_UUID
         [[ ! $IS_NEW_UUID ]] && ask string IS_NEW_UUID "请输入新 UUID:"
-        add $NET auto $IS_NEW_UUID
+        if ! add $NET auto $IS_NEW_UUID; then
+            err "修改 UUID 失败"
+            return 1
+        fi
         # 重新部署 VPS 架构
-        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+        if ! redeploy_vps_architecture "修改 UUID 后 VPS 架构部署失败"; then
+            return 1
+        fi
         ;;
     6)
         # new method
@@ -1127,9 +1156,14 @@ change() {
             ask set_ss_method
             IS_NEW_METHOD=$SS_METHOD
         }
-        add $NET auto auto $IS_NEW_METHOD
+        if ! add $NET auto auto $IS_NEW_METHOD; then
+            err "修改加密方式失败"
+            return 1
+        fi
         # 重新部署 VPS 架构
-        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+        if ! redeploy_vps_architecture "修改加密方式后 VPS 架构部署失败"; then
+            return 1
+        fi
         ;;
     7)
         # new header type
@@ -1146,9 +1180,14 @@ change() {
             ask set_header_type
             IS_NEW_HEADER_TYPE=$HEADER_TYPE
         }
-        add $NET auto auto $IS_NEW_HEADER_TYPE
+        if ! add $NET auto auto $IS_NEW_HEADER_TYPE; then
+            err "修改伪装类型失败"
+            return 1
+        fi
         # 重新部署 VPS 架构
-        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+        if ! redeploy_vps_architecture "修改伪装类型后 VPS 架构部署失败"; then
+            return 1
+        fi
         ;;
     8)
         # new remote addr
@@ -1156,9 +1195,14 @@ change() {
         [[ $NET != 'door' ]] && err "($IS_CONFIG_FILE) 不支持更改目标地址."
         [[ ! $IS_NEW_DOOR_ADDR ]] && ask string IS_NEW_DOOR_ADDR "请输入新的目标地址:"
         DOOR_ADDR=$IS_NEW_DOOR_ADDR
-        add $NET
+        if ! add $NET; then
+            err "修改目标地址失败"
+            return 1
+        fi
         # 重新部署 VPS 架构
-        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+        if ! redeploy_vps_architecture "修改目标地址后 VPS 架构部署失败"; then
+            return 1
+        fi
         ;;
     9)
         # new remote port
@@ -1168,9 +1212,14 @@ change() {
             ask string door_port "请输入新的目标端口:"
             IS_NEW_DOOR_PORT=$DOOR_PORT
         }
-        add $NET auto auto $IS_NEW_DOOR_PORT
+        if ! add $NET auto auto $IS_NEW_DOOR_PORT; then
+            err "修改目标端口失败"
+            return 1
+        fi
         # 重新部署 VPS 架构
-        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+        if ! redeploy_vps_architecture "修改目标端口后 VPS 架构部署失败"; then
+            return 1
+        fi
         ;;
     10)
         # new is_private_key is_public_key
@@ -1179,9 +1228,14 @@ change() {
         [[ ! $IS_REALITY ]] && err "($IS_CONFIG_FILE) 不支持更改密钥."
         if [[ $IS_AUTO ]]; then
             get_pbk
-            add $NET
+            if ! add $NET; then
+                err "修改密钥失败"
+                return 1
+            fi
             # 重新部署 VPS 架构
-            [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+            if ! redeploy_vps_architecture "修改密钥后 VPS 架构部署失败"; then
+                return 1
+            fi
         else
             [[ $IS_NEW_PRIVATE_KEY && ! $IS_NEW_PUBLIC_KEY ]] && {
                 err "无法找到 Public key."
@@ -1209,9 +1263,14 @@ change() {
             IS_PRIVATE_KEY=$IS_NEW_PRIVATE_KEY
             IS_PUBLIC_KEY=$IS_NEW_PUBLIC_KEY
             IS_TEST_JSON=
-            add $NET
+            if ! add $NET; then
+                err "修改密钥失败"
+                return 1
+            fi
             # 重新部署 VPS 架构
-            [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+            if ! redeploy_vps_architecture "修改密钥后 VPS 架构部署失败"; then
+                return 1
+            fi
         fi
         ;;
     11)
@@ -1221,9 +1280,14 @@ change() {
         [[ $IS_AUTO ]] && IS_NEW_SERVERNAME=$IS_RANDOM_SERVERNAME
         [[ ! $IS_NEW_SERVERNAME ]] && ask string IS_NEW_SERVERNAME "请输入新的 serverName:"
         IS_SERVERNAME=$IS_NEW_SERVERNAME
-        add $NET
+        if ! add $NET; then
+            err "修改密钥失败"
+            return 1
+        fi
         # 重新部署 VPS 架构
-        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+        if ! redeploy_vps_architecture "修改密钥后 VPS 架构部署失败"; then
+            return 1
+        fi
         ;;
     12)
         # new dynamic-port
@@ -1232,18 +1296,28 @@ change() {
         [[ ! $IS_DYNAMIC_PORT ]] && err "($IS_CONFIG_FILE) 不支持更改动态端口."
         if [[ $IS_AUTO ]]; then
             get dynamic-port
-            add $NET
+            if ! add $NET; then
+                err "修改密钥失败"
+                return 1
+            fi
             # 重新部署 VPS 架构
-            [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+            if ! redeploy_vps_architecture "修改密钥后 VPS 架构部署失败"; then
+                return 1
+            fi
         else
             [[ $IS_NEW_DYNAMIC_PORT_START && ! $IS_NEW_DYNAMIC_PORT_END ]] && {
                 err "无法找到动态结束端口."
             }
             [[ ! $IS_NEW_DYNAMIC_PORT_START ]] && ask string IS_NEW_DYNAMIC_PORT_START "请输入新的动态开始端口:"
             [[ ! $IS_NEW_DYNAMIC_PORT_END ]] && ask string IS_NEW_DYNAMIC_PORT_END "请输入新的动态结束端口:"
-            add $NET auto auto auto $IS_NEW_DYNAMIC_PORT_START $IS_NEW_DYNAMIC_PORT_END
+            if ! add $NET auto auto auto $IS_NEW_DYNAMIC_PORT_START $IS_NEW_DYNAMIC_PORT_END; then
+                err "修改密钥失败"
+                return 1
+            fi
             # 重新部署 VPS 架构
-            [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+            if ! redeploy_vps_architecture "修改密钥后 VPS 架构部署失败"; then
+                return 1
+            fi
         fi
         ;;
     13)
@@ -1267,22 +1341,36 @@ change() {
         [[ $IS_AUTO ]] && get_uuid && IS_NEW_KCP_SEED=$TMP_UUID
         [[ ! $IS_NEW_KCP_SEED ]] && ask string IS_NEW_KCP_SEED "请输入新 mKCP seed:"
         KCP_SEED=$IS_NEW_KCP_SEED
-        add $NET
+        if ! add $NET; then
+            err "修改密钥失败"
+            return 1
+        fi
         # 重新部署 VPS 架构
-        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+        if ! redeploy_vps_architecture "修改密钥后 VPS 架构部署失败"; then
+            return 1
+        fi
         ;;
     15)
         # new socks user
         [[ ! $IS_SOCKS_USER ]] && err "($IS_CONFIG_FILE) 不支持更改用户名 (Username)."
         ask string IS_SOCKS_USER "请输入新用户名 (Username):"
-        add $NET
+        if ! add $NET; then
+            err "修改密钥失败"
+            return 1
+        fi
         # 重新部署 VPS 架构
-        [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+        if ! redeploy_vps_architecture "修改密钥后 VPS 架构部署失败"; then
+            return 1
+        fi
         ;;
     esac
     
     # 最终调用：确保所有更改都应用后重新部署
-    [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" && $IS_CHANGE ]] && auto_deploy_vps_architecture "$IS_JSON_FILE" "$web_server" "true"
+    if [[ $IS_JSON_FILE && -f "$IS_JSON_FILE" && -n "$web_server" && $IS_CHANGE ]]; then
+        if ! redeploy_vps_architecture "修改后 VPS 架构部署失败"; then
+            return 1
+        fi
+    fi
 }
 
 # delete config.
