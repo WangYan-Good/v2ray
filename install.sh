@@ -993,10 +993,16 @@ main() {
         HOST=$DOMAIN_INPUT
         case $PROTOCOL_TYPE in
         *-TLS | *-tls)
-            add $PROTOCOL_TYPE $DOMAIN_INPUT
+            if ! add $PROTOCOL_TYPE $DOMAIN_INPUT; then
+                msg ERROR "配置失败，请检查错误信息"
+                exit_and_del_tmpdir error
+            fi
             ;;
         *)
-            add $PROTOCOL_TYPE auto auto auto
+            if ! add $PROTOCOL_TYPE auto auto auto; then
+                msg ERROR "配置失败，请检查错误信息"
+                exit_and_del_tmpdir error
+            fi
             ;;
         esac
         echo
