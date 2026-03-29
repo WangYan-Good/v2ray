@@ -3,18 +3,18 @@
 show_help() {
     case $1 in
     api | convert | tls | run | uuid | version)
-        $is_core_bin help $1 ${@:2}
+        $IS_CORE_BIN help $1 ${@:2}
         ;;
     *)
         [[ $1 ]] && warn "未知选项 '$1'"
-        msg "$is_core_name script $is_sh_ver by $author"
-        msg "Usage: $is_core [options]... [args]... "
+        msg "$IS_CORE_NAME script $IS_SH_VER by $AUTHOR"
+        msg "Usage: $IS_CORE [options]... [args]... "
         msg
-        help_info=(
+        HELP_INFO=(
             "基本:"
             "   v, version                                      显示当前版本"
             "   ip                                              返回当前主机的 IP"
-            # "   pbk                                             同等于 $is_core x25519"
+            # "   pbk                                             同等于 $IS_CORE x25519"
             "   get-port                                        返回一个可用的端口\n"
             # "   ss2022                                          返回一个可用于 Shadowsocks 2022 的密码\n"
             "一般:"
@@ -63,19 +63,19 @@ show_help() {
             "   gen [...]                                       同等于 add, 但只显示 JSON 内容，不创建文件，测试使用"
             "   genc [name]                                     显示用于客户端部分 JSON, 仅供参考"
             "   no-auto-tls [...]                               同等于 add, 但禁止自动配置 TLS, 可用于 *TLS 相关协议"
-            "   xapi [...]                                      同等于 $is_core api, 但 API 后端使用当前运行的 $is_core_name 服务\n"
+            "   xapi [...]                                      同等于 $IS_CORE api, 但 API 后端使用当前运行的 $IS_CORE_NAME 服务\n"
             "其他:"
             "   bbr                                             启用 BBR, 如果支持"
-            "   bin [...]                                       运行 $is_core_name 命令，例如：$is_core bin help"
-            "   api, convert, tls, run, uuid  [...]             兼容 $is_core_name 命令"
+            "   bin [...]                                       运行 $IS_CORE_NAME 命令，例如：$IS_CORE bin help"
+            "   api, convert, tls, run, uuid  [...]             兼容 $IS_CORE_NAME 命令"
             "   h, help                                         显示此帮助界面\n"
         )
-        for v in "${help_info[@]}"; do
+        for v in "${HELP_INFO[@]}"; do
             msg "$v"
         done
         msg "谨慎使用 del, ddel, 此选项会直接删除配置; 无需确认"
-        msg "反馈问题) $(msg_ul https://github.com/${is_sh_repo}/issues) "
-        msg "文档 (doc) $(msg_ul https://wangyan-good.github.io/v2ray/$is_core-script/)"
+        msg "反馈问题) $(msg_ul https://github.com/${IS_SH_REPO}/issues) "
+        msg "文档 (doc) $(msg_ul https://wangyan-good.github.io/v2ray/$IS_CORE-script/)"
         ;;
 
     esac
@@ -85,7 +85,7 @@ about() {
     msg
     msg "网站：https://wangyan-good.github.io/v2ray/"
     msg "Github: https://github.com/WangYan-Good/v2ray"
-    msg "$is_core_name site: https://www.v2fly.org"
-    msg "$is_core_name core: https://github.com/v2fly/v2ray-core"
+    msg "$IS_CORE_NAME site: https://www.v2fly.org"
+    msg "$IS_CORE_NAME core: https://github.com/v2fly/v2ray-core"
     msg
 }

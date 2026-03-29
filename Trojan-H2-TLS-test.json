@@ -1,0 +1,38 @@
+{
+  "inbounds": [{
+    "port": 443,
+    "protocol": "trojan",
+    "settings": {
+      "clients": [{
+        "password": "test-uuid-1234567890"
+      }],
+      "fallbacks": [
+        {
+          "dest": 80
+        },
+        {
+          "alpn": "h2",
+          "dest": 8443
+        }
+      ]
+    },
+    "streamSettings": {
+      "network": "h2",
+      "security": "tls",
+      "tlsSettings": {
+        "serverName": "proxy.yourdie.com",
+        "certificates": [{
+          "certificateFile": "/path/to/cert.crt",
+          "keyFile": "/path/to/key.key"
+        }]
+      },
+      "httpSettings": {
+        "path": "/h2-path",
+        "host": ["proxy.yourdie.com"]
+      }
+    }
+  }],
+  "outbounds": [{
+    "protocol": "freedom"
+  }]
+}

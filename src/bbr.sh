@@ -10,9 +10,9 @@ _open_bbr() {
 }
 
 _try_enable_bbr() {
-	local _test1=$(uname -r | cut -d\. -f1)
-	local _test2=$(uname -r | cut -d\. -f2)
-	if [[ $_test1 -eq 4 && $_test2 -ge 9 ]] || [[ $_test1 -ge 5 ]]; then
+	local _TEST1=$(uname -r | cut -d\. -f1)
+	local _TEST2=$(uname -r | cut -d\. -f2)
+	if [[ $_TEST1 -eq 4 && $_TEST2 -ge 9 ]] || [[ $_TEST1 -ge 5 ]]; then
 		_open_bbr
 	else
 		err "不支持启用 BBR 优化."
