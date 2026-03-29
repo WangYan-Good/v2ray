@@ -2,28 +2,44 @@ name: Test
 
 on:
   push:
-    branches: [ main, fix, dev ]
+    branches: [ main, fix, dev, master, develop ]
   pull_request:
-    branches: [ main, fix, dev ]
+    branches: [ main, fix, dev, master, develop ]
+  workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
+    - name: Checkout code
+      uses: actions/checkout@v4
+
     - name: Install bats
       run: |
         git clone https://github.com/bats-core/bats-core.git /tmp/bats
         cd /tmp/bats && ./install.sh /usr/local
-    
+
+    - name: Setup Caddy (required for validation)
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
+        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+        sudo apt-get update -y
+        sudo apt-get install -y caddy
+
     - name: Run unit tests
       run: bats tests/unit/
-    
+
     - name: Run integration tests
       run: bats tests/integration/
-    
+
+    - name: Run Caddy validation tests
+      if: hashFiles('test-caddy-validation.sh') != ''
+      run: |
+        bash test-caddy-validation.sh
+
     - name: Generate coverage report
       run: |
         echo "Test coverage report"
@@ -32,3 +48,13 @@ jobs:
         echo "Integration tests: ${#INTEGRATION_TESTS[@]} tests"
         echo ""
         echo "Note: Full coverage reporting requires bashcov or similar tool"
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          /tmp/v2ray-test-*.log
+          test-results/
+        retention-days: 7
