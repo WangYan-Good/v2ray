@@ -578,7 +578,7 @@ server {
 }
 EOF
 
-# 5. 为 WordPress 申请证书
+# 5. 申请证书
 certbot certonly --webroot -w /var/www/certbot -d example.com
 
 # 6. 测试并重载
@@ -1005,4 +1005,799 @@ systemctl reload nginx
 #### 示例：自定义 API 服务
 
 ```bash
-cat > /etc/nginx/sites-enabled/api.example.com.conf <
+cat > /etc/nginx/sites-enabled/api.example.com.conf << 'EOF'
+server {
+    listen 80;
+    server_name api.example.com;
+    
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api.example.com;
+    
+    ssl_certificate /etc/nginx/ssl/api.example.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/api.example.com/privkey.pem;
+    
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+EOF
+```
+
+### 伪装网站配置
+
+如果要配置伪装网站，修改 `.conf.add` 文件：
+
+```bash
+# 编辑伪装配置
+vim /etc/nginx/v2ray/v2ray.example.com.conf.add
+```
+
+内容示例：
+
+```nginx
+# 伪装成 Google
+location / {
+    proxy_pass https://www.google.com;
+    proxy_ssl_server_name on;
+    proxy_set_header Host www.google.com;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_buffering off;
+}
+```
+
+然后重载 Nginx：
+
+```bash
+nginx -t && systemctl reload nginx
+```
+
+### 证书管理
+
+#### 自动续期
+
+脚本安装时会自动添加定时任务：
+
+```bash
+# 查看定时任务
+crontab -l | grep certbot
+
+# 输出:
+# 0 3 * * * certbot renew --quiet --deploy-hook 'systemctl reload nginx'
+```
+
+#### 手动续期
+
+```bash
+# 续期所有证书
+certbot renew
+
+# 强制续期特定域名
+certbot renew --force-renewal -d example.com
+
+# 测试续期
+certbot renew --dry-run
+```
+
+#### 查看证书
+
+```bash
+# 查看所有证书
+certbot certificates
+
+# 查看证书详情
+certbot certificates --name example.com
+```
+
+---
+
+## 配置参考
+
+### V2Ray 配置文件示例
+
+#### VMess-WS-TLS
+
+```json
+{
+  "inbounds": [
+    {
+      "tag": "VMess-WS-example.com.json",
+      "port": 10000,
+      "listen": "127.0.0.1",
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          {
+            "id": "uuid-here",
+            "alterId": 0
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "wsSettings": {
+          "path": "/path",
+          "headers": {
+            "Host": "example.com"
+          }
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
+      }
+    }
+  ]
+}
+```
+
+#### Nginx 配置示例 (VMess-WS-TLS)
+
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+    
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name example.com;
+    
+    ssl_certificate /etc/nginx/ssl/example.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/example.com/privkey.pem;
+    
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:50m;
+    
+    location /path {
+        proxy_pass http://127.0.0.1:10000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 86400;
+    }
+}
+```
+
+### Caddy 配置示例
+
+```caddy
+example.com:443 {
+    reverse_proxy /path 127.0.0.1:10000
+}
+```
+
+### 防火墙配置
+
+#### UFW (Ubuntu/Debian)
+
+```bash
+# 允许 SSH
+ufw allow 22/tcp
+
+# 允许 HTTP/HTTPS
+ufw allow 80/tcp
+ufw allow 443/tcp
+
+# 启用防火墙
+ufw enable
+
+# 查看状态
+ufw status
+```
+
+#### Firewalld (CentOS)
+
+```bash
+# 允许服务
+firewall-cmd --permanent --add-service=ssh
+firewall-cmd --permanent --add-service=http
+firewall-cmd --permanent --add-service=https
+
+# 重载
+firewall-cmd --reload
+
+# 查看状态
+firewall-cmd --list-all
+```
+
+---
+
+## 故障排查
+
+### V2Ray 无法启动
+
+```bash
+# 查看状态
+systemctl status v2ray
+
+# 查看日志
+journalctl -u v2ray -f
+
+# 测试配置
+v2ray bin run -config /etc/v2ray/config.json -confdir /etc/v2ray/conf
+
+# 检查端口占用
+netstat -tlnp | grep :端口号
+```
+
+### Nginx 无法启动
+
+```bash
+# 测试配置
+nginx -t
+
+# 查看错误日志
+tail -f /var/log/nginx/error.log
+
+# 查看状态
+journalctl -u nginx -f
+
+# 检查端口占用
+netstat -tlnp | grep :80
+netstat -tlnp | grep :443
+```
+
+### 证书申请失败
+
+```bash
+# 检查 80 端口是否开放
+netstat -tlnp | grep :80
+
+# 检查防火墙
+ufw status  # 或 firewall-cmd --list-all
+
+# 检查 DNS 解析
+dig example.com
+ping example.com
+
+# 手动申请测试
+certbot certonly --webroot -w /var/www/certbot -d example.com --dry-run
+
+# 查看详细错误
+tail -f /var/log/letsencrypt/letsencrypt.log
+```
+
+### WebSocket 连接失败
+
+```bash
+# 检查 V2Ray 是否运行
+systemctl status v2ray
+
+# 检查 Nginx 配置
+cat /etc/nginx/v2ray/example.com.conf
+
+# 测试本地连接
+curl -i -H "Upgrade: websocket" -H "Connection: Upgrade" -H "Sec-WebSocket-Key: test" -H "Sec-WebSocket-Version: 13" http://127.0.0.1:端口/path
+
+# 查看 Nginx 访问日志
+tail -f /var/log/nginx/access.log
+```
+
+### 客户端无法连接
+
+1. **检查服务器状态**
+   ```bash
+   v2ray status
+   ```
+
+2. **检查防火墙**
+   ```bash
+   ufw status
+   ```
+
+3. **检查端口**
+   ```bash
+   netstat -tlnp | grep v2ray
+   ```
+
+4. **检查证书**
+   ```bash
+   certbot certificates
+   ```
+
+5. **重新生成配置**
+   ```bash
+   v2ray fix 配置名.json
+   ```
+
+---
+
+## 常见问题
+
+### Q: 可以同時使用 Caddy 和 Nginx 吗？
+
+**A:** 不建议。两者都会监听 80/443 端口，会产生冲突。选择其中一个即可。
+
+### Q: 如何切换 TLS 方案（Caddy ↔ Nginx）？
+
+**A:** 
+```bash
+# 卸载当前方案
+v2ray uninstall
+# 选择卸载 V2Ray + Caddy/Nginx
+
+# 重新安装
+./install.sh
+# 选择另一个方案
+```
+
+### Q: 域名解析后多久能申请证书？
+
+**A:** 通常几分钟内生效。可以使用 `dig example.com` 检查是否已解析到服务器 IP。
+
+### Q: 证书多久续期一次？
+
+**A:** Let's Encrypt 证书有效期 90 天，脚本会在到期前自动续期。
+
+### Q: 如何备份配置？
+
+**A:**
+```bash
+# 备份 V2Ray 配置
+tar czf v2ray-backup.tar.gz /etc/v2ray/
+
+# 备份 Nginx 配置
+tar czf nginx-backup.tar.gz /etc/nginx/
+
+# 备份 Caddy 配置
+tar czf caddy-backup.tar.gz /etc/caddy/
+```
+
+### Q: 如何迁移到另一台服务器？
+
+**A:**
+1. 在新服务器安装脚本
+2. 恢复备份的配置
+3. 重新申请证书（或复制证书）
+4. 更新域名 DNS 解析
+
+### Q: 支持 IPv6 吗？
+
+**A:** 支持。脚本会自动检测 IPv6 地址并配置。
+
+### Q: 如何禁用日志？
+
+**A:**
+```bash
+v2ray log none
+```
+
+### Q: 如何查看客户端配置？
+
+**A:**
+```bash
+v2ray client 配置名.json
+```
+
+### Q: 支持 Cloudflare 代理吗？
+
+**A:** 支持。配置流程分为两个阶段：
+
+**阶段 1 - 申请证书（必须关闭代理）:**
+```bash
+# 1. Cloudflare DNS 设置：DNS only (灰色云) ☁️
+# 2. 添加配置
+v2ray add vmess-ws-tls your-domain.com
+# 3. 脚本自动申请 Let's Encrypt 证书
+```
+
+**阶段 2 - 正常使用（开启代理享受 CDN）:**
+```bash
+# 1. Cloudflare DNS 设置：Proxied (橙色云) 🌩️
+# 2. SSL/TLS 模式：Full 或 Full (Strict)
+# 3. 正常使用
+```
+
+> ⚠️ **重要**: 申请证书时必须关闭 Cloudflare 代理，因为 Let's Encrypt 需要直接访问你的服务器验证域名所有权。
+
+**Cloudflare 配置要点:**
+
+| 设置项 | 推荐配置 | 说明 |
+|--------|----------|------|
+| **SSL/TLS 模式** | Full 或 Full (Strict) | 必须启用 HTTPS |
+| **Proxy 状态（申请证书时）** | DNS only (灰色云) | 让 Let's Encrypt 验证域名 |
+| **Proxy 状态（正常使用）** | Proxied (橙色云) | 启用 CDN 代理 |
+| **WebSocket 支持** | 自动支持 | 无需额外配置 |
+| **gRPC 支持** | 需在 Network 设置中启用 | Cloudflare → Network → gRPC |
+
+**优势:**
+- 🛡️ **隐藏真实 IP**: Cloudflare 作为中间层，隐藏 VPS 真实 IP
+- 🛡️ **DDoS 防护**: 利用 Cloudflare 的防护能力
+- 🚀 **CDN 加速**: 全球 200+ 数据中心，加速访问速度
+- 🔒 **免费 TLS**: 使用 Let's Encrypt 或 Cloudflare 通用证书
+
+**注意事项:**
+- ⚠️ 不支持 `VMess-TCP` (无 TLS)、`mKCP`、`QUIC` 等协议
+- ⚠️ Cloudflare 只支持特定端口 (80, 443, 8443, 2053, 2083, 2087, 2096 等)
+- ⚠️ WebSocket 空闲超时 100 秒，建议客户端配置自动重连
+
+### Q: 域名解析到 Cloudflare IP，脚本提示错误怎么办？
+
+**A:** 这是正常现象。脚本需要验证域名解析到你的 VPS 真实 IP。
+
+**解决方法:**
+1. **临时关闭 Cloudflare 代理**（灰色云）
+2. **等待 DNS 生效**（1-5 分钟）
+3. **运行脚本添加配置**
+4. **配置完成后，重新开启代理**（橙色云）
+
+```bash
+# 验证 DNS 是否生效
+dig your-domain.com
+
+# 应该返回你的 VPS IP，而不是 Cloudflare IP
+```
+
+---
+
+## Cloudflare 代理配置
+
+### 概述
+
+本项目完全支持通过 Cloudflare CDN 代理流量。使用 Cloudflare 可以隐藏服务器真实 IP、获得 DDoS 防护、享受全球 CDN 加速。
+
+### 支持的协议
+
+| 协议 | 传输方式 | Cloudflare 支持 | 推荐度 |
+|------|----------|----------------|--------|
+| VMess | WebSocket + TLS | ✅ 完美支持 | ⭐⭐⭐⭐⭐ |
+| VLESS | WebSocket + TLS | ✅ 完美支持 | ⭐⭐⭐⭐⭐ |
+| VLESS | gRPC + TLS | ✅ 完美支持 | ⭐⭐⭐⭐ |
+| Trojan | WebSocket + TLS | ✅ 完美支持 | ⭐⭐⭐⭐ |
+| Trojan | gRPC + TLS | ✅ 完美支持 | ⭐⭐⭐⭐ |
+| VMess | H2 + TLS | ✅ 支持 | ⭐⭐⭐ |
+| VMess | TCP (无 TLS) | ❌ 不支持 | - |
+| VMess | mKCP / QUIC | ❌ 不支持 (UDP) | - |
+
+### 快速配置
+
+> ⚠️ **重要提示**: 配置流程分为两个阶段
+> - **阶段 1（申请证书）**: Cloudflare 必须设为 **DNS only (灰色云)** ☁️
+> - **阶段 2（正常使用）**: Cloudflare 可以设为 **Proxied (橙色云)** 🌩️
+
+#### 步骤 1: 添加 V2Ray 配置
+
+```bash
+# 推荐：VMess + WebSocket + TLS
+v2ray add vmess-ws-tls your-domain.com
+
+# 或：VLESS + gRPC + TLS
+v2ray add vless-grpc-tls grpc.your-domain.com
+
+# 或：Trojan + WebSocket + TLS
+v2ray add trojan-ws-tls trojan.your-domain.com
+```
+
+#### 步骤 2: 配置 Cloudflare DNS（阶段 1 - 申请证书）
+
+> ⚠️ **申请 Let's Encrypt 证书时，必须关闭 Cloudflare 代理！**
+> 
+> 原因：Let's Encrypt 需要直接访问你的服务器验证域名所有权。
+
+1. 登录 Cloudflare 控制台
+2. 进入 **DNS** 设置页面
+3. 添加或编辑 A 记录:
+   - **Name**: `your-domain` 或 `@`
+   - **Content**: 你的 VPS IP 地址
+   - **Proxy status**: **DNS only** (灰色云) ☁️
+
+```
+类型    名称              内容          代理状态
+A       your-domain.com   x.x.x.x       DNS only ☁️
+```
+
+4. **等待 DNS 生效**（通常 1-5 分钟）
+5. **验证解析**: `dig your-domain.com` 应返回你的 VPS IP
+
+#### 步骤 3: 运行脚本添加配置
+
+```bash
+v2ray add vmess-ws-tls your-domain.com
+```
+
+脚本会自动：
+- ✅ 验证域名解析
+- ✅ 申请 Let's Encrypt 证书
+- ✅ 配置 Nginx/Caddy
+- ✅ 生成 V2Ray 配置
+
+#### 步骤 4: 开启 Cloudflare 代理（阶段 2 - 正常使用）
+
+> 配置完成后，可以开启 Cloudflare 代理享受 CDN 和防护
+
+1. 回到 Cloudflare **DNS** 设置页面
+2. 将代理状态改为 **Proxied** (橙色云) 🌩️
+
+```
+类型    名称              内容          代理状态
+A       your-domain.com   x.x.x.x       Proxied 🌩️
+```
+
+3. **SSL/TLS** 设置:
+   - 进入 **SSL/TLS** → **Overview**
+   - 选择 **Full** 或 **Full (Strict)**
+
+```
+SSL/TLS → Overview → Full (Strict) ✓
+```
+
+#### 步骤 5: (可选) 启用 gRPC 支持
+
+如果使用 gRPC 协议:
+
+1. 进入 **Network** 设置页面
+2. 找到 **gRPC** 选项
+3. 开启 **Enable gRPC**
+
+```
+Network → gRPC → Enable gRPC ✓
+```
+
+### Cloudflare 设置详解
+
+#### SSL/TLS 模式对比
+
+| 模式 | 说明 | 推荐场景 |
+|------|------|----------|
+| **Off** | 不加密 | ❌ 不推荐 |
+| **Flexible** | 仅客户端到 Cloudflare 加密 | ⚠️ 安全性较低 |
+| **Full** | 全程加密，不验证源站证书 | ✅ 推荐 (自签名证书) |
+| **Full (Strict)** | 全程加密，验证源站证书 | ✅✅ 最推荐 (有效证书) |
+
+**建议**: 使用本脚本会自动申请 Let's Encrypt 证书，推荐使用 **Full (Strict)** 模式。
+
+#### 端口限制
+
+Cloudflare 仅代理特定端口，推荐使用:
+
+| 端口 | 用途 |
+|------|------|
+| 80 | HTTP (自动跳转 HTTPS) |
+| 443 | HTTPS (推荐) |
+| 8443 | HTTPS 备用 |
+| 2053, 2083, 2087, 2096 | HTTPS 备用端口 |
+
+#### WebSocket 配置
+
+Cloudflare 自动支持 WebSocket，无需额外配置:
+
+- **最大消息大小**: 100 MB
+- **空闲超时**: 100 秒
+- **连接超时**: 30 秒
+
+#### gRPC 配置
+
+启用 gRPC 需要手动开启:
+
+1. **Cloudflare 控制台** → **Network** → **gRPC** → **Enable**
+2. 确保使用 **443** 或其他 HTTPS 端口
+3. 客户端需支持 gRPC
+
+### 优势与注意事项
+
+#### 优势
+
+✅ **隐藏真实 IP**: Cloudflare 作为反向代理，隐藏 VPS 真实 IP 地址
+
+✅ **DDoS 防护**: 免费享受 Cloudflare 的 DDoS 攻击防护
+
+✅ **CDN 加速**: 全球 200+ 数据中心，加速访问速度
+
+✅ **免费 TLS**: 即使不申请证书，也可使用 Cloudflare 通用证书
+
+✅ **WAF 防护**: Web 应用防火墙，阻挡恶意请求
+
+✅ **Analytics**: 详细的流量分析和统计
+
+#### 注意事项
+
+⚠️ **协议限制**: Cloudflare 仅代理 HTTP/HTTPS/gRPC 流量
+- 不支持: TCP (无 TLS)、mKCP、QUIC 等基于 UDP 的协议
+
+⚠️ **端口限制**: 只能使用 Cloudflare 支持的端口列表
+
+⚠️ **WebSocket 超时**: 空闲连接 100 秒后可能断开，建议客户端配置重连
+
+⚠️ **带宽限制**: 
+- 免费版：每月 100,000 次请求
+- Pro 版：每月 1,000,000 次请求
+- Business 版：无限
+
+⚠️ **规则限制**: 遵守 Cloudflare 服务条款，不得用于违法用途
+
+### 客户端配置示例
+
+#### VMess + WebSocket + TLS
+
+```json
+{
+  "v": "2",
+  "ps": "VMess-WS-TLS",
+  "add": "your-domain.com",
+  "port": "443",
+  "id": "uuid-here",
+  "aid": "0",
+  "net": "ws",
+  "type": "none",
+  "host": "your-domain.com",
+  "path": "/your-path",
+  "tls": "tls",
+  "sni": "your-domain.com"
+}
+```
+
+#### VLESS + gRPC + TLS
+
+```json
+{
+  "v": "0",
+  "ps": "VLESS-gRPC-TLS",
+  "add": "grpc.your-domain.com",
+  "port": "443",
+  "id": "uuid-here",
+  "flow": "",
+  "net": "grpc",
+  "type": "none",
+  "host": "",
+  "path": "path",
+  "tls": "tls",
+  "sni": "grpc.your-domain.com",
+  "alpn": "h2"
+}
+```
+
+### 故障排查
+
+#### 证书申请失败：Connection refused
+
+**错误信息**:
+```
+Detail: 72.11.140.248: Fetching http://your-domain.com/.well-known/acme-challenge/...
+        Connection refused
+```
+
+**原因**: Nginx 未运行，80 端口无法访问
+
+**解决**（脚本已自动修复）:
+```bash
+# 脚本会自动执行以下操作：
+# 1. 检测 Nginx 状态
+# 2. 自动启动 Nginx
+# 3. 测试 Nginx 配置
+# 4. 重新申请证书
+
+# 如果仍然失败，手动执行：
+systemctl start nginx
+certbot certonly --webroot -w /var/www/certbot -d your-domain.com
+```
+
+**脚本自动处理流程**:
+```
+1. 检测 Nginx 是否运行 → 未运行
+2. 自动启动 Nginx → systemctl start nginx
+3. 测试 Nginx 配置 → nginx -t
+4. 申请证书 → certbot certonly --webroot
+5. 成功 → 重载 Nginx
+6. 失败 → 给出详细提示
+```
+
+**常见失败原因**:
+- ❌ 域名未解析到 VPS IP（Cloudflare 未关闭代理）
+- ❌ 防火墙未开放 80 端口
+- ❌ Nginx 配置错误
+- ❌ 端口被其他程序占用
+
+**检查命令**:
+```bash
+# 验证 DNS 解析
+dig your-domain.com +short
+
+# 检查防火墙
+ufw status
+
+# 检查 80 端口
+netstat -tlnp | grep :80
+
+# 测试 HTTP 访问
+curl -I http://your-domain.com/.well-known/acme-challenge/test
+
+# 查看 Certbot 日志
+tail -20 /var/log/letsencrypt/letsencrypt.log
+```
+
+#### Cloudflare 显示 521/522 错误
+
+**原因**: Cloudflare 无法连接到源站
+
+**解决**:
+```bash
+# 检查 V2Ray 状态
+v2ray status
+
+# 检查 Nginx/Caddy 状态
+v2ray status nginx
+# 或
+v2ray status caddy
+
+# 检查防火墙
+ufw status
+
+# 检查端口监听
+netstat -tlnp | grep :443
+```
+
+#### WebSocket 连接失败
+
+**检查 Nginx 配置**:
+```bash
+cat /etc/nginx/v2ray/your-domain.com.conf
+```
+
+确保包含 WebSocket 升级头:
+```nginx
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "upgrade";
+```
+
+#### gRPC 无法连接
+
+1. 确认 Cloudflare 已启用 gRPC 支持
+2. 检查客户端是否支持 gRPC
+3. 确保使用 443 端口
+
+### 性能优化建议
+
+1. **启用 Cloudflare 缓存**: 对静态资源启用缓存
+2. **使用 Argo Smart Routing**: 优化路由 (付费功能)
+3. **开启 HTTP/2**: Cloudflare 默认支持
+4. **开启 HTTP/3**: 在 **Network** 设置中启用
+5. **使用 Polish**: 自动优化图片 (付费功能)
+
+---
+
+## 附录
+
+### 相关链接
+
+- **GitHub**: https://github.com/WangYan-Good/v2ray
+- **文档**: https://wangyan-good.github.io/v2ray/
+- **V2Ray 官方**: https://www.v2fly.org
+- **Nginx 官方**: https://nginx.org
+- **Certbot 官方**: https://certbot.eff.org
+
+### 许可证
+
+GPL-3.0 License
+
+### 致谢
+
+感谢所有贡献者和使用者！
+
+---
+
+*最后更新：2026 年*

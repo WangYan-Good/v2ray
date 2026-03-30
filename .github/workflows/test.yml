@@ -36,9 +36,9 @@ jobs:
       run: bats tests/integration/
 
     - name: Run Caddy validation tests
-      if: hashFiles('test-caddy-validation.sh') != ''
+      if: hashFiles('scripts/test-caddy-validation.sh') != ''
       run: |
-        bash test-caddy-validation.sh
+        bash scripts/test-caddy-validation.sh
 
     - name: Generate coverage report
       run: |

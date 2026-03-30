@@ -10,6 +10,7 @@ Do:
 Do NOT:
 - Change requirements
 - Redesign architecture
+- Review your own solution
 
 Output:
 
