@@ -16,7 +16,7 @@ class TestParameterCombinations:
     def script_path(self):
         """获取脚本路径"""
         return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                          'caddy-validation-optimizer.sh')
+                          'scripts/caddy-validation-optimizer.sh')
     
     def test_skip_dns_with_force_deploy(self, script_path):
         """测试 8.1: --skip-dns-check + --force-deploy 组合"""

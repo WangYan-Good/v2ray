@@ -16,7 +16,7 @@ class TestEnvironmentConsistency:
     def script_path(self):
         """获取脚本路径"""
         return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                          'caddy-validation-optimizer.sh')
+                          'scripts/caddy-validation-optimizer.sh')
     
     def test_production_env_identification(self, script_path):
         """测试 1.1: 生产环境识别"""

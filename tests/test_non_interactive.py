@@ -16,7 +16,7 @@ class TestNonInteractive:
     def script_path(self):
         """获取脚本路径"""
         return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                          'caddy-validation-optimizer.sh')
+                          'scripts/caddy-validation-optimizer.sh')
     
     def test_noninteractive_mode_env(self, script_path):
         """测试 9.1: 非交互式环境变量"""

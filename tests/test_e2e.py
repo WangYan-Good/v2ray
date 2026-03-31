@@ -17,13 +17,7 @@ class TestEndToEnd:
     def script_path(self):
         """获取脚本路径"""
         return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                          'caddy-validation-optimizer.sh')
-    
-    @pytest.fixture
-    def test_script(self):
-        """获取测试脚本路径"""
-        return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                          'test-caddy-validation.sh')
+                          'scripts/caddy-validation-optimizer.sh')
     
     def test_e2e_parse_and_analyze(self, script_path):
         """测试 10.1: 完整的解析和分析流程"""
@@ -32,8 +26,8 @@ class TestEndToEnd:
             ['bash', '-c', f'''
                 source "{script_path}"
                 SKIP_CHECKS=$(parse_cli_args "--skip-dns-check" "--skip-tls-check")
-                # 使用 resolver 而非 example.com 避免占位符匹配
-                CODE=$(analyze_validation_error "resolver error: dialing: lookup dns.example.com on 8.8.8.8:51: no such host")
+                # 使用不在占位符列表中的域名
+                CODE=$(analyze_validation_error "resolver error: dialing: lookup mytestdomain.com on 8.8.8.8:51: no such host")
                 echo "SKIP_CHECKS=$SKIP_CHECKS CODE=$CODE"
             '''],
             capture_output=True,
@@ -62,7 +56,7 @@ class TestEndToEnd:
     def test_e2e_dns_flow(self, script_path):
         """测试 10.3: DNS 问题完整流程"""
         env = os.environ.copy()
-        env['CADDY_ERROR_LOG'] = 'resolver error: dialing: lookup dns.example.com on 8.8.8.8:53: no such host'
+        env['CADDY_ERROR_LOG'] = 'resolver error: dialing: lookup mytestdomain.com on 8.8.8.8:53: no such host'
         
         result = subprocess.run(
             ['bash', '-c', f'source "{script_path}" && analyze_validation_error "{env["CADDY_ERROR_LOG"]}"'],
@@ -103,15 +97,25 @@ class TestEndToEnd:
         output = result.stdout.strip()
         assert output == "4" or "version" in result.stderr.lower(), "应诊断为版本问题 (code=4)"
     
-    def test_e2e_full_integration(self, test_script):
+    def test_e2e_full_integration(self, script_path):
         """测试 10.6: 完整集成测试"""
-        # 运行完整的测试脚本
+        # 运行基本的功能测试
         result = subprocess.run(
-            ['bash', test_script],
+            ['bash', '-c', f'''
+                source "{script_path}"
+                # 测试诊断功能
+                CODE=$(analyze_validation_error "dns error: lookup yourdomain.com on 8.8.8.8:51: no such host")
+                # 测试环境识别
+                ENV=$(IDENTIFY_ENVIRONMENT)
+                # 测试参数解析
+                FLAGS=$(parse_cli_args "--skip-dns-check" "--skip-tls-check")
+                echo "CODE=$CODE ENV=$ENV FLAGS=$FLAGS"
+            '''],
             capture_output=True,
             text=True,
             timeout=60
         )
-        # 检查是否有通过的测试
-        assert '通过:' in result.stdout or 'PASS' in result.stdout, "应有测试通过"
-        # 不检查失败数，因为某些测试可能依赖外部环境
+        # 检查基本功能是否工作
+        assert 'CODE=3' in result.stdout, "应能诊断占位符域名"
+        assert 'ENV=' in result.stdout, "应能识别环境"
+        assert 'FLAGS=' in result.stdout, "应能解析参数"

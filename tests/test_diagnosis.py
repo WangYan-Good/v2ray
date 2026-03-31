@@ -16,7 +16,7 @@ class TestDiagnosis:
     def script_path(self):
         """获取脚本路径"""
         return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                          'caddy-validation-optimizer.sh')
+                          'scripts/caddy-validation-optimizer.sh')
     
     def test_diagnostic_code_other(self, script_path):
         """测试 3.1: 其他问题诊断码 (code=0)"""
@@ -29,9 +29,9 @@ class TestDiagnosis:
     
     def test_diagnostic_code_dns(self, script_path):
         """测试 3.2: DNS 问题诊断码 (code=1)"""
-        # 使用 resolver 而非 example.com 来避免占位符匹配
+        # 使用一个不在占位符列表中的域名
         result = subprocess.run(
-            ['bash', '-c', f'source "{script_path}" && analyze_validation_error "resolver error: dialing: lookup dns.example.com on 8.8.8.8:51: no such host"'],
+            ['bash', '-c', f'source "{script_path}" && analyze_validation_error "resolver error: dialing: lookup mytestdomain.com on 8.8.8.8:51: no such host"'],
             capture_output=True,
             text=True
         )

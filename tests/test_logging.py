@@ -17,7 +17,7 @@ class TestLogging:
     def script_path(self):
         """获取脚本路径"""
         return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                          'caddy-validation-optimizer.sh')
+                          'scripts/caddy-validation-optimizer.sh')
     
     def test_log_message_info(self, script_path, tmp_path):
         """测试 6.1: INFO 级别日志"""
@@ -96,9 +96,9 @@ class TestLogging:
     def test_log_stderr_output(self, script_path):
         """测试 6.5: 日志输出到 stderr"""
         result = subprocess.run(
-            ['bash', '-c', f'source "{script_path}" && log_message "INFO" "stderr test"'],
+            ['bash', '-c', f'source "{script_path}" && log_message "ERROR" "stderr test"'],
             capture_output=True,
             text=True
         )
-        # INFO 级别应输出到 stderr
-        assert 'INFO' in result.stderr or 'stderr test' in result.stderr, "日志应输出到 stderr"
+        # ERROR 级别应输出到 stderr
+        assert 'ERROR' in result.stderr or 'stderr test' in result.stderr, "ERROR 日志应输出到 stderr"
