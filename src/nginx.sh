@@ -3,6 +3,13 @@
 # Nginx + Certbot 自动 TLS 配置模块
 # 支持多站点共存，共享 80/443 端口
 
+# 加载错误处理框架（如果尚未加载）
+if [[ -n "$IS_SH_DIR" ]] && [[ -f "$IS_SH_DIR/src/utils/error_handler.sh" ]] && [[ -z "$ERROR_HANDLER_LOADED" ]]; then
+    # shellcheck source=/dev/null
+    . "$IS_SH_DIR/src/utils/error_handler.sh"
+    ERROR_HANDLER_LOADED=1
+fi
+
 nginx_config() {
     # 配置文件名包含协议名，如 VLESS-gRPC-TLS-proxy.yourdie.com.conf
     IS_NGINX_SITE_FILE=$IS_NGINX_CONF/${1}-${HOST}.conf
@@ -17,8 +24,8 @@ nginx_config() {
     case $PROTOCOL_LOWER in
     new)
         # 创建目录结构
-        mkdir -p $IS_NGINX_DIR $IS_NGINX_DIR/ssl $IS_NGINX_CONF
-        mkdir -p /var/log/nginx /var/www/certbot
+        safe_mkdir $IS_NGINX_DIR $IS_NGINX_DIR/ssl $IS_NGINX_CONF
+        safe_mkdir /var/log/nginx /var/www/certbot
 
         # 检查是否已有主配置
         if [[ ! -f $IS_NGINXFILE ]]; then
@@ -72,7 +79,7 @@ EOF
             # nginx.conf 已存在，检查是否需要添加 V2Ray 导入
             if ! grep -q "include $IS_NGINX_CONF/\*.conf" $IS_NGINXFILE; then
                 # 备份原配置
-                cp -f $IS_NGINXFILE ${IS_NGINXFILE}.bak.$(date +%Y%m%d%H%M%S)
+                safe_cp $IS_NGINXFILE ${IS_NGINXFILE}.bak.$(date +%Y%m%d%H%M%S)
                 msg WARNING "检测到现有 Nginx 配置，已备份到 ${IS_NGINXFILE}.bak.*"
 
                 # 在 http 块中添加 V2Ray 导入（在 http 块的最后一个 } 之前）
@@ -108,7 +115,7 @@ EOF
                         msg WARNING "添加：include $IS_NGINX_CONF/*.conf;"
                     fi
                 else
-                    rm -f $TMP_CONF
+                    safe_rm $TMP_CONF
                     msg WARNING "无法自动添加 V2Ray 配置导入，请手动编辑 $IS_NGINXFILE"
                     msg WARNING "添加：include $IS_NGINX_CONF/*.conf;"
                 fi
@@ -130,7 +137,7 @@ EOF
                 [[ ! $NGINX_CONF_CHOICE ]] && NGINX_CONF_CHOICE=1
                 case $NGINX_CONF_CHOICE in
                 1)
-                    cp -f ${IS_NGINX_SITE_FILE} ${IS_NGINX_SITE_FILE}.bak
+                    safe_cp ${IS_NGINX_SITE_FILE} ${IS_NGINX_SITE_FILE}.bak
                     msg OK "已备份现有配置：${IS_NGINX_SITE_FILE}.bak"
                     break
                     ;;
@@ -241,7 +248,7 @@ server {
                 [[ ! $NGINX_CONF_CHOICE ]] && NGINX_CONF_CHOICE=1
                 case $NGINX_CONF_CHOICE in
                 1)
-                    cp -f ${IS_NGINX_SITE_FILE} ${IS_NGINX_SITE_FILE}.bak
+                    safe_cp ${IS_NGINX_SITE_FILE} ${IS_NGINX_SITE_FILE}.bak
                     msg OK "已备份现有配置：${IS_NGINX_SITE_FILE}.bak"
                     break
                     ;;
@@ -339,7 +346,7 @@ server {
                 [[ ! $NGINX_CONF_CHOICE ]] && NGINX_CONF_CHOICE=1
                 case $NGINX_CONF_CHOICE in
                 1)
-                    cp -f ${IS_NGINX_SITE_FILE} ${IS_NGINX_SITE_FILE}.bak
+                    safe_cp ${IS_NGINX_SITE_FILE} ${IS_NGINX_SITE_FILE}.bak
                     msg OK "已备份现有配置：${IS_NGINX_SITE_FILE}.bak"
                     break
                     ;;
@@ -441,10 +448,10 @@ server {
     del)
         # 删除配置 - 遍历所有协议前缀的配置文件
         for conf in $IS_NGINX_CONF/*-${HOST}.conf $IS_NGINX_CONF/*-${HOST}.conf.add; do
-            [[ -f $conf ]] && rm -f $conf
+            [[ -f $conf ]] && safe_rm $conf
         done
         # 清理证书（可选，注释掉以保留证书）
-        # rm -rf $IS_NGINX_DIR/ssl/${HOST}
+        # safe_rm -rf $IS_NGINX_DIR/ssl/${HOST}
         ;;
     esac
     
@@ -498,7 +505,7 @@ nginx_certbot() {
                     # 检查软链接是否存在
                     if [[ ! -L $IS_NGINX_DIR/ssl/${DOMAIN} ]]; then
                         msg WARNING "证书软链接不存在，正在创建..."
-                        mkdir -p $IS_NGINX_DIR/ssl
+                        safe_mkdir $IS_NGINX_DIR/ssl
                         ln -sf /etc/letsencrypt/live/${DOMAIN} $IS_NGINX_DIR/ssl/${DOMAIN}
                         msg OK "软链接创建成功"
                     else
@@ -543,15 +550,15 @@ nginx_certbot() {
             # 验证挑战文件
             msg WARNING "验证 Nginx 配置..."
             local TEST_FILE="/var/www/certbot/.well-known/acme-challenge/test"
-            mkdir -p "$(dirname $TEST_FILE)"
+            safe_mkdir "$(dirname $TEST_FILE)"
             echo "test" > $TEST_FILE
             sleep 1
             if ! curl -s --connect-timeout 3 "http://localhost/.well-known/acme-challenge/test" | grep -q "test"; then
                 msg ERROR "Nginx 配置验证失败：无法访问挑战文件"
-                rm -f $TEST_FILE
+                safe_rm $TEST_FILE
                 return 1
             fi
-            rm -f $TEST_FILE
+            safe_rm $TEST_FILE
             msg OK "Nginx 配置验证通过"
 
             # 续期证书（根据版本决定是否使用 ECDSA）
@@ -572,7 +579,7 @@ nginx_certbot() {
                 # 检查软链接是否存在
                 if [[ ! -L $IS_NGINX_DIR/ssl/${DOMAIN} ]]; then
                     msg WARNING "创建证书软链接..."
-                    mkdir -p $IS_NGINX_DIR/ssl
+                    safe_mkdir $IS_NGINX_DIR/ssl
                     ln -sf /etc/letsencrypt/live/${DOMAIN} $IS_NGINX_DIR/ssl/${DOMAIN}
                     msg OK "软链接创建成功"
                 fi
@@ -614,7 +621,7 @@ nginx_certbot() {
                 msg OK "证书申请成功"
                 # 创建软链接到 Nginx 配置目录
                 msg WARNING "创建证书软链接到 /etc/nginx/ssl/${DOMAIN}/..."
-                mkdir -p $IS_NGINX_DIR/ssl
+                safe_mkdir $IS_NGINX_DIR/ssl
                 ln -sf /etc/letsencrypt/live/${DOMAIN} $IS_NGINX_DIR/ssl/${DOMAIN}
                 msg OK "软链接创建成功"
                 # 启动 Nginx
@@ -677,11 +684,11 @@ install_nginx_certbot() {
     fi
     
     # 创建目录
-    mkdir -p $IS_NGINX_DIR $IS_NGINX_CONF /var/www/certbot
+    safe_mkdir $IS_NGINX_DIR $IS_NGINX_CONF /var/www/certbot
     
     # 备份现有 nginx.conf（如果存在）
     if [[ -f $IS_NGINXFILE && ! -f ${IS_NGINXFILE}.bak ]]; then
-        cp -f $IS_NGINXFILE ${IS_NGINXFILE}.bak
+        safe_cp $IS_NGINXFILE ${IS_NGINXFILE}.bak
         msg WARNING "已备份现有 nginx.conf 到 ${IS_NGINXFILE}.bak"
     fi
     

@@ -58,8 +58,12 @@ load() {
 load_error_modules() {
     # shellcheck source=/dev/null
     . "$IS_SH_DIR/src/error.sh"
-    # shellcheck source=/dev/null  
+    # shellcheck source=/dev/null
     . "$IS_SH_DIR/src/log.sh"
+    # shellcheck source=/dev/null
+    . "$IS_SH_DIR/src/utils/error_handler.sh"
+    # 初始化错误处理框架
+    init_error_handler 2>/dev/null || true
 }
 
 # wget add --no-check-certificate
