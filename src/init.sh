@@ -119,13 +119,13 @@ IS_CORE_VER=$($IS_CORE_BIN version | head -n1 | cut -d " " -f1-2)
 if [[ $(grep -o ^[0-9] <<<"${IS_CORE_VER#* }") -lt 5 ]]; then
     # core version less than 5, e.g, v4.45.2
     IS_CORE_VER_LT_5=1
-    if [[ $(grep 'run -config' /lib/systemd/system/v2ray.service 2>/dev/null) ]]; then
+    if [[ -f /lib/systemd/system/v2ray.service ]] && [[ $(grep 'run -config' /lib/systemd/system/v2ray.service 2>/dev/null) ]]; then
         sed -i 's/run //' /lib/systemd/system/v2ray.service
         systemctl daemon-reload 2>/dev/null || true
     fi
 else
     IS_WITH_RUN_ARG=run
-    if [[ ! $(grep 'run -config' /lib/systemd/system/v2ray.service 2>/dev/null) ]]; then
+    if [[ -f /lib/systemd/system/v2ray.service ]] && [[ ! $(grep 'run -config' /lib/systemd/system/v2ray.service 2>/dev/null) ]]; then
         sed -i 's/-config/run -config/' /lib/systemd/system/v2ray.service
         systemctl daemon-reload 2>/dev/null || true
     fi
@@ -140,16 +140,18 @@ fi
 if [[ -f "$IS_CADDY_BIN" && -d "$IS_CADDY_DIR" && $IS_CADDY_SERVICE ]]; then
     IS_CADDY=1
     # fix caddy run; ver >= 2.8.2
-    [[ ! $(grep '\-\-adapter caddyfile' /lib/systemd/system/caddy.service) ]] && {
+    if [[ -f /lib/systemd/system/caddy.service ]] && [[ ! $(grep '\-\-adapter caddyfile' /lib/systemd/system/caddy.service) ]]; then
         load systemd.sh
         install_service caddy
         systemctl restart caddy 2>/dev/null &
-    }
+    fi
     IS_CADDY_VER=$($IS_CADDY_BIN version | head -n1 | cut -d " " -f1)
-    IS_TMP_HTTP_PORT=$(grep -E '^ {2,}http_port|^http_port' "$IS_CADDYFILE" | grep -E -o [0-9]+)
-    IS_TMP_HTTPS_PORT=$(grep -E '^ {2,}https_port|^https_port' "$IS_CADDYFILE" | grep -E -o [0-9]+)
-    [[ $IS_TMP_HTTP_PORT ]] && IS_HTTP_PORT=$IS_TMP_HTTP_PORT
-    [[ $IS_TMP_HTTPS_PORT ]] && IS_HTTPS_PORT=$IS_TMP_HTTPS_PORT
+    if [[ -f "$IS_CADDYFILE" ]]; then
+        IS_TMP_HTTP_PORT=$(grep -E '^ {2,}http_port|^http_port' "$IS_CADDYFILE" | grep -E -o [0-9]+)
+        IS_TMP_HTTPS_PORT=$(grep -E '^ {2,}https_port|^https_port' "$IS_CADDYFILE" | grep -E -o [0-9]+)
+        [[ $IS_TMP_HTTP_PORT ]] && IS_HTTP_PORT=$IS_TMP_HTTP_PORT
+        [[ $IS_TMP_HTTPS_PORT ]] && IS_HTTPS_PORT=$IS_TMP_HTTPS_PORT
+    fi
     if [[ $(pgrep -f "$IS_CADDY_BIN") ]]; then
         IS_CADDY_STATUS=$(_green running)
     else
