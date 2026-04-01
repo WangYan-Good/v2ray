@@ -401,7 +401,7 @@ pass_args() {
             shift 2
             ;;
         -l | --local-install)
-            [[ ! -f ${PWD}/src/core.sh || ! -f ${PWD}/$IS_CORE.sh ]] && {
+            [[ ! -f ${PWD}/src/core/core.sh || ! -f ${PWD}/scripts/${IS_CORE}.sh ]] && {
                 err "当前目录 (${PWD}) 非完整的脚本目录."
             }
             LOCAL_INSTALL=1
