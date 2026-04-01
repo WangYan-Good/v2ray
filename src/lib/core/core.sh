@@ -1804,7 +1804,25 @@ add() {
                     pause
                 fi
             }
-            IS_INSTALL_CADDY=1
+            # NEW: Ask user to choose between Caddy and Nginx for auto-TLS
+            if [[ ! $V2RAY_NON_INTERACTIVE ]]; then
+                msg "\n请选择 Web 服务器用于自动配置 TLS:"
+                msg "1) Caddy (默认)"
+                msg "2) Nginx + Certbot"
+                read -p "请选择 [1-2] (默认:1): " WEB_SERVER_CHOICE
+                case $WEB_SERVER_CHOICE in
+                    2) IS_INSTALL_NGINX=1 ;;
+                    *) IS_INSTALL_CADDY=1 ;;
+                esac
+            else
+                # Batch mode: Use environment variable to choose web server
+                # V2RAY_WEB_SERVER=nginx to use Nginx, otherwise default to Caddy
+                if [[ "${V2RAY_WEB_SERVER,,}" == "nginx" ]]; then
+                    IS_INSTALL_NGINX=1
+                else
+                    IS_INSTALL_CADDY=1
+                fi
+            fi
         fi
         # set host
         [[ ! $HOST ]] && ask string HOST "请输入域名:"
@@ -1879,6 +1897,40 @@ add() {
 
     # create json
     create server $IS_NEW_PROTOCOL
+
+    # NEW: Apply Nginx configuration if Nginx is selected
+    if [[ $IS_INSTALL_NGINX ]]; then
+        load nginx.sh
+        # Determine network type from protocol
+        local NET_TYPE=""
+        case ${IS_NEW_PROTOCOL,,} in
+            *ws*|*wst*) NET_TYPE="ws" ;;
+            *h2*|*h2t*) NET_TYPE="h2" ;;
+            *grpc*|*grpcs*) NET_TYPE="grpc" ;;
+        esac
+        # Generate Nginx config
+        nginx_config "$NET_TYPE" "" "$URL_PATH" "$PORT" || {
+            msg ERROR "Nginx 配置生成失败"
+            return 1
+        }
+        # Issue certificate
+        if [[ $HOST ]]; then
+            nginx_certbot issue "$HOST" || {
+                msg ERROR "TLS 证书申请失败"
+                return 1
+            }
+        fi
+        # Validate Nginx configuration
+        nginx_test || {
+            msg ERROR "Nginx 配置验证失败"
+            return 1
+        }
+        # Reload Nginx
+        nginx_reload || {
+            msg ERROR "Nginx 重载失败"
+            return 1
+        }
+    fi
 
     # show config info.
     info
@@ -2366,13 +2418,19 @@ get() {
         _green "安装 Caddy 成功.\n"
         ;;
     install-nginx)
-        _green "\n安装 Nginx 实现自动配置 TLS.\n"
+        _green "\n安装 Nginx + Certbot 实现自动配置 TLS.\n"
         load download.sh
         download nginx
+        # 安装 Certbot
+        if [[ $CMD =~ apt-get ]]; then
+            $CMD install -y certbot python3-certbot-nginx &>/dev/null
+        else
+            $CMD install -y certbot python3-certbot-nginx &>/dev/null
+        fi
         load systemd.sh
         install_service nginx &>/dev/null
         IS_NGINX=1
-        _green "安装 Nginx 成功.\n"
+        _green "安装 Nginx + Certbot 成功.\n"
         ;;
     reinstall)
         IS_INSTALL_SH=$(cat $IS_SH_DIR/install.sh)
