@@ -510,7 +510,34 @@ EOF
 # 自动初始化模块加载器
 _init_module_loader() {
     # 初始化已加载模块列表
-    MODULE_LOADED=()
+    if ! declare -p MODULE_LOADED &>/dev/null || [[ $(declare -p MODULE_LOADED) != *"declare -A"* ]]; then
+        declare -gA MODULE_LOADED=()
+    else
+        MODULE_LOADED=()
+    fi
+    
+    # 确保其他关联数组也被正确初始化
+    if ! declare -p MODULE_DEPENDS &>/dev/null || [[ $(declare -p MODULE_DEPENDS) != *"declare -A"* ]]; then
+        declare -gA MODULE_DEPENDS=()
+    fi
+}
+
+# 修改 _is_module_loaded 函数
+_is_module_loaded() {
+    local module_name="$1"
+    if ! declare -p MODULE_LOADED &>/dev/null || [[ $(declare -p MODULE_LOADED) != *"declare -A"* ]]; then
+        return 1
+    fi
+    [[ "${MODULE_LOADED[$module_name]+isset}" == "isset" ]] && [[ "${MODULE_LOADED[$module_name]}" == "true" ]]
+}
+
+# 修改 _mark_module_loaded 函数
+_mark_module_loaded() {
+    local module_name="$1"
+    if ! declare -p MODULE_LOADED &>/dev/null || [[ $(declare -p MODULE_LOADED) != *"declare -A"* ]]; then
+        declare -gA MODULE_LOADED=()
+    fi
+    MODULE_LOADED[$module_name]="true"
 }
 
 # 执行全局初始化

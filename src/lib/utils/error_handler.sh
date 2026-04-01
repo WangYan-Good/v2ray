@@ -1,9 +1,33 @@
 #!/bin/bash
 # error_handler.sh - Enhanced Error Handling Framework
-# Provides unified error handling, retry mechanisms, safe file operations, and cleanup function registration
 
 # DEPENDS: log.sh error.sh
 # PROVIDES: error_handler
+
+# 确保 logging 模块已加载
+_ensure_logging_loaded() {
+    if ! declare -f log_info >/dev/null 2>&1; then
+        # 尝试从标准位置加载 log.sh
+        local log_module_path=""
+        if [[ -n "$IS_SH_DIR" ]] && [[ -f "$IS_SH_DIR/src/log.sh" ]]; then
+            log_module_path="$IS_SH_DIR/src/log.sh"
+        elif [[ -f "/etc/v2ray/sh/src/log.sh" ]]; then
+            log_module_path="/etc/v2ray/sh/src/log.sh"
+        fi
+        
+        if [[ -n "$log_module_path" ]] && [[ -f "$log_module_path" ]]; then
+            source "$log_module_path"
+        else
+            # 创建备用日志函数
+            log_info() { echo "[INFO] $(date '+%Y-%m-%d %H:%M:%S') $*" >&2; }
+            log_warn() { echo "[WARN] $(date '+%Y-%m-%d %H:%M:%S') $*" >&2; }
+            log_error() { echo "[ERROR] $(date '+%Y-%m-%d %H:%M:%S') $*" >&2; }
+        fi
+    fi
+}
+
+# 在文件开头立即确保 logging 可用
+_ensure_logging_loaded
 
 # =============================================================================
 # File Name: error_handler.sh
