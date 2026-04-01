@@ -2,12 +2,6 @@
 # error_handler.sh - Enhanced Error Handling Framework
 # Provides unified error handling, retry mechanisms, safe file operations, and cleanup function registration
 
-# Ensure logging functions are available
-if ! declare -f log_info >/dev/null 2>&1; then
-    # shellcheck source=/dev/null
-    . "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
-fi
-
 # =============================================================================
 # File Name: error_handler.sh
 # Description: Enhanced error handling framework providing unified error handling and safe operations

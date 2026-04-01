@@ -1,0 +1,319 @@
+#!/bin/bash
+# v2ray - V2Ray 主入口脚本 (新架构)
+# 实现环境设置、模块加载和主逻辑执行
+
+# =============================================================================
+# 文件信息
+# =============================================================================
+AUTHOR=WangYan-Good
+VERSION=2.0.0
+REPO=https://github.com/WangYan-Good/v2ray
+
+# =============================================================================
+# 环境设置
+# =============================================================================
+
+# 确保使用 bash
+if [[ -z "$BASH_VERSION" ]]; then
+    echo "ERROR: Please run with bash" >&2
+    exit 1
+fi
+
+# 严格模式
+set -euo pipefail
+
+# 捕获错误
+trap 'handle_error "$LINENO" "$BASH_LINENO" "$BASH_SOURCE" "$@"' ERR
+
+# =============================================================================
+# 全局变量
+# =============================================================================
+
+# 目录路径（相对于脚本位置）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+LIB_DIR="$ROOT_DIR/lib"
+BIN_DIR="$ROOT_DIR/bin"
+
+# 旧版兼容路径（用于回退）
+LEGACY_SRC_DIR="$ROOT_DIR/src"
+
+# 模块目录
+COMMON_DIR="$LIB_DIR/common"
+CORE_DIR="$LIB_DIR/core"
+UTILS_DIR="$LIB_DIR/utils"
+
+# =============================================================================
+# 帮助函数
+# =============================================================================
+
+show_help() {
+    cat << EOF
+V2Ray Script v$VERSION
+Author: $AUTHOR
+
+用法: $0 [命令] [参数...]
+
+命令:
+    add         添加配置
+    change      更改配置
+    config      配置管理
+    del         删除配置
+    info        显示配置信息
+    log         查看日志
+    restart     重启服务
+    start       启动服务
+    status      显示状态
+    stop        停止服务
+    update      更新
+    help        显示帮助
+    version     显示版本
+
+示例:
+    $0 add vmess
+    $0 info config.json
+    $0 log access
+    $0 restart
+
+文档: $REPO
+EOF
+}
+
+show_version() {
+    echo "V2Ray Script v$VERSION"
+    echo "Author: $AUTHOR"
+    echo "Repository: $REPO"
+}
+
+# =============================================================================
+# 错误处理
+# =============================================================================
+
+handle_error() {
+    local lineno="$1"
+    local linenum="$2"
+    local source="$3"
+    local msg="${4:-Unknown error}"
+    
+    echo -e "\n\033[31mERROR\033[0m: $msg" >&2
+    echo -e "  File: $source" >&2
+    echo -e "  Line: $lineno" >&2
+    echo -e "  Call Stack: $linenum" >&2
+    
+    # 执行清理（如果已注册）
+    if command -v execute_cleanup &>/dev/null; then
+        execute_cleanup 2>/dev/null || true
+    fi
+    
+    exit 1
+}
+
+# =============================================================================
+# 初始化日志系统
+# =============================================================================
+
+init_logging() {
+    # 初始化日志级别
+    export LOG_LEVEL="${LOG_LEVEL:-1}"  # 默认 INFO
+    
+    # 初始化日志目录
+    export LOG_DIR="${LOG_DIR:-/var/log/v2ray}"
+    mkdir -p "$LOG_DIR"
+}
+
+# =============================================================================
+# 模块加载
+# =============================================================================
+
+load_modules() {
+    echo "Loading modules..."
+    
+    # 加载模块加载器
+    if [[ -f "$COMMON_DIR/module_loader.sh" ]]; then
+        # shellcheck source=module_loader.sh
+        source "$COMMON_DIR/module_loader.sh"
+        echo "  ✓ Module loader loaded"
+    else
+        echo "  ✗ Module loader not found: $COMMON_DIR/module_loader.sh" >&2
+        return 1
+    fi
+    
+    # 初始化模块加载器
+    init_module_loader "$COMMON_DIR:$CORE_DIR:$UTILS_DIR"
+    
+    # 加载公共模块
+    load_modules "$COMMON_DIR" init log error
+    echo "  ✓ Common modules loaded"
+    
+    # 加载核心模块
+    load_modules "$CORE_DIR" core dns systemd bbr
+    echo "  ✓ Core modules loaded"
+    
+    # 加载工具模块
+    load_modules "$UTILS_DIR" error_handler log
+    echo "  ✓ Utility modules loaded"
+    
+    # 初始化错误处理框架
+    if command -v init_error_handler &>/dev/null; then
+        init_error_handler
+        echo "  ✓ Error handler initialized"
+    fi
+    
+    return 0
+}
+
+# =============================================================================
+# 主逻辑
+# =============================================================================
+
+main() {
+    local command="${1:-help}"
+    shift || true
+    
+    # 设置环境
+    export IS_SH_DIR="$ROOT_DIR"
+    export IS_SH_BIN="$BIN_DIR"
+    export IS_CORE="v2ray"
+    export IS_CORE_NAME="V2Ray"
+    export IS_CORE_DIR="/etc/v2ray"
+    export IS_CONF_DIR="$IS_CORE_DIR/conf"
+    export IS_LOG_DIR="/var/log/v2ray"
+    export IS_CONFIG_JSON="$IS_CORE_DIR/config.json"
+    
+    # 初始化日志
+    init_logging
+    
+    # 加载模块
+    if ! load_modules; then
+        echo -e "\n\033[31mFailed to load modules\033[0m" >&2
+        exit 1
+    fi
+    
+    # 显示版本信息
+    if [[ "$command" == "version" || "$command" == "ver" || "$command" == "-v" || "$command" == "--version" ]]; then
+        show_version
+        exit 0
+    fi
+    
+    # 显示帮助
+    if [[ "$command" == "help" || "$command" == "-h" || "$command" == "--help" ]]; then
+        show_help
+        exit 0
+    fi
+    
+    # 显示主菜单
+    if [[ "$command" == "main" || "$command" == "menu" ]]; then
+        # 加载主菜单逻辑
+        if command -v is_main_menu &>/dev/null; then
+            is_main_menu
+        else
+            echo "ERROR: Main menu not available" >&2
+            exit 1
+        fi
+        exit 0
+    fi
+    
+    # 命令路由
+    case "$command" in
+        add|a)
+            if command -v add &>/dev/null; then
+                add "$@"
+            else
+                echo "ERROR: 'add' command not available" >&2
+                exit 1
+            fi
+            ;;
+        change|c)
+            if command -v change &>/dev/null; then
+                change "$@"
+            else
+                echo "ERROR: 'change' command not available" >&2
+                exit 1
+            fi
+            ;;
+        config|conf)
+            if command -v create &>/dev/null; then
+                create config.json
+            else
+                echo "ERROR: 'config' command not available" >&2
+                exit 1
+            fi
+            ;;
+        del|remove|rm|d)
+            if command -v del &>/dev/null; then
+                del "$@"
+            else
+                echo "ERROR: 'del' command not available" >&2
+                exit 1
+            fi
+            ;;
+        info|i)
+            if command -v info &>/dev/null; then
+                info "$@"
+            else
+                echo "ERROR: 'info' command not available" >&2
+                exit 1
+            fi
+            ;;
+        log|l)
+            if command -v log_set &>/dev/null; then
+                log_set "$@"
+            else
+                echo "ERROR: 'log' command not available" >&2
+                exit 1
+            fi
+            ;;
+        restart|r)
+            if command -v manage &>/dev/null; then
+                manage restart "$@"
+            else
+                echo "ERROR: 'restart' command not available" >&2
+                exit 1
+            fi
+            ;;
+        start)
+            if command -v manage &>/dev/null; then
+                manage start "$@"
+            else
+                echo "ERROR: 'start' command not available" >&2
+                exit 1
+            fi
+            ;;
+        status|s)
+            if command -v manage &>/dev/null; then
+                manage status "$@"
+            else
+                echo "ERROR: 'status' command not available" >&2
+                exit 1
+            fi
+            ;;
+        stop)
+            if command -v manage &>/dev/null; then
+                manage stop "$@"
+            else
+                echo "ERROR: 'stop' command not available" >&2
+                exit 1
+            fi
+            ;;
+        update|u)
+            if command -v update &>/dev/null; then
+                update "$@"
+            else
+                echo "ERROR: 'update' command not available" >&2
+                exit 1
+            fi
+            ;;
+        *)
+            echo -e "\033[31mERROR\033[0m: Unknown command '$command'" >&2
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+# =============================================================================
+# 入口点
+# =============================================================================
+
+# 执行主函数
+main "$@"

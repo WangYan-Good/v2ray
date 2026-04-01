@@ -58,8 +58,12 @@ load() {
 load_error_modules() {
     # shellcheck source=/dev/null
     . "$IS_SH_DIR/src/error.sh"
-    # shellcheck source=/dev/null  
+    # shellcheck source=/dev/null
     . "$IS_SH_DIR/src/log.sh"
+    # shellcheck source=/dev/null
+    . "$IS_SH_DIR/src/utils/error_handler.sh"
+    # 初始化错误处理框架
+    init_error_handler 2>/dev/null || true
 }
 
 # wget add --no-check-certificate
@@ -92,7 +96,32 @@ IS_CORE_DIR=/etc/$IS_CORE
 IS_CORE_BIN=$IS_CORE_DIR/bin/$IS_CORE
 IS_CORE_REPO=v2fly/$IS_CORE-core
 IS_CONF_DIR=$IS_CORE_DIR/conf
-IS_LOG_DIR=/var/log/$IS_CORE
+
+# 日志目录初始化（支持非root用户）
+_init_log_dir() {
+    # 允许用户通过环境变量覆盖日志目录
+    export LOG_DIR="${LOG_DIR:-/tmp/v2ray-logs}"
+    export IS_LOG_DIR="${IS_LOG_DIR:-$LOG_DIR}"
+    
+    # 如果 IS_LOG_DIR 不是 /var/log 开头，则直接使用
+    if [[ "$IS_LOG_DIR" != /var/log* ]]; then
+        return 0
+    fi
+    
+    # 检查 /var/log/v2ray 是否可写
+    if [[ ! -d "$IS_LOG_DIR" ]]; then
+        if ! mkdir -p "$IS_LOG_DIR" 2>/dev/null; then
+            # 降级到临时目录
+            IS_LOG_DIR="/tmp/v2ray-logs"
+            mkdir -p "$IS_LOG_DIR" 2>/dev/null || true
+            _yellow "使用临时日志目录: $IS_LOG_DIR"
+        fi
+    fi
+}
+
+# 初始化日志目录
+_init_log_dir
+
 IS_SH_BIN=/usr/local/bin/$IS_CORE
 IS_SH_DIR=$IS_CORE_DIR/sh
 IS_SH_REPO=$AUTHOR/$IS_CORE
@@ -119,14 +148,14 @@ IS_CORE_VER=$($IS_CORE_BIN version | head -n1 | cut -d " " -f1-2)
 if [[ $(grep -o ^[0-9] <<<"${IS_CORE_VER#* }") -lt 5 ]]; then
     # core version less than 5, e.g, v4.45.2
     IS_CORE_VER_LT_5=1
-    if [[ $(grep 'run -config' /lib/systemd/system/v2ray.service 2>/dev/null) ]]; then
-        sed -i 's/run //' /lib/systemd/system/v2ray.service
+    if [[ -f /lib/systemd/system/v2ray.service ]] && grep -q 'run -config' /lib/systemd/system/v2ray.service 2>/dev/null; then
+        sed -i 's/run //' /lib/systemd/system/v2ray.service 2>/dev/null
         systemctl daemon-reload 2>/dev/null || true
     fi
 else
     IS_WITH_RUN_ARG=run
-    if [[ ! $(grep 'run -config' /lib/systemd/system/v2ray.service 2>/dev/null) ]]; then
-        sed -i 's/-config/run -config/' /lib/systemd/system/v2ray.service
+    if [[ -f /lib/systemd/system/v2ray.service ]] && ! grep -q 'run -config' /lib/systemd/system/v2ray.service 2>/dev/null; then
+        sed -i 's/-config/run -config/' /lib/systemd/system/v2ray.service 2>/dev/null
         systemctl daemon-reload 2>/dev/null || true
     fi
 fi
@@ -140,16 +169,18 @@ fi
 if [[ -f "$IS_CADDY_BIN" && -d "$IS_CADDY_DIR" && $IS_CADDY_SERVICE ]]; then
     IS_CADDY=1
     # fix caddy run; ver >= 2.8.2
-    [[ ! $(grep '\-\-adapter caddyfile' /lib/systemd/system/caddy.service) ]] && {
+    if [[ -f /lib/systemd/system/caddy.service ]] && [[ ! $(grep '\-\-adapter caddyfile' /lib/systemd/system/caddy.service) ]]; then
         load systemd.sh
         install_service caddy
         systemctl restart caddy 2>/dev/null &
-    }
+    fi
     IS_CADDY_VER=$($IS_CADDY_BIN version | head -n1 | cut -d " " -f1)
-    IS_TMP_HTTP_PORT=$(grep -E '^ {2,}http_port|^http_port' "$IS_CADDYFILE" | grep -E -o [0-9]+)
-    IS_TMP_HTTPS_PORT=$(grep -E '^ {2,}https_port|^https_port' "$IS_CADDYFILE" | grep -E -o [0-9]+)
-    [[ $IS_TMP_HTTP_PORT ]] && IS_HTTP_PORT=$IS_TMP_HTTP_PORT
-    [[ $IS_TMP_HTTPS_PORT ]] && IS_HTTPS_PORT=$IS_TMP_HTTPS_PORT
+    if [[ -f "$IS_CADDYFILE" ]]; then
+        IS_TMP_HTTP_PORT=$(grep -E '^ {2,}http_port|^http_port' "$IS_CADDYFILE" | grep -E -o [0-9]+)
+        IS_TMP_HTTPS_PORT=$(grep -E '^ {2,}https_port|^https_port' "$IS_CADDYFILE" | grep -E -o [0-9]+)
+        [[ $IS_TMP_HTTP_PORT ]] && IS_HTTP_PORT=$IS_TMP_HTTP_PORT
+        [[ $IS_TMP_HTTPS_PORT ]] && IS_HTTPS_PORT=$IS_TMP_HTTPS_PORT
+    fi
     if [[ $(pgrep -f "$IS_CADDY_BIN") ]]; then
         IS_CADDY_STATUS=$(_green running)
     else
@@ -174,7 +205,7 @@ if [[ -f "$IS_NGINX_BIN" && -d "$IS_NGINX_DIR" && $IS_NGINX_SERVICE ]]; then
     fi
 fi
 
-load core.sh
+load core/core.sh
 # old sh ver
 IS_OLD_DIR=/etc/v2ray/old_backup
 IS_OLD_CONF=/etc/v2ray/233blog_v2ray_backup.conf

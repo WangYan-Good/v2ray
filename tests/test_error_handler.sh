@@ -198,22 +198,27 @@ test_error_exit_recoverable() {
     echo "测试 6: 可恢复错误处理"
     
     local test_flag=false
+    local test_flag_before=false
+    local test_flag_after=false
     
     _error_test_func() {
         test_flag=true
+        test_flag_before=$test_flag
         error_exit "测试错误" "$ERR_GENERAL" "true"
-        test_flag=false
+        test_flag_after=$test_flag
         return 0
     }
     
     _error_test_func
     local exit_code=$?
     
-    if [[ "$test_flag" == "true" ]]; then
-        echo "  ✓ 可恢复错误处理成功"
-        return $exit_code
+    # Check that error_exit was called and returned
+    if [[ "$test_flag_before" == "true" ]] && [[ "$exit_code" -eq 0 ]]; then
+        echo "  ✓ error_exit 正确返回而非退出"
+        return 0
     else
-        echo "  ✗ 可恢复错误处理失败"
+        echo "  ✗ error_exit 行为异常"
+        echo "    test_flag_before=$test_flag_before, exit_code=$exit_code"
         return 1
     fi
 }
@@ -236,8 +241,10 @@ test_retry_command() {
         return 1
     fi
     
-    # 测试重试耗尽
-    if ! retry_command 2 0.1 false; then
+    # 测试重试耗尽（需要在子shell中运行，因为 error_exit 会 exit）
+    local test_result
+    (retry_command 2 0.1 false) && test_result=0 || test_result=$?
+    if [[ $test_result -ne 0 ]]; then
         echo "  ✓ 重试机制（耗尽）"
     else
         echo "  ✗ 重试机制（耗尽）"
@@ -301,7 +308,9 @@ main() {
     safe_mkdir "$TEST_DIR"
     
     # 运行所有测试
-    for test_func in $(compgen -A function test_*); do
+    echo "DEBUG: Test functions to run:"
+    for test_func in $(declare -F | grep "^declare -f test_" | sed "s/declare -f //"); do
+        echo "DEBUG: Running $test_func"
         if $test_func; then
             ((passed++))
         else

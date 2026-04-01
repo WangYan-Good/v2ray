@@ -737,7 +737,7 @@ main() {
     ##
     ## 核心命令
     ##
-    ln -sf $IS_SH_DIR/$IS_CORE.sh $IS_SH_BIN
+    ln -sf $IS_SH_DIR/scripts/$IS_CORE.sh $IS_SH_BIN
     msg OK "  - 已创建命令链接"
 
     ##
@@ -918,7 +918,7 @@ main() {
         fi
     fi
 
-    load core.sh
+    load core/core.sh
     
     ##
     ## 初始化 TLS 配置（Nginx 或 Caddy）
