@@ -198,6 +198,11 @@ if [[ -f "$IS_NGINX_BIN" && -d "$IS_NGINX_DIR" && $IS_NGINX_SERVICE ]]; then
     fi
 fi
 
+# IS_SH_VER: 脚本版本号
+# 注意：IS_SH_VER 通常在 shell 文件中定义，这里提供一个默认值
+# 如果 shell 文件中有版本信息，将覆盖此默认值
+: ${IS_SH_VER:="2.0.0"}
+
 load core/core.sh
 # old sh ver
 IS_OLD_DIR=/etc/v2ray/old_backup
