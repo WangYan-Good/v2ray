@@ -1,19 +1,19 @@
 #!/bin/bash
-# error_handler.sh - 增强版错误处理框架
-# 提供统一错误处理、重试机制、安全文件操作和清理函数注册
+# error_handler.sh - Enhanced Error Handling Framework
+# Provides unified error handling, retry mechanisms, safe file operations, and cleanup function registration
 
 # =============================================================================
-# 文件名称: error_handler.sh
-# 功能描述: 增强版错误处理框架，提供统一错误处理和安全操作
-# 作者: Developer
-# 版本: 1.0
-# 创建日期: 2026-03-31
+# File Name: error_handler.sh
+# Description: Enhanced error handling framework providing unified error handling and safe operations
+# Author: Developer
+# Version: 1.0
+# Creation Date: 2026-03-31
 # =============================================================================
 
 ##
-## 统一错误码定义（扩展现有 error.sh）
+## Unified Error Codes Definition (Extends existing error.sh)
 ##
-# 继承 src/error.sh 中的错误码定义
+# Inherits error code definitions from src/error.sh
 # ERR_SUCCESS=0
 # ERR_GENERAL=1
 # ERR_INVALID_ARGS=2
@@ -24,45 +24,42 @@
 # ERR_CONFIG=7
 # ERR_SERVICE=8
 
-# 新增错误码
+# New error codes
 readonly ERR_CLEANUP=9
 readonly ERR_RETRY_EXHAUSTED=10
 readonly ERR_SERVICE_ACTION=11
 
 # =============================================================================
-# 全局状态变量
-## =============================================================================
+# Global State Variables
+# =============================================================================
 
-# 错误发生标志
+# Error occurrence flag
 ERROR_OCCURRED=false
 
-# 清理函数注册表（数组）
+# Cleanup function registry (array)
 CLEANUP_FUNCS=()
 
 # =============================================================================
-# 基础工具函数
-## =============================================================================
+# Basic Utility Functions
+# =============================================================================
 
 ##
-## 获取调用栈信息
-## @param: [max_frames] 最大显示帧数（可选，默认10）
-## @return: 调用栈字符串
+## Get call stack information
+## @param: [max_frames] Maximum number of frames to display (optional, default 10)
+## @return: Call stack string
 ##
 get_call_stack() {
     local max_frames="${1:-10}"
     local stack=""
     local i
 
-    for ((i=0; i<max_frames && i<${#BASH_SOURCE[@]}; i++)); do
-        if [[ $i -eq 0 ]]; then
-            continue  # 跳过当前函数
-        fi
-
+    for ((i=1; i<max_frames && i<${#BASH_SOURCE[@]}; i++)); do
         local line="${BASH_LINENO[$((i-1))]}"
         local source="${BASH_SOURCE[$i]}"
         local func="${FUNCNAME[$i]}"
 
-        if [[ -n "$func" && "$func" != "main" ]]; then
+        # Only skip get_call_stack itself, don't exclude main (main script)
+        if [[ -n "$func" && "$func" != "get_call_stack" ]]; then
             stack+="  at $func($source:$line)\n"
         fi
     done
@@ -71,8 +68,8 @@ get_call_stack() {
 }
 
 ##
-## 获取调用栈摘要
-## @return: 调用栈摘要字符串
+## Get call stack summary
+## @return: Call stack summary string
 ##
 get_call_summary() {
     local summary=""
@@ -83,7 +80,8 @@ get_call_summary() {
         local line="${BASH_LINENO[$((i-1))]}"
         local source="${BASH_SOURCE[$i]#*src/}"
 
-        if [[ -n "$func" && "$func" != "main" && "$func" != "get_call_stack" ]]; then
+        # Exclude get_call_stack and get_call_summary themselves
+        if [[ -n "$func" && "$func" != "get_call_stack" && "$func" != "get_call_summary" ]]; then
             summary+="${func}:${source}:${line}"
             if [[ $i -lt ${#BASH_SOURCE[@]}-1 ]]; then
                 summary+=" <- "
@@ -95,14 +93,14 @@ get_call_summary() {
 }
 
 # =============================================================================
-# 清理函数注册机制
-## =============================================================================
+## Cleanup Function Registration Mechanism
+# =============================================================================
 
 ##
-## 注册清理函数
-## @param: cleanup_func 清理函数名
-## @param: ... 添加清理函数时的参数（可选）
-## @return: 0 成功
+## Register a cleanup function
+## @param: cleanup_func Cleanup function name
+## @param: ... Arguments to add with the cleanup function (optional)
+## @return: 0 Success
 ## @see: execute_cleanup
 ##
 register_cleanup() {
@@ -110,36 +108,36 @@ register_cleanup() {
     shift
 
     if [[ -z "$func_name" ]]; then
-        log_error "register_cleanup: 清理函数名不能为空"
+        log_error "register_cleanup: Cleanup function name cannot be empty"
         return $ERR_INVALID_ARGS
     fi
 
-    # 检查函数是否存在
+    # Check if function exists
     if ! declare -f "$func_name" >/dev/null 2>&1; then
-        log_error "register_cleanup: 清理函数 '$func_name' 未定义"
+        log_error "register_cleanup: Cleanup function '$func_name' is not defined"
         return $ERR_GENERAL
     fi
 
-    # 注册清理函数及其参数
+    # Register cleanup function and its arguments
     CLEANUP_FUNCS+=("$(printf '%q' "$func_name")")
     for arg in "$@"; do
         CLEANUP_FUNCS+=("$(printf '%q' "$arg")")
     done
-    CLEANUP_FUNCS+=("__SEP__")  # 分隔符
+    CLEANUP_FUNCS+=("__SEP__")  # Separator
 
-    log_debug "已注册清理函数: $func_name"
+    log_debug "Registered cleanup function: $func_name"
     return 0
 }
 
 ##
-## 执行所有已注册的清理函数
-## @return: 0 成功（即使某些清理函数失败）
+## Execute all registered cleanup functions
+## @return: 0 Success (even if some cleanup functions fail)
 ##
 execute_cleanup() {
     local has_error=false
     local i=0
 
-    log_info "开始执行清理函数..."
+    log_info "Executing cleanup functions..."
 
     while [[ $i -lt ${#CLEANUP_FUNCS[@]} ]]; do
         local func_name="${CLEANUP_FUNCS[$i]}"
@@ -149,7 +147,7 @@ execute_cleanup() {
             continue
         fi
 
-        # 收集参数
+        # Collect arguments
         local args=()
         ((i++))
         while [[ $i -lt ${#CLEANUP_FUNCS[@]} && "${CLEANUP_FUNCS[$i]}" != "__SEP__" ]]; do
@@ -157,43 +155,42 @@ execute_cleanup() {
             ((i++))
         done
 
-        # 执行清理函数
-        if [[ $i -lt ${#CLEANUP_FUNCS[@]} ]] || [[ "${CLEANUP_FUNCS[$((i))]}" == "__SEP__" ]]; then
-            # 恢复索引到参数位置
-            local temp_i=$((i - ${#args[@]} - 1))
-            if ! "${args[0]}" "${args[@]:1}" 2>/dev/null; then
-                log_warn "清理函数 '$func_name' 执行失败"
+        # Execute cleanup function
+        if [[ -n "$func_name" && ${#args[@]} -gt 0 ]]; then
+            if ! "$func_name" "${args[@]}" 2>/dev/null; then
+                log_warn "Cleanup function '$func_name' failed to execute"
                 has_error=true
             fi
         fi
 
+        # Move past __SEP__
         ((i++))
     done
 
-    # 清空清理函数列表
+    # Clear cleanup function list
     CLEANUP_FUNCS=()
 
     if [[ "$has_error" == "true" ]]; then
-        log_error "部分清理函数执行失败"
+        log_error "Some cleanup functions failed to execute"
         return $ERR_CLEANUP
     fi
 
-    log_info "清理函数执行完成"
+    log_info "Cleanup functions executed successfully"
     return 0
 }
 
 # =============================================================================
-# 增强版错误处理
-## =============================================================================
+# Enhanced Error Handling
+# =============================================================================
 
 ##
-## 增强版错误退出函数
-## 提供可恢复错误、调用栈追踪和清理函数执行
+## Enhanced error exit function with stack trace and cleanup
+## Provides recoverable error handling, call stack tracing, and cleanup execution
 ##
-## @param: message 错误信息
-## @param: [code] 错误码（可选，默认 ERR_GENERAL）
-## @param: [recoverable] 是否为可恢复错误（可选，默认 false）
-## @return: 如果 recoverable=true，返回错误码；否则退出脚本
+## @param: message Error message
+## @param: [code] Error code (optional, default ERR_GENERAL)
+## @param: [recoverable] Whether this is a recoverable error (optional, default false)
+## @return: If recoverable=true, returns error code; otherwise exits script
 ## @see: register_cleanup execute_cleanup
 ##
 error_exit() {
@@ -201,45 +198,45 @@ error_exit() {
     local code="${2:-$ERR_GENERAL}"
     local recoverable="${3:-false}"
 
-    # 设置错误标志
+    # Set error flag
     ERROR_OCCURRED=true
 
-    # 记录详细错误信息
+    # Log detailed error information
     log_error "========================================"
-    log_error "错误详情: $message"
-    log_error "错误码: $code"
-    log_error "调用栈摘要: $(get_call_summary)"
-    log_error "调用栈: $(get_call_stack 15)"
+    log_error "Error Details: $message"
+    log_error "Error Code: $code"
+    log_error "Call Stack Summary: $(get_call_summary)"
+    log_error "Call Stack: $(get_call_stack 15)"
     log_error "========================================"
 
-    # 执行清理函数
+    # Execute cleanup functions
     if [[ ${#CLEANUP_FUNCS[@]} -gt 0 ]]; then
         execute_cleanup
     fi
 
-    # 根据错误类型决定是否退出
+    # Decide whether to exit based on error type
     if [[ "$recoverable" == "true" ]]; then
-        log_warn "可恢复错误，继续执行..."
+        log_warn "Recoverable error, continuing execution..."
         return $code
     else
-        log_error "不可恢复错误，程序退出"
+        log_error "Non-recoverable error, exiting..."
         exit $code
     fi
 }
 
 # =============================================================================
-# 重试机制
-## =============================================================================
+# Retry Mechanism
+# =============================================================================
 
 ##
-## 带重试机制的命令执行（指数退避）
-## 自动重试失败的命令，最多 3 次，采用指数退避策略
+## Command execution with retry mechanism (exponential backoff)
+## Automatically retries failed commands, up to 3 times by default, using exponential backoff strategy
 ##
-## @param: max_attempts 最大重试次数（可选，默认 3）
-## @param: delay 初始延迟秒数（可选，默认 1）
-## @param: ... 命令及其参数
-## @return: 0 成功，否则返回失败码
-## @exit: 如果重试耗尽，调用 error_exit
+## @param: max_attempts Maximum retry attempts (optional, default 3)
+## @param: delay Initial delay in seconds (optional, default 1)
+## @param: ... Command and its arguments
+## @return: 0 Success, otherwise returns failure code
+## @exit: If retry exhausted, calls error_exit
 ## @see: error_exit
 ##
 retry_command() {
@@ -247,49 +244,50 @@ retry_command() {
     local delay="${2:-1}"
     shift 2
 
-    # 检查是否有命令
+    # Check if command is specified
     if [[ $# -eq 0 ]]; then
-        log_error "retry_command: 没有指定命令"
-        error_exit "retry_command: 没有指定命令" $ERR_INVALID_ARGS false
+        log_error "retry_command: No command specified"
+        error_exit "retry_command: No command specified" $ERR_INVALID_ARGS false
     fi
 
     local cmd=("$@")
     local attempt=0
 
     for ((attempt=1; attempt<=max_attempts; attempt++)); do
-        log_info "执行命令 [$attempt/$max_attempts]: ${cmd[*]}"
+        log_info "Executing command [$attempt/$max_attempts]: ${cmd[*]}"
 
-        # 执行命令
+        # Execute command
         if "${cmd[@]}"; then
             if [[ $attempt -gt 1 ]]; then
-                log_info "命令成功，重试次数: $((attempt-1))"
+                log_info "Command successful, retry count: $((attempt-1))"
             fi
             return 0
         fi
 
-        # 检查是否还有重试机会
+        # Check if there are retry attempts left
         if [[ $attempt -lt $max_attempts ]]; then
-            log_warn "命令失败，${delay}秒后第${attempt}次重试"
+            log_warn "Command failed, retrying after ${delay}s (attempt $attempt)"
+            # Use awk for floating-point arithmetic
             sleep "$delay"
-            # 指数退避：1, 2, 4, 8, ...
-            delay=$((delay * 2))
+            # Exponential backoff: 1, 2, 4, 8, ...
+            delay=$(awk "BEGIN {printf \"%.1f\", $delay * 2}")
         fi
     done
 
-    # 重试耗尽
-    log_error "命令重试失败 [$attempt-1/$max_attempts]: ${cmd[*]}"
-    error_exit "命令重试失败: ${cmd[*]}" $ERR_RETRY_EXHAUSTED false
+    # Retry exhausted
+    log_error "Command retry failed [$((attempt-1))/$max_attempts]: ${cmd[*]}"
+    error_exit "Command retry failed: ${cmd[*]}" $ERR_RETRY_EXHAUSTED false
 }
 
 ##
-## 带超时的重试命令
-## 在 retry_command 基础上增加超时控制
+## Command execution with retry and timeout
+## Adds timeout control on top of retry_command
 ##
-## @param: max_attempts 最大重试次数（可选，默认 3）
-## @param: delay 初始延迟秒数（可选，默认 1）
-## @param: timeout 单次命令超时时间（可选，默认 60）
-## @param: ... 命令及其参数
-## @return: 0 成功，否则返回失败码
+## @param: max_attempts Maximum retry attempts (optional, default 3)
+## @param: delay Initial delay in seconds (optional, default 1)
+## @param: timeout Single command timeout in seconds (optional, default 60)
+## @param: ... Command and its arguments
+## @return: 0 Success, otherwise returns failure code
 ##
 retry_command_with_timeout() {
     local max_attempts="${1:-3}"
@@ -297,23 +295,23 @@ retry_command_with_timeout() {
     local timeout="${3:-60}"
     shift 3
 
-    # 包装命令并添加超时
+    # Wrap command with timeout
     local wrapped_cmd=("timeout" "$timeout" "${@}")
 
     retry_command "$max_attempts" "$delay" "${wrapped_cmd[@]}"
 }
 
 # =============================================================================
-# 安全文件操作包装器
-## =============================================================================
+# Safe File Operation Wrappers
+# =============================================================================
 
 ##
-## 安全删除文件/目录
-## 检查文件存在性、权限和路径安全性
+## Safely remove file/directory
+## Checks file existence, permissions, and path safety
 ##
-## @param: file 文件或目录路径
-## @param: ... 其他参数传递给 rm
-## @return: 0 成功
+## @param: file File or directory path
+## @param: ... Additional arguments passed to rm
+## @return: 0 Success
 ## @see: error_exit
 ##
 safe_rm() {
@@ -321,61 +319,61 @@ safe_rm() {
     shift
 
     if [[ -z "$path" ]]; then
-        log_error "safe_rm: 路径不能为空"
-        error_exit "safe_rm: 路径不能为空" $ERR_INVALID_ARGS false
+        log_error "safe_rm: Path cannot be empty"
+        error_exit "safe_rm: Path cannot be empty" $ERR_INVALID_ARGS false
     fi
 
-    # 检查路径是否为空
+    # Check if path is empty
     if [[ "$path" == "" ]]; then
-        log_error "safe_rm: 不能删除空路径"
-        error_exit "safe_rm: 不能删除空路径" $ERR_INVALID_ARGS false
+        log_error "safe_rm: Cannot remove empty path"
+        error_exit "safe_rm: Cannot remove empty path" $ERR_INVALID_ARGS false
     fi
 
-    # 检查是否是根目录
+    # Check if path is root directory
     if [[ "$path" == "/" ]]; then
-        log_error "safe_rm: 不能删除根目录"
-        error_exit "safe_rm: 不能删除根目录" $ERR_GENERAL false
+        log_error "safe_rm: Cannot remove root directory"
+        error_exit "safe_rm: Cannot remove root directory" $ERR_GENERAL false
     fi
 
-    # 检查路径是否包含危险模式（可配置）
+    # Check if path contains dangerous patterns (configurable)
     if [[ "$path" == *".."* ]] && [[ "$path" != *"/../*" && "$path" != "../"* ]]; then
-        # 检查是否是相对路径中的 ..
+        # Check if it's .. in relative path
         if [[ "$path" == *"../"* ]] || [[ "$path" == *".." ]]; then
-            log_warn "safe_rm: 路径包含 '..'，将进行安全检查: $path"
+            log_warn "safe_rm: Path contains '..', performing safety check: $path"
         fi
     fi
 
-    # 检查文件是否存在
+    # Check if file exists
     if [[ ! -e "$path" ]]; then
-        log_info "safe_rm: 文件不存在，跳过删除: $path"
+        log_info "safe_rm: File does not exist, skipping deletion: $path"
         return 0
     fi
 
-    # 记录删除操作
-    log_info "safe_rm: 删除文件/目录: $path"
+    # Log deletion operation
+    log_info "safe_rm: Deleting file/directory: $path"
     if [[ -d "$path" ]]; then
-        log_debug "safe_rm: 这是一个目录"
+        log_debug "safe_rm: This is a directory"
     elif [[ -f "$path" ]]; then
-        log_debug "safe_rm: 这是一个文件"
+        log_debug "safe_rm: This is a file"
     fi
 
-    # 执行删除
+    # Execute deletion
     if rm -rf "$path" "$@"; then
-        log_info "safe_rm: 删除成功: $path"
+        log_info "safe_rm: Deletion successful: $path"
         return 0
     else
-        log_error "safe_rm: 删除失败: $path"
-        error_exit "safe_rm: 删除失败: $path" $ERR_GENERAL true
+        log_error "safe_rm: Deletion failed: $path"
+        error_exit "safe_rm: Deletion failed: $path" $ERR_GENERAL true
     fi
 }
 
 ##
-## 安全创建目录
-## 检查权限、递归创建和存在性
+## Safely create directory
+## Checks permissions, recursive creation, and existence
 ##
-## @param: dir 目录路径
-## @param: ... 其他参数传递给 mkdir
-## @return: 0 成功
+## @param: dir Directory path
+## @param: ... Additional arguments passed to mkdir
+## @return: 0 Success
 ## @see: error_exit
 ##
 safe_mkdir() {
@@ -383,45 +381,45 @@ safe_mkdir() {
     shift
 
     if [[ -z "$dir" ]]; then
-        log_error "safe_mkdir: 路径不能为空"
-        error_exit "safe_mkdir: 路径不能为空" $ERR_INVALID_ARGS false
+        log_error "safe_mkdir: Path cannot be empty"
+        error_exit "safe_mkdir: Path cannot be empty" $ERR_INVALID_ARGS false
     fi
 
-    # 检查目录是否已存在
+    # Check if directory already exists
     if [[ -d "$dir" ]]; then
-        log_info "safe_mkdir: 目录已存在: $dir"
+        log_info "safe_mkdir: Directory already exists: $dir"
         return 0
     fi
 
-    # 检查父目录是否存在
+    # Check if parent directory exists
     local parent_dir
     parent_dir="$(dirname "$dir")"
     if [[ ! -d "$parent_dir" ]]; then
-        log_info "safe_mkdir: 父目录不存在，正在创建: $parent_dir"
+        log_info "safe_mkdir: Parent directory does not exist, creating: $parent_dir"
         safe_mkdir "$parent_dir"
     fi
 
-    # 记录创建操作
-    log_info "safe_mkdir: 创建目录: $dir"
+    # Log creation operation
+    log_info "safe_mkdir: Creating directory: $dir"
 
-    # 执行创建
+    # Execute creation
     if mkdir -p "$dir" "$@"; then
-        log_info "safe_mkdir: 创建成功: $dir"
+        log_info "safe_mkdir: Creation successful: $dir"
         return 0
     else
-        log_error "safe_mkdir: 创建失败: $dir"
-        error_exit "safe_mkdir: 创建失败: $dir" $ERR_GENERAL true
+        log_error "safe_mkdir: Creation failed: $dir"
+        error_exit "safe_mkdir: Creation failed: $dir" $ERR_GENERAL true
     fi
 }
 
 ##
-## 安全复制文件/目录
-## 检查源文件存在性和目标目录权限
+## Safely copy file/directory
+## Checks source file existence and destination directory permissions
 ##
-## @param: src 源路径
-## @param: dst 目标路径
-## @param: ... 其他参数传递给 cp
-## @return: 0 成功
+## @param: src Source path
+## @param: dst Destination path
+## @param: ... Additional arguments passed to cp
+## @return: 0 Success
 ## @see: error_exit
 ##
 safe_cp() {
@@ -430,53 +428,53 @@ safe_cp() {
     shift 2
 
     if [[ -z "$src" ]]; then
-        log_error "safe_cp: 源路径不能为空"
-        error_exit "safe_cp: 源路径不能为空" $ERR_INVALID_ARGS false
+        log_error "safe_cp: Source path cannot be empty"
+        error_exit "safe_cp: Source path cannot be empty" $ERR_INVALID_ARGS false
     fi
 
     if [[ -z "$dst" ]]; then
-        log_error "safe_cp: 目标路径不能为空"
-        error_exit "safe_cp: 目标路径不能为空" $ERR_INVALID_ARGS false
+        log_error "safe_cp: Destination path cannot be empty"
+        error_exit "safe_cp: Destination path cannot be empty" $ERR_INVALID_ARGS false
     fi
 
-    # 检查源文件是否存在
+    # Check if source file exists
     if [[ ! -e "$src" ]]; then
-        log_error "safe_cp: 源文件/目录不存在: $src"
-        error_exit "safe_cp: 源文件/目录不存在: $src" $ERR_FILE_NOT_FOUND false
+        log_error "safe_cp: Source file/directory does not exist: $src"
+        error_exit "safe_cp: Source file/directory does not exist: $src" $ERR_FILE_NOT_FOUND false
     fi
 
-    # 确保目标目录存在
+    # Ensure destination directory exists
     local dst_dir
     dst_dir="$(dirname "$dst")"
     if [[ ! -d "$dst_dir" ]]; then
-        log_info "safe_cp: 目标目录不存在，正在创建: $dst_dir"
+        log_info "safe_cp: Destination directory does not exist, creating: $dst_dir"
         safe_mkdir "$dst_dir"
     fi
 
-    # 记录复制操作
-    log_info "safe_cp: 复制: $src -> $dst"
+    # Log copy operation
+    log_info "safe_cp: Copying: $src -> $dst"
     if [[ -d "$src" ]]; then
-        log_debug "safe_cp: 这是目录复制"
+        log_debug "safe_cp: This is directory copy"
     fi
 
-    # 执行复制
+    # Execute copy
     if cp -rf "$src" "$dst" "$@"; then
-        log_info "safe_cp: 复制成功: $src -> $dst"
+        log_info "safe_cp: Copy successful: $src -> $dst"
         return 0
     else
-        log_error "safe_cp: 复制失败: $src -> $dst"
-        error_exit "safe_cp: 复制失败: $src -> $dst" $ERR_GENERAL true
+        log_error "safe_cp: Copy failed: $src -> $dst"
+        error_exit "safe_cp: Copy failed: $src -> $dst" $ERR_GENERAL true
     fi
 }
 
 ##
-## 安全移动文件/目录
-## 结合复制和删除的安全操作
+## Safely move file/directory
+## Combines safe copy and safe delete
 ##
-## @param: src 源路径
-## @param: dst 目标路径
-## @param: ... 其他参数传递给 mv
-## @return: 0 成功
+## @param: src Source path
+## @param: dst Destination path
+## @param: ... Additional arguments passed to mv
+## @return: 0 Success
 ## @see: safe_cp safe_rm
 ##
 safe_mv() {
@@ -484,27 +482,27 @@ safe_mv() {
     local dst="$2"
     shift 2
 
-    # 首先尝试直接移动
+    # Try direct move first
     if mv -f "$src" "$dst" "$@" 2>/dev/null; then
-        log_info "safe_mv: 移动成功: $src -> $dst"
+        log_info "safe_mv: Move successful: $src -> $dst"
         return 0
     fi
 
-    # 移动失败，使用复制+删除
-    log_info "safe_mv: 直接移动失败，使用复制+删除: $src -> $dst"
+    # Move failed, use copy + delete
+    log_info "safe_mv: Direct move failed, using copy + delete: $src -> $dst"
     safe_cp "$src" "$dst"
     safe_rm "$src"
     return 0
 }
 
 ##
-## 安全写入文件
-## 确保目录存在，备份原文件（如果存在）
+## Safely write to file
+## Ensures directory exists, backs up original file if exists
 ##
-## @param: file 文件路径
-## @param: content 文件内容
-## @param: [backup] 是否备份原文件（可选，默认 true）
-## @return: 0 成功
+## @param: file File path
+## @param: content File content
+## @param: [backup] Whether to backup original file (optional, default true)
+## @return: 0 Success
 ## @see: safe_mkdir
 ##
 safe_write_file() {
@@ -513,58 +511,58 @@ safe_write_file() {
     local backup="${3:-true}"
 
     if [[ -z "$file" ]]; then
-        log_error "safe_write_file: 文件路径不能为空"
-        error_exit "safe_write_file: 文件路径不能为空" $ERR_INVALID_ARGS false
+        log_error "safe_write_file: File path cannot be empty"
+        error_exit "safe_write_file: File path cannot be empty" $ERR_INVALID_ARGS false
     fi
 
-    # 确保目录存在
+    # Ensure directory exists
     local dir
     dir="$(dirname "$file")"
     safe_mkdir "$dir"
 
-    # 备份原文件
+    # Backup original file
     if [[ -f "$file" && "$backup" == "true" ]]; then
         local backup_file="${file}.bak.$(date +%Y%m%d%H%M%S)"
-        log_info "safe_write_file: 备份原文件: $file -> $backup_file"
+        log_info "safe_write_file: Backing up original file: $file -> $backup_file"
         safe_cp "$file" "$backup_file"
     fi
 
-    # 写入文件
+    # Write file
     if echo -n "$content" > "$file"; then
-        log_info "safe_write_file: 写入成功: $file"
+        log_info "safe_write_file: Write successful: $file"
         return 0
     else
-        log_error "safe_write_file: 写入失败: $file"
-        error_exit "safe_write_file: 写入失败: $file" $ERR_GENERAL true
+        log_error "safe_write_file: Write failed: $file"
+        error_exit "safe_write_file: Write failed: $file" $ERR_GENERAL true
     fi
 }
 
 # =============================================================================
-# 服务状态检查和操作
-## =============================================================================
+# Service Status Check and Operations
+# =============================================================================
 
 ##
-## 检查服务状态
-## @param: service 服务名称
-## @return: 0 运行中, 1 停止, 2 未安装
+## Check service status
+## @param: service Service name
+## @return: 0 Running, 1 Stopped, 2 Not installed
 ##
 service_status() {
     local service="$1"
 
-    # 检查服务是否存在
+    # Check if service exists
     if ! systemctl list-unit-files "$service" 2>/dev/null | grep -q "$service"; then
-        # 尝试另一种检查方式
+        # Try alternative check method
         if [[ ! -f "/lib/systemd/system/$service" ]] && [[ ! -f "/etc/systemd/system/$service" ]]; then
             return 2
         fi
     fi
 
-    # 检查服务是否正在运行
+    # Check if service is running
     if systemctl is-active --quiet "$service" 2>/dev/null; then
         return 0
     fi
 
-    # 检查进程是否存在
+    # Check if process exists
     if pidof "$service" >/dev/null 2>&1; then
         return 0
     fi
@@ -573,13 +571,13 @@ service_status() {
 }
 
 ##
-## 检查服务状态并采取相应操作
-## 自动处理服务启动/停止/重载
+## Check service status and take appropriate action
+## Automatically handles service start/stop/reload
 ##
-## @param: service 服务名称
-## @param: action 操作: start|stop|restart|reload
-## @param: [timeout] 超时时间（可选，默认 30）
-## @return: 0 成功
+## @param: service Service name
+## @param: action Operation: start|stop|restart|reload
+## @param: [timeout] Timeout in seconds (optional, default 30)
+## @return: 0 Success
 ## @see: error_exit
 ##
 service_check_and_restart() {
@@ -588,16 +586,16 @@ service_check_and_restart() {
     local timeout="${3:-30}"
 
     if [[ -z "$service" ]]; then
-        log_error "service_check_and_restart: 服务名称不能为空"
-        error_exit "service_check_and_restart: 服务名称不能为空" $ERR_INVALID_ARGS false
+        log_error "service_check_and_restart: Service name cannot be empty"
+        error_exit "service_check_and_restart: Service name cannot be empty" $ERR_INVALID_ARGS false
     fi
 
-    log_info "service_check_and_restart: 处理服务 '$service'，操作: $action"
+    log_info "service_check_and_restart: Processing service '$service', action: $action"
 
-    # 检查 systemctl 是否可用
+    # Check if systemctl is available
     if ! command -v systemctl &>/dev/null; then
-        log_warn "systemctl 不可用，尝试使用 service 命令"
-        # 使用 service 命令
+        log_warn "systemctl not available, trying service command"
+        # Use service command
         case "$action" in
             start)
                 service "$service" start
@@ -612,99 +610,99 @@ service_check_and_restart() {
                 service "$service" reload
                 ;;
             *)
-                log_error "未知操作: $action"
-                error_exit "service_check_and_restart: 未知操作: $action" $ERR_GENERAL false
+                log_error "Unknown action: $action"
+                error_exit "service_check_and_restart: Unknown action: $action" $ERR_GENERAL false
                 ;;
         esac
         return $?
     fi
 
-    # 检查服务是否存在
+    # Check if service file exists
     local unit_file="/lib/systemd/system/${service}.service"
     if [[ ! -f "$unit_file" ]]; then
         unit_file="/etc/systemd/system/${service}.service"
     fi
 
     if [[ ! -f "$unit_file" ]]; then
-        log_error "服务文件不存在: $unit_file"
-        error_exit "服务文件不存在: $unit_file" $ERR_SERVICE false
+        log_error "Service file does not exist: $unit_file"
+        error_exit "Service file does not exist: $unit_file" $ERR_SERVICE false
     fi
 
-    # 根据当前状态执行操作
+    # Execute action based on current status
     case "$action" in
         start)
             if service_status "$service" == 0; then
-                log_info "服务 '$service' 已在运行"
+                log_info "Service '$service' is already running"
                 return 0
             fi
-            log_info "启动服务: $service"
+            log_info "Starting service: $service"
             if systemctl start "$service" 2>&1 | while IFS= read -r line; do
                 log_debug "systemctl: $line"
             done; then
-                log_info "服务启动成功: $service"
+                log_info "Service started successfully: $service"
                 return 0
             else
-                log_error "服务启动失败: $service"
-                error_exit "服务启动失败: $service" $ERR_SERVICE false
+                log_error "Service failed to start: $service"
+                error_exit "Service failed to start: $service" $ERR_SERVICE false
             fi
             ;;
 
         stop)
             if service_status "$service" == 1 || service_status "$service" == 2; then
-                log_info "服务 '$service' 已停止"
+                log_info "Service '$service' is already stopped"
                 return 0
             fi
-            log_info "停止服务: $service"
+            log_info "Stopping service: $service"
             if systemctl stop "$service" 2>&1 | while IFS= read -r line; do
                 log_debug "systemctl: $line"
             done; then
-                log_info "服务停止成功: $service"
+                log_info "Service stopped successfully: $service"
                 return 0
             else
-                log_error "服务停止失败: $service"
-                error_exit "服务停止失败: $service" $ERR_SERVICE false
+                log_error "Service failed to stop: $service"
+                error_exit "Service failed to stop: $service" $ERR_SERVICE false
             fi
             ;;
 
         restart)
-            log_info "重启服务: $service"
+            log_info "Restarting service: $service"
             if systemctl restart "$service" 2>&1 | while IFS= read -r line; do
                 log_debug "systemctl: $line"
             done; then
-                log_info "服务重启成功: $service"
+                log_info "Service restarted successfully: $service"
                 return 0
             else
-                log_error "服务重启失败: $service"
-                error_exit "服务重启失败: $service" $ERR_SERVICE false
+                log_error "Service failed to restart: $service"
+                error_exit "Service failed to restart: $service" $ERR_SERVICE false
             fi
             ;;
 
         reload)
-            log_info "重载服务: $service"
+            log_info "Reloading service: $service"
             if systemctl reload "$service" 2>&1 | while IFS= read -r line; do
                 log_debug "systemctl: $line"
             done; then
-                log_info "服务重载成功: $service"
+                log_info "Service reloaded successfully: $service"
                 return 0
             else
-                log_error "服务重载失败: $service"
-                error_exit "服务重载失败: $service" $ERR_SERVICE false
+                log_error "Service failed to reload: $service"
+                error_exit "Service failed to reload: $service" $ERR_SERVICE false
             fi
             ;;
 
         *)
-            log_error "未知操作: $action"
-            error_exit "service_check_and_restart: 未知操作: $action" $ERR_GENERAL false
+            log_error "Unknown action: $action"
+            error_exit "service_check_and_restart: Unknown action: $action" $ERR_GENERAL false
             ;;
     esac
 }
 
 ##
-## 重启服务并验证（带重试）
+## Restart service and verify (with retry)
 ##
-## @param: service 服务名称
-## @param: max_attempts 重试次数（可选，默认 3）
-## @return: 0 成功
+## @param: service Service name
+## @param: max_attempts Retry attempts (optional, default 3)
+## @return: 0 Success
 ## @see: service_check_and_restart retry_command
 ##
 service_restart_with_retry() {
@@ -713,80 +711,80 @@ service_restart_with_retry() {
 
     service_check_and_restart "$service" restart
 
-    # 验证服务正常运行
+    # Verify service is running
     for ((attempt=1; attempt<=max_attempts; attempt++)); do
         if service_status "$service" == 0; then
-            log_info "服务验证成功: $service"
+            log_info "Service verification successful: $service"
             return 0
         fi
-        log_warn "服务验证失败，等待中... (attempt $attempt/$max_attempts)"
+        log_warn "Service verification failed, waiting... (attempt $attempt/$max_attempts)"
         sleep 2
     done
 
-    log_error "服务验证重复失败: $service"
-    error_exit "服务验证重复失败: $service" $ERR_SERVICE false
+    log_error "Service verification failed repeatedly: $service"
+    error_exit "Service verification failed repeatedly: $service" $ERR_SERVICE false
 }
 
 # =============================================================================
-# 上下文管理
-## =============================================================================
+# Context Management
+# =============================================================================
 
 ##
-## 创建错误处理上下文（用于子 Shell）
-## 创建临时文件用于错误处理状态传递
+## Create error handling context (for subshells)
+## Creates temporary files for error handling status传递
 ##
-## @param: context_name 上下文名称
-## @return: 0 成功
+## @param: context_name Context name
+## @return: 0 Success
 ##
 create_error_context() {
     local context_name="$1"
 
     if [[ -z "$context_name" ]]; then
-        error_exit "create_error_context: 上下文名称不能为空" $ERR_INVALID_ARGS false
+        error_exit "create_error_context: Context name cannot be empty" $ERR_INVALID_ARGS false
     fi
 
-    # 创建上下文目录
+    # Create context directory
     local context_dir="/tmp/v2ray_error_context/${context_name}"
     safe_mkdir "$context_dir"
 
-    # 初始化状态文件
+    # Initialize status file
     echo "false" > "$context_dir/error_occurred"
     echo "$$" > "$context_dir/pid"
 
-    log_debug "创建错误处理上下文: $context_name"
+    log_debug "Created error handling context: $context_name"
     echo "$context_dir"
 }
 
 ##
-## 销毁错误处理上下文
+## Destroy error handling context
 ##
-## @param: context_dir 上下文目录路径
-## @return: 0 成功
+## @param: context_dir Context directory path
+## @return: 0 Success
 ##
 destroy_error_context() {
     local context_dir="$1"
 
     if [[ -z "$context_dir" ]]; then
-        error_exit "destroy_error_context: 上下文目录不能为空" $ERR_INVALID_ARGS false
+        error_exit "destroy_error_context: Context directory cannot be empty" $ERR_INVALID_ARGS false
     fi
 
     safe_rm "$context_dir"
 }
 
 # =============================================================================
-# 统计和诊断
-## =============================================================================
+# Statistics and Diagnostics
+# =============================================================================
 
 ##
-## 显示当前清理函数列表
+## Display current cleanup function list
 ##
 show_cleanup_registry() {
     if [[ ${#CLEANUP_FUNCS[@]} -eq 0 ]]; then
-        echo "未注册任何清理函数"
+        echo "No cleanup functions registered"
         return 0
     fi
 
-    echo "=== 注册的清理函数 ==="
+    echo "=== Registered Cleanup Functions ==="
     local i=0
     while [[ $i -lt ${#CLEANUP_FUNCS[@]} ]]; do
         local func_name="${CLEANUP_FUNCS[$i]}"
@@ -796,60 +794,60 @@ show_cleanup_registry() {
         fi
         echo "  - $func_name"
         ((i++))
-        # 打印参数
+        # Print arguments
         while [[ $i -lt ${#CLEANUP_FUNCS[@]} && "${CLEANUP_FUNCS[$i]}" != "__SEP__" ]]; do
             echo "      -> ${CLEANUP_FUNCS[$i]}"
             ((i++))
         done
-        ((i++))  # 跳过 __SEP__
+        ((i++))  # Skip __SEP__
     done
-    echo "========================"
+    echo "======================================"
 }
 
 # =============================================================================
-# 测试和验证
-## =============================================================================
+# Testing and Verification
+# =============================================================================
 
 ##
-## 运行错误处理框架自检
+## Run error handling framework self-test
 ##
 error_handler_self_test() {
-    echo "=== 错误处理框架自检 ==="
+    echo "=== Error Handling Framework Self-Test ==="
 
-    # 测试 1: 错误码定义
-    echo "测试 1: 错误码定义"
+    # Test 1: Error code definitions
+    echo "Test 1: Error Code Definitions"
     if [[ -n "$ERR_CLEANUP" ]]; then
         echo "  ✓ ERR_CLEANUP = $ERR_CLEANUP"
     else
-        echo "  ✗ ERR_CLEANUP 未定义"
+        echo "  ✗ ERR_CLEANUP not defined"
         return 1
     fi
 
-    # 测试 2: get_call_stack
-    echo "测试 2: 调用栈追踪"
+    # Test 2: get_call_stack
+    echo "Test 2: Call Stack Tracing"
     local stack
     stack=$(get_call_stack 5)
     if [[ -n "$stack" ]]; then
-        echo "  ✓ 调用栈获取成功"
+        echo "  ✓ Call stack retrieval successful"
     else
-        echo "  ✗ 调用栈获取失败"
+        echo "  ✗ Call stack retrieval failed"
         return 1
     fi
 
-    # 测试 3: 安全目录创建
-    echo "测试 3: 安全目录创建"
+    # Test 3: Safe directory creation
+    echo "Test 3: Safe Directory Creation"
     local test_dir="/tmp/test_error_handler_$$"
     safe_mkdir "$test_dir"
     if [[ -d "$test_dir" ]]; then
-        echo "  ✓ 目录创建成功"
+        echo "  ✓ Directory creation successful"
         safe_rm "$test_dir"
     else
-        echo "  ✗ 目录创建失败"
+        echo "  ✗ Directory creation failed"
         return 1
     fi
 
-    # 测试 4: 清理函数注册
-    echo "测试 4: 清理函数注册"
+    # Test 4: Cleanup function registration
+    echo "Test 4: Cleanup Function Registration"
     local test_file="/tmp/test_cleanup_$$"
     touch "$test_file"
 
@@ -859,38 +857,38 @@ error_handler_self_test() {
 
     register_cleanup "_test_cleanup_func"
     if [[ ${#CLEANUP_FUNCS[@]} -gt 0 ]]; then
-        echo "  ✓ 清理函数注册成功"
+        echo "  ✓ Cleanup function registration successful"
     else
-        echo "  ✗ 清理函数注册失败"
+        echo "  ✗ Cleanup function registration failed"
         return 1
     fi
 
     execute_cleanup
     if [[ ! -f "$test_file" ]]; then
-        echo "  ✓ 清理函数执行成功"
+        echo "  ✓ Cleanup function execution successful"
     else
-        echo "  ✗ 清理函数执行失败"
+        echo "  ✗ Cleanup function execution failed"
         return 1
     fi
 
-    echo "========================"
-    echo "所有测试通过！"
+    echo "========================================"
+    echo "All tests passed!"
     return 0
 }
 
 ##
-## 初始化错误处理框架
-## 在脚本开始时调用
+## Initialize error handling framework
+## Call at the beginning of script
 ##
 init_error_handler() {
-    log_info "初始化错误处理框架..."
+    log_info "Initializing error handling framework..."
 
-    # 重置全局状态
+    # Reset global state
     ERROR_OCCURRED=false
     CLEANUP_FUNCS=()
 
-    # 注册默认清理函数
+    # Register default cleanup function
     register_cleanup "execute_cleanup"
 
-    log_info "错误处理框架初始化完成"
+    log_info "Error handling framework initialized"
 }
