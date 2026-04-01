@@ -180,7 +180,7 @@ if [[ -f "$IS_NGINX_BIN" && -d "$IS_NGINX_DIR" && $IS_NGINX_SERVICE ]]; then
     fi
 fi
 
-load core.sh
+load core/core.sh
 # old sh ver
 IS_OLD_DIR=/etc/v2ray/old_backup
 IS_OLD_CONF=/etc/v2ray/233blog_v2ray_backup.conf
