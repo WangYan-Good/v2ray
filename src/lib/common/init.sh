@@ -212,5 +212,6 @@ IS_OLD_CONF=/etc/v2ray/233blog_v2ray_backup.conf
 if [[ -f "$IS_OLD_CONF" && -d "$IS_OLD_DIR" ]]; then
     load old.sh
 fi
-[[ ! $ARGS ]] && ARGS=main
+# Fix: Use parameter expansion to avoid unbound variable error
+ARGS=${ARGS:-main}
 main "$ARGS"
