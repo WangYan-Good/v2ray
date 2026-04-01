@@ -225,11 +225,48 @@ server {
         # 创建空的 .add 文件（避免 Nginx 启动失败）
         [[ ! -f ${IS_NGINX_SITE_FILE}.add ]] && echo "# 伪装网站配置" >${IS_NGINX_SITE_FILE}.add
         
-        # 自动申请 Certbot 证书
-        if ! nginx_certbot issue ${HOST}; then
-            msg ERROR "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
-            msg WARNING "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${HOST}"
+        # 先备份现有配置（如果存在）
+        NGINX_BACKUP_FILE=""
+        if [[ -n "${IS_NGINX_SITE_FILE}" && -f "${IS_NGINX_SITE_FILE}" ]]; then
+            NGINX_BACKUP_FILE="${IS_NGINX_SITE_FILE}.rollback.$(date +%Y%m%d%H%M%S)"
+            safe_cp "${IS_NGINX_SITE_FILE}" "$NGINX_BACKUP_FILE"
+        fi
+        
+        # 创建回滚函数
+        rollback_nginx_config() {
+            if [[ -n "$NGINX_BACKUP_FILE" && -f "$NGINX_BACKUP_FILE" ]]; then
+                log_info "Rolling back Nginx configuration..."
+                safe_cp "$NGINX_BACKUP_FILE" "$IS_NGINX_SITE_FILE"
+                if nginx -t 2>/dev/null; then
+                    systemctl reload nginx
+                    log_info "Nginx configuration rolled back successfully"
+                else
+                    log_error "Nginx configuration rollback failed: configuration test failed"
+                fi
+            fi
+        }
+        
+        # 注册清理函数
+        register_cleanup "rollback_nginx_config"
+        
+        # 验证 Nginx 配置语法
+        if ! nginx -t 2>/dev/null; then
+            log_error "Nginx 配置验证失败，正在回滚..."
+            rollback_nginx_config
             return 1
+        fi
+        
+        # 自动申请 Certbot 证书
+        # 申请证书
+        if ! nginx_certbot issue ${HOST}; then
+            log_error "证书申请失败，正在回滚 Nginx 配置..."
+            rollback_nginx_config
+            return 1
+        fi
+        
+        # 成功后删除备份
+        if [[ -n "$NGINX_BACKUP_FILE" && -f "$NGINX_BACKUP_FILE" ]]; then
+            safe_rm "$NGINX_BACKUP_FILE"
         fi
         return 0
         ;;
@@ -323,11 +360,48 @@ server {
         # 创建空的 .add 文件（避免 Nginx 启动失败）
         [[ ! -f ${IS_NGINX_SITE_FILE}.add ]] && echo "# 伪装网站配置" >${IS_NGINX_SITE_FILE}.add
         
-        # 自动申请 Certbot 证书
-        if ! nginx_certbot issue ${HOST}; then
-            msg ERROR "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
-            msg WARNING "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${HOST}"
+        # 先备份现有配置（如果存在）
+        NGINX_BACKUP_FILE=""
+        if [[ -n "${IS_NGINX_SITE_FILE}" && -f "${IS_NGINX_SITE_FILE}" ]]; then
+            NGINX_BACKUP_FILE="${IS_NGINX_SITE_FILE}.rollback.$(date +%Y%m%d%H%M%S)"
+            safe_cp "${IS_NGINX_SITE_FILE}" "$NGINX_BACKUP_FILE"
+        fi
+        
+        # 创建回滚函数
+        rollback_nginx_config() {
+            if [[ -n "$NGINX_BACKUP_FILE" && -f "$NGINX_BACKUP_FILE" ]]; then
+                log_info "Rolling back Nginx configuration..."
+                safe_cp "$NGINX_BACKUP_FILE" "$IS_NGINX_SITE_FILE"
+                if nginx -t 2>/dev/null; then
+                    systemctl reload nginx
+                    log_info "Nginx configuration rolled back successfully"
+                else
+                    log_error "Nginx configuration rollback failed: configuration test failed"
+                fi
+            fi
+        }
+        
+        # 注册清理函数
+        register_cleanup "rollback_nginx_config"
+        
+        # 验证 Nginx 配置语法
+        if ! nginx -t 2>/dev/null; then
+            log_error "Nginx 配置验证失败，正在回滚..."
+            rollback_nginx_config
             return 1
+        fi
+        
+        # 自动申请 Certbot 证书
+        # 申请证书
+        if ! nginx_certbot issue ${HOST}; then
+            log_error "证书申请失败，正在回滚 Nginx 配置..."
+            rollback_nginx_config
+            return 1
+        fi
+        
+        # 成功后删除备份
+        if [[ -n "$NGINX_BACKUP_FILE" && -f "$NGINX_BACKUP_FILE" ]]; then
+            safe_rm "$NGINX_BACKUP_FILE"
         fi
         return 0
         ;;
@@ -419,11 +493,48 @@ server {
         # 创建空的 .add 文件（避免 Nginx 启动失败）
         [[ ! -f ${IS_NGINX_SITE_FILE}.add ]] && echo "# 伪装网站配置" >${IS_NGINX_SITE_FILE}.add
         
-        # 自动申请 Certbot 证书
-        if ! nginx_certbot issue ${HOST}; then
-            msg ERROR "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
-            msg WARNING "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${HOST}"
+        # 先备份现有配置（如果存在）
+        NGINX_BACKUP_FILE=""
+        if [[ -n "${IS_NGINX_SITE_FILE}" && -f "${IS_NGINX_SITE_FILE}" ]]; then
+            NGINX_BACKUP_FILE="${IS_NGINX_SITE_FILE}.rollback.$(date +%Y%m%d%H%M%S)"
+            safe_cp "${IS_NGINX_SITE_FILE}" "$NGINX_BACKUP_FILE"
+        fi
+        
+        # 创建回滚函数
+        rollback_nginx_config() {
+            if [[ -n "$NGINX_BACKUP_FILE" && -f "$NGINX_BACKUP_FILE" ]]; then
+                log_info "Rolling back Nginx configuration..."
+                safe_cp "$NGINX_BACKUP_FILE" "$IS_NGINX_SITE_FILE"
+                if nginx -t 2>/dev/null; then
+                    systemctl reload nginx
+                    log_info "Nginx configuration rolled back successfully"
+                else
+                    log_error "Nginx configuration rollback failed: configuration test failed"
+                fi
+            fi
+        }
+        
+        # 注册清理函数
+        register_cleanup "rollback_nginx_config"
+        
+        # 验证 Nginx 配置语法
+        if ! nginx -t 2>/dev/null; then
+            log_error "Nginx 配置验证失败，正在回滚..."
+            rollback_nginx_config
             return 1
+        fi
+        
+        # 自动申请 Certbot 证书
+        # 申请证书
+        if ! nginx_certbot issue ${HOST}; then
+            log_error "证书申请失败，正在回滚 Nginx 配置..."
+            rollback_nginx_config
+            return 1
+        fi
+        
+        # 成功后删除备份
+        if [[ -n "$NGINX_BACKUP_FILE" && -f "$NGINX_BACKUP_FILE" ]]; then
+            safe_rm "$NGINX_BACKUP_FILE"
         fi
         return 0
         ;;
