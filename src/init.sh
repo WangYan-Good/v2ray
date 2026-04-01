@@ -123,14 +123,14 @@ IS_CORE_VER=$($IS_CORE_BIN version | head -n1 | cut -d " " -f1-2)
 if [[ $(grep -o ^[0-9] <<<"${IS_CORE_VER#* }") -lt 5 ]]; then
     # core version less than 5, e.g, v4.45.2
     IS_CORE_VER_LT_5=1
-    if [[ -f /lib/systemd/system/v2ray.service ]] && [[ $(grep 'run -config' /lib/systemd/system/v2ray.service 2>/dev/null) ]]; then
-        sed -i 's/run //' /lib/systemd/system/v2ray.service
+    if [[ -f /lib/systemd/system/v2ray.service ]] && grep -q 'run -config' /lib/systemd/system/v2ray.service 2>/dev/null; then
+        sed -i 's/run //' /lib/systemd/system/v2ray.service 2>/dev/null
         systemctl daemon-reload 2>/dev/null || true
     fi
 else
     IS_WITH_RUN_ARG=run
-    if [[ -f /lib/systemd/system/v2ray.service ]] && [[ ! $(grep 'run -config' /lib/systemd/system/v2ray.service 2>/dev/null) ]]; then
-        sed -i 's/-config/run -config/' /lib/systemd/system/v2ray.service
+    if [[ -f /lib/systemd/system/v2ray.service ]] && ! grep -q 'run -config' /lib/systemd/system/v2ray.service 2>/dev/null; then
+        sed -i 's/-config/run -config/' /lib/systemd/system/v2ray.service 2>/dev/null
         systemctl daemon-reload 2>/dev/null || true
     fi
 fi
