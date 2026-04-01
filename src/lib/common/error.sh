@@ -13,6 +13,8 @@ readonly ERR_NETWORK=5
 readonly ERR_DEPENDENCY=6
 readonly ERR_CONFIG=7
 readonly ERR_SERVICE=8
+readonly ERR_MODULE_NOT_FOUND=9
+readonly ERR_MODULE_LOAD=10
 
 ##
 ## 统一错误处理函数

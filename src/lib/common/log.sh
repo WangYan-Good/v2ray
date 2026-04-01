@@ -114,3 +114,30 @@ log_set() {
 
     fi
 }
+
+##
+## 初始化日志系统
+## 设置日志目录和日志文件路径
+##
+init_logging() {
+    local log_dir="${LOG_DIR:-/tmp/v2ray-logs}"
+    
+    # 如果 IS_LOG_DIR 未设置，使用 log_dir
+    if [[ -z "$IS_LOG_DIR" ]]; then
+        IS_LOG_DIR="$log_dir"
+    fi
+    
+    # 尝试创建日志目录
+    if [[ ! -d "$IS_LOG_DIR" ]]; then
+        if ! mkdir -p "$IS_LOG_DIR" 2>/dev/null; then
+            # 备选方案：使用临时目录
+            IS_LOG_DIR="/tmp/v2ray-logs-$$"
+            mkdir -p "$IS_LOG_DIR" 2>/dev/null || true
+            log_warn "使用临时日志目录: $IS_LOG_DIR"
+        fi
+    fi
+    
+    # 设置日志文件路径
+    export ACCESS_LOG="$IS_LOG_DIR/access.log"
+    export ERROR_LOG="$IS_LOG_DIR/error.log"
+}

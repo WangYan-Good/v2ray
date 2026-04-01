@@ -113,11 +113,12 @@ parse_module_dependencies() {
 ##
 ## 解析所有模块的依赖
 ## @param: module_dir 模块目录
+## @param: module_type 模块类型（可选，默认为空）
 ## @return: 解析所有模块的依赖信息
 ##
 parse_all_dependencies() {
     local module_dir="$1"
-    local module_type="$2"
+    local module_type="${2:-}"
     local -a all_modules=()
     
     # 收集所有 .sh 文件
@@ -364,6 +365,94 @@ get_loaded_modules() {
             echo "$module"
         fi
     done
+}
+
+##
+## 查找模块路径
+## @param: module_name 模块名（不带扩展名）
+## @param: base_dir 模块基础目录（默认为 $IS_SH_DIR/lib）
+## @return: 模块文件完整路径
+##
+find_module_path() {
+    local module_name="$1"
+    local base_dir="${2:-$IS_SH_DIR/lib}"
+    local module_file="$base_dir/${module_name}.sh"
+    
+    if [[ -f "$module_file" ]]; then
+        echo "$module_file"
+        return 0
+    fi
+    
+    # 在 MODULE_SEARCH_PATH 中查找
+    local search_path
+    for search_path in "${MODULE_SEARCH_PATH[@]}"; do
+        if [[ -f "$search_path/${module_name}.sh" ]]; then
+            echo "$search_path/${module_name}.sh"
+            return 0
+        fi
+    done
+    
+    # 在 base_dir 的子目录中查找
+    if [[ -d "$base_dir" ]]; then
+        local subdir
+        for subdir in "$base_dir"/*; do
+            if [[ -d "$subdir" ]] && [[ -f "$subdir/${module_name}.sh" ]]; then
+                echo "$subdir/${module_name}.sh"
+                return 0
+            fi
+        done
+    fi
+    
+    return 1
+}
+
+##
+## 安全加载单个模块（支持依赖解析和错误处理）
+## @param: module_name 模块名（不带扩展名）
+## @param: base_dir 模块基础目录
+## @return: 0 加载成功, 非0 加载失败
+##
+safe_load_module() {
+    local module_name="$1"
+    local base_dir="${2:-$IS_SH_DIR/lib}"
+    
+    # 检查是否已加载
+    if _is_module_loaded "$module_name"; then
+        return 0
+    fi
+    
+    # 构建模块路径
+    local module_path
+    module_path=$(find_module_path "$module_name" "$base_dir")
+    
+    if [[ -z "$module_path" ]] || [[ ! -f "$module_path" ]]; then
+        log_error "Module '$module_name' not found"
+        return $ERR_MODULE_NOT_FOUND
+    fi
+    
+    # 解析并加载依赖
+    local dependencies
+    dependencies=$(parse_module_dependencies "$module_path")
+    
+    for dep in $dependencies; do
+        if ! _is_module_loaded "$dep"; then
+            if ! safe_load_module "$dep" "$base_dir"; then
+                log_error "Failed to load dependency '$dep' for module '$module_name'"
+                return $ERR_DEPENDENCY
+            fi
+        fi
+    done
+    
+    # 加载当前模块
+    if ! . "$module_path"; then
+        log_error "Failed to load module '$module_name'"
+        return $ERR_MODULE_LOAD
+    fi
+    
+    # 标记模块已加载
+    _mark_module_loaded "$module_name"
+    
+    return 0
 }
 
 # =============================================================================#

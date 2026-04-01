@@ -96,7 +96,32 @@ IS_CORE_DIR=/etc/$IS_CORE
 IS_CORE_BIN=$IS_CORE_DIR/bin/$IS_CORE
 IS_CORE_REPO=v2fly/$IS_CORE-core
 IS_CONF_DIR=$IS_CORE_DIR/conf
-IS_LOG_DIR=/var/log/$IS_CORE
+
+# 日志目录初始化（支持非root用户）
+_init_log_dir() {
+    # 允许用户通过环境变量覆盖日志目录
+    export LOG_DIR="${LOG_DIR:-/tmp/v2ray-logs}"
+    export IS_LOG_DIR="${IS_LOG_DIR:-$LOG_DIR}"
+    
+    # 如果 IS_LOG_DIR 不是 /var/log 开头，则直接使用
+    if [[ "$IS_LOG_DIR" != /var/log* ]]; then
+        return 0
+    fi
+    
+    # 检查 /var/log/v2ray 是否可写
+    if [[ ! -d "$IS_LOG_DIR" ]]; then
+        if ! mkdir -p "$IS_LOG_DIR" 2>/dev/null; then
+            # 降级到临时目录
+            IS_LOG_DIR="/tmp/v2ray-logs"
+            mkdir -p "$IS_LOG_DIR" 2>/dev/null || true
+            _yellow "使用临时日志目录: $IS_LOG_DIR"
+        fi
+    fi
+}
+
+# 初始化日志目录
+_init_log_dir
+
 IS_SH_BIN=/usr/local/bin/$IS_CORE
 IS_SH_DIR=$IS_CORE_DIR/sh
 IS_SH_REPO=$AUTHOR/$IS_CORE
