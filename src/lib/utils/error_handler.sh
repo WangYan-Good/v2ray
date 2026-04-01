@@ -5,12 +5,25 @@
 # PROVIDES: error_handler
 
 # 确保 logging 模块已加载
+# Try to load from multiple locations in order of preference
 _ensure_logging_loaded() {
     if ! declare -f log_info >/dev/null 2>&1; then
         # 尝试从标准位置加载 log.sh
         local log_module_path=""
-        if [[ -n "$IS_SH_DIR" ]] && [[ -f "$IS_SH_DIR/src/log.sh" ]]; then
-            log_module_path="$IS_SH_DIR/src/log.sh"
+        
+        # Try src/lib/common/log.sh first (new unified logging)
+        if [[ -n "$IS_SH_DIR" ]] && [[ -f "${IS_SH_DIR}/src/lib/common/log.sh" ]]; then
+            log_module_path="${IS_SH_DIR}/src/lib/common/log.sh"
+        elif [[ -f "${BASH_SOURCE[0]%/lib/utils/*}/lib/common/log.sh" ]]; then
+            log_module_path="${BASH_SOURCE[0]%/lib/utils/*}/lib/common/log.sh"
+        # Fallback to src/utils/log.sh (enhanced version)
+        elif [[ -n "$IS_SH_DIR" ]] && [[ -f "${IS_SH_DIR}/src/utils/log.sh" ]]; then
+            log_module_path="${IS_SH_DIR}/src/utils/log.sh"
+        elif [[ -f "${BASH_SOURCE[0]%/lib/utils/*}/utils/log.sh" ]]; then
+            log_module_path="${BASH_SOURCE[0]%/lib/utils/*}/utils/log.sh"
+        # Try src/log.sh (legacy)
+        elif [[ -n "$IS_SH_DIR" ]] && [[ -f "${IS_SH_DIR}/src/log.sh" ]]; then
+            log_module_path="${IS_SH_DIR}/src/log.sh"
         elif [[ -f "/etc/v2ray/sh/src/log.sh" ]]; then
             log_module_path="/etc/v2ray/sh/src/log.sh"
         fi

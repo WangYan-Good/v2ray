@@ -3,9 +3,25 @@
 # Provides unified error handling, retry mechanisms, safe file operations, and cleanup function registration
 
 # Ensure logging functions are available
+# Try to load from multiple locations in order of preference
 if ! declare -f log_info >/dev/null 2>&1; then
     # shellcheck source=/dev/null
-    . "$(dirname "${BASH_SOURCE[0]}")/../log.sh"
+    # Try src/lib/common/log.sh first (new unified logging)
+    if [[ -n "$IS_SH_DIR" ]] && [[ -f "${IS_SH_DIR}/src/lib/common/log.sh" ]]; then
+        . "${IS_SH_DIR}/src/lib/common/log.sh"
+    elif [[ -f "${BASH_SOURCE[0]%/utils/*}/lib/common/log.sh" ]]; then
+        . "${BASH_SOURCE[0]%/utils/*}/lib/common/log.sh"
+    # Fallback to src/utils/log.sh (enhanced version)
+    elif [[ -n "$IS_SH_DIR" ]] && [[ -f "${IS_SH_DIR}/src/utils/log.sh" ]]; then
+        . "${IS_SH_DIR}/src/utils/log.sh"
+    elif [[ -f "${BASH_SOURCE[0]%/utils/*}/utils/log.sh" ]]; then
+        . "${BASH_SOURCE[0]%/utils/*}/utils/log.sh"
+    # Try src/log.sh (legacy)
+    elif [[ -n "$IS_SH_DIR" ]] && [[ -f "${IS_SH_DIR}/src/log.sh" ]]; then
+        . "${IS_SH_DIR}/src/log.sh"
+    elif [[ -f "${BASH_SOURCE[0]%/utils/*}/src/log.sh" ]]; then
+        . "${BASH_SOURCE[0]%/utils/*}/src/log.sh"
+    fi
 fi
 
 # =============================================================================
