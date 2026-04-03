@@ -91,13 +91,13 @@ is_config_json=$is_core_dir/config.json
 is_caddy_bin=/usr/local/bin/caddy
 is_caddy_dir=/etc/caddy
 is_caddy_repo=caddyserver/caddy
-is_caddyfile=$is_caddy_dir/Caddyfile
+is_caddy_file=$is_caddy_dir/Caddyfile
 is_caddy_conf=$is_caddy_dir/$author
 is_caddy_service=$(systemctl list-units --full -all | grep caddy.service)
 is_nginx_bin=/usr/sbin/nginx
 is_nginx_dir=/etc/nginx
 is_nginx_repo=nginx/nginx
-is_nginxfile=$is_nginx_dir/nginx.conf
+is_nginx_file=$is_nginx_dir/nginx.conf
 is_nginx_conf=$is_nginx_dir/v2ray
 is_nginx_service=$(systemctl list-units --full -all | grep nginx.service)
 is_http_port=80
@@ -136,8 +136,8 @@ if [[ -f $is_caddy_bin && -d $is_caddy_dir && $is_caddy_service ]]; then
         systemctl restart caddy &
     }
     is_caddy_ver=$($is_caddy_bin version | head -n1 | cut -d " " -f1)
-    is_tmp_http_port=$(grep -E '^ {2,}http_port|^http_port' $is_caddyfile | grep -E -o [0-9]+)
-    is_tmp_https_port=$(grep -E '^ {2,}https_port|^https_port' $is_caddyfile | grep -E -o [0-9]+)
+    is_tmp_http_port=$(grep -E '^ {2,}http_port|^http_port' $is_caddy_file | grep -E -o [0-9]+)
+    is_tmp_https_port=$(grep -E '^ {2,}https_port|^https_port' $is_caddy_file | grep -E -o [0-9]+)
     [[ $is_tmp_http_port ]] && is_http_port=$is_tmp_http_port
     [[ $is_tmp_https_port ]] && is_https_port=$is_tmp_https_port
     if [[ $(pgrep -f $is_caddy_bin) ]]; then
@@ -152,8 +152,8 @@ fi
 if [[ -f $is_nginx_bin && -d $is_nginx_dir && $is_nginx_service ]]; then
     is_nginx=1
     is_nginx_ver=$($is_nginx_bin -v 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-    is_tmp_http_port=$(grep -E 'listen.*\s80\s|listen\s80\s' $is_nginxfile 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
-    is_tmp_https_port=$(grep -E 'listen.*\s443\s|listen\s443\s' $is_nginxfile 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
+    is_tmp_http_port=$(grep -E 'listen.*\s80\s|listen\s80\s' $is_nginx_file 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
+    is_tmp_https_port=$(grep -E 'listen.*\s443\s|listen\s443\s' $is_nginx_file 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
     [[ $is_tmp_http_port ]] && is_http_port=$is_tmp_http_port
     [[ $is_tmp_https_port ]] && is_https_port=$is_tmp_https_port
     if [[ $(pgrep -f $is_nginx_bin) ]]; then

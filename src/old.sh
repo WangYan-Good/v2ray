@@ -90,7 +90,7 @@ if [[ $is_old_use ]]; then
 	if [[ $caddy ]]; then
 		get install-caddy
 		# bak caddy files
-		mv -f $is_caddyfile $is_caddyfile.233.bak
+		mv -f $is_caddy_file $is_caddy_file.233.bak
 		mv -f $is_caddy_dir/sites $is_caddy_dir/sites.233.bak
 		load caddy.sh
 		caddy_config new

@@ -3,7 +3,7 @@ caddy_config() {
     case $1 in
     new)
         mkdir -p $is_caddy_dir $is_caddy_dir/sites $is_caddy_conf
-        cat >$is_caddyfile <<-EOF
+        cat >$is_caddy_file <<-EOF
 # don't edit this file #
 # for more info, see https://wangyan-good.github.io/v2ray/caddy-auto-tls/
 # 不要编辑这个文件 #

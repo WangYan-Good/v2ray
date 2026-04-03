@@ -31,8 +31,10 @@ warn() {
     echo -e "\n$is_warn $@\n"
 }
 
+## >>> start: 修复BUG #1:安全：强制 ROOT 权限
 # root
-[[ $EUID != 0 ]] && err "当前非 ${yellow}ROOT用户.${none}"
+# [[ $EUID != 0 ]] && err "当前非 ${yellow}ROOT用户.${none}"
+## <<< end
 
 # yum or apt-get, ubuntu/debian/centos
 cmd=$(type -P apt-get || type -P yum)
