@@ -317,7 +317,9 @@ ask() {
     unset is_opt_msg is_opt_input_msg is_tmp_list is_ask_result is_default_arg is_emtpy_exit
 }
 
-# create file
+##
+## create file
+##
 create() {
     case $1 in
     server)
@@ -400,6 +402,9 @@ create() {
         msg
         ;;
     caddy)
+        ##
+        ## 加载 caddy.sh 脚本
+        ##
         load caddy.sh
         [[ $is_install_caddy ]] && caddy_config new
         [[ ! $(grep "$is_caddy_conf" $is_caddy_file) ]] && {
@@ -410,15 +415,34 @@ create() {
         manage restart caddy &
         ;;
     nginx)
+        ##
+        ## 加载 nginx.sh 脚本
+        ##
         load nginx.sh
+        
+        ##
+        ## 在 nginx 主配置文件中添加 v2ray 配置
+        ##
         [[ $is_install_nginx ]] && nginx_config new
+        
+        ##
+        ## 创建 v2ray 配置文件
+        ##
         [[ ! -d $is_nginx_conf ]] && mkdir -p $is_nginx_conf
+        
+        ##
+        ## create nginx new
+        ##
         if ! nginx_config $2; then
             msg err "Nginx 配置生成失败，证书申请未成功"
             msg warn "V2Ray 配置已生成，但 TLS 尚未启用"
             msg warn "你可以稍后手动申请证书并重载 Nginx"
             is_api_fail=1
         fi
+        
+        ##
+        ## 重新加载 nginx 以让配置生效
+        ##
         nginx_reload
         ;;
     config.json)
@@ -903,12 +927,23 @@ api() {
     }
 }
 
-# add a config
+##
+## add a config
+##
 add() {
+    ##
+    ## 把传入的第一个参数 $1 全部转为小写字母
+    ##
     is_lower=${1,,}
     if [[ $is_lower ]]; then
         case $is_lower in
         tcp | kcp | quic | tcpd | kcpd | quicd)
+            ##
+            ## ${is_lower^^} - 把变量 全部转成大写
+            ## sed ... - 做两个替换
+            ##  - 开头是 K → 改成 mK
+            ##  - 结尾是 D → 结尾加上 -dynamic-port
+            ##
             is_new_protocol=VMess-$(sed 's/^K/mK/;s/D$/-dynamic-port/' <<<${is_lower^^})
             ;;
         ws | h2 | grpc | vws | vh2 | vgrpc | tws | th2 | tgrpc)
@@ -1566,11 +1601,18 @@ $is_json_data_reality"
     esac
 }
 
-# show info
+##
+## show info
+##
 info() {
-    # 总是从 JSON 文件读取配置信息，确保变量正确设置
+    ##
+    ## 总是从 JSON 文件读取配置信息，确保变量正确设置
+    ##
     get info $1
-    # is_color=$(shuf -i 41-45 -n1)
+    
+    ##
+    ## is_color=$(shuf -i 41-45 -n1)
+    ##
     is_color=44
     case $net in
     tcp | kcp | quic)
@@ -1678,10 +1720,12 @@ footer_msg() {
     [[ $is_caddy_stop && $host ]] && warn "Caddy 当前处于停止状态."
     [[ $is_nginx_stop && $host ]] && warn "Nginx 当前处于停止状态."
     msg "------------- END -------------"
-    msg "文档(doc): $(msg_ul https://wangyan-good.github.io/v2ray/$is_core-script/)"
+    # msg "文档(doc): $(msg_ul https://wangyan-good.github.io/v2ray/$is_core-script/)"
 }
 
-# URL or qrcode
+##
+## URL or qrcode
+##
 url_qr() {
     is_dont_show_info=1
     info $2
@@ -1713,7 +1757,9 @@ url_qr() {
     fi
 }
 
-# update core, sh, caddy
+##
+## update core, sh, caddy
+##
 update() {
     case $1 in
     1 | core | $is_core)
@@ -1770,7 +1816,10 @@ update() {
     [[ $is_update_name == 'caddy' ]] && manage restart $is_update_name &
 }
 
-# main menu; if no prefer args.
+
+##
+## main menu; if no prefer args.
+##
 is_main_menu() {
     msg "\n------------- $is_core_name script $is_sh_ver by $author -------------"
     msg "$is_core_ver: $is_core_status"
@@ -1840,7 +1889,9 @@ is_main_menu() {
     esac
 }
 
-# check prefer args, if not exist prefer args and show main menu
+##
+## check prefer args, if not exist prefer args and show main menu
+##
 main() {
     case $1 in
     a | add | gen | no-auto-tls)

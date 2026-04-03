@@ -3,7 +3,9 @@
 author=WangYan-Good
 # github=https://github.com/WangYan-Good/v2ray
 
-# bash fonts colors
+##
+## bash fonts colors
+##
 red='\e[31m'
 yellow='\e[33m'
 gray='\e[90m'
@@ -47,21 +49,30 @@ warn() {
     echo -e "\n$is_warn $@\n"
 }
 
-# load bash script.
+##
+## load bash script.
+## 加载执行 /etc/v2ray/sh/src/ 下传参的第一个参数文件
+##
 load() {
     . $is_sh_dir/src/$1
 }
 
-# wget add --no-check-certificate
+##
+## wget add --no-check-certificate
+##
 _wget() {
     # [[ $proxy ]] && export https_proxy=$proxy
     wget --no-check-certificate "$@"
 }
 
-# yum or apt-get
+##
+## yum or apt-get
+##
 cmd=$(type -P apt-get || type -P yum)
 
-# x64
+##
+## x64
+##
 case $(arch) in
 amd64 | x86_64)
     is_core_arch="64"
@@ -103,7 +114,9 @@ is_nginx_service=$(systemctl list-units --full -all | grep nginx.service)
 is_http_port=80
 is_https_port=443
 
-# core ver
+##
+## core ver
+##
 is_core_ver=$($is_core_bin version | head -n1 | cut -d " " -f1-2)
 
 if [[ $(grep -o ^[0-9] <<<${is_core_ver#* }) -lt 5 ]]; then
@@ -148,7 +161,9 @@ if [[ -f $is_caddy_bin && -d $is_caddy_dir && $is_caddy_service ]]; then
     fi
 fi
 
-# Nginx 状态检测
+##
+## Nginx 状态检测
+##
 if [[ -f $is_nginx_bin && -d $is_nginx_dir && $is_nginx_service ]]; then
     is_nginx=1
     is_nginx_ver=$($is_nginx_bin -v 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
@@ -165,9 +180,12 @@ if [[ -f $is_nginx_bin && -d $is_nginx_dir && $is_nginx_service ]]; then
 fi
 
 load core.sh
-# old sh ver
+
+##
+## old sh ver
+##
 is_old_dir=/etc/v2ray/old_backup
-is_old_conf=/etc/v2ray/233blog_v2ray_backup.conf
+is_old_conf=/etc/v2ray/v2ray_backup.conf
 if [[ -f $is_old_conf && -d $is_old_dir ]]; then
     load old.sh
 fi
