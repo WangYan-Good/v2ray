@@ -76,12 +76,12 @@ is_config_json=$is_core_dir/config.json
 
 # Nginx 变量
 is_nginx_dir=/etc/nginx
-is_nginxfile=$is_nginx_dir/nginx.conf
+is_nginx_file=$is_nginx_dir/nginx.conf
 is_nginx_conf=$is_nginx_dir/v2ray
 
 # Caddy 变量
 is_caddy_dir=/etc/caddy
-is_caddyfile=$is_caddy_dir/Caddyfile
+is_caddy_file=$is_caddy_dir/Caddyfile
 is_caddy_conf=$is_caddy_dir/$author
 tmp_var_lists=(
     tmpcore
@@ -350,88 +350,22 @@ exit_and_del_tmpdir() {
     exit
 }
 
-# main
+##
+## main, entry point
+##
 main() {
-
-    # 先检查是否有 --uninstall 参数（需要在检查已安装之前处理）
-    for arg in "$@"; do
-        if [[ $arg == '--uninstall' ]]; then
-            msg warn "开始卸载 V2Ray 和相关组件..."
-            
-            # 步骤 1: 检查并卸载 V2Ray
-            if [[ -f /usr/local/bin/v2ray ]]; then
-                msg warn "[步骤 1/6] 检测到 v2ray 命令，使用交互式卸载..."
-                v2ray uninstall
-                exit
-            fi
-            
-            # 步骤 1: 删除 V2Ray 文件
-            msg warn "[步骤 1/6] 删除 V2Ray 文件..."
-            if [[ -d /etc/v2ray ]]; then
-                rm -rf /etc/v2ray
-                msg ok "  - 已删除 /etc/v2ray"
-            fi
-            if [[ -d /var/log/v2ray ]]; then
-                rm -rf /var/log/v2ray
-                msg ok "  - 已删除 /var/log/v2ray"
-            fi
-            if [[ -f /usr/local/bin/v2ray ]]; then
-                rm -f /usr/local/bin/v2ray
-                msg ok "  - 已删除 /usr/local/bin/v2ray"
-            fi
-            
-            # 步骤 2: 清理 bashrc
-            msg warn "[步骤 2/6] 清理 bashrc 配置..."
-            sed -i '/v2ray/d' /root/.bashrc
-            msg ok "  - 已清理 /root/.bashrc"
-            
-            # 步骤 3: 停止并卸载 Caddy（如果存在）
-            if [[ -f /usr/local/bin/caddy ]]; then
-                msg warn "[步骤 3/6] 检测到 Caddy，停止并卸载..."
-                systemctl stop caddy &>/dev/null && msg ok "  - 已停止 Caddy 服务"
-                systemctl disable caddy &>/dev/null && msg ok "  - 已禁用 Caddy 服务"
-                rm -rf /etc/caddy /usr/local/bin/caddy /lib/systemd/system/caddy.service
-                msg ok "  - 已删除 Caddy 文件"
-            else
-                msg warn "[步骤 3/6] 未检测到 Caddy，跳过"
-            fi
-            
-            # 步骤 4: 停止并卸载 Nginx（如果存在）
-            if [[ -f /usr/sbin/nginx ]]; then
-                msg warn "[步骤 4/6] 检测到 Nginx，停止并卸载..."
-                systemctl stop nginx &>/dev/null && msg ok "  - 已停止 Nginx 服务"
-                systemctl disable nginx &>/dev/null && msg ok "  - 已禁用 Nginx 服务"
-                rm -rf /etc/nginx /lib/systemd/system/nginx.service
-                msg ok "  - 已删除 Nginx 文件"
-            else
-                msg warn "[步骤 4/6] 未检测到 Nginx，跳过"
-            fi
-            
-            # 步骤 5: 清理 systemd
-            msg warn "[步骤 5/6] 清理 systemd 配置..."
-            systemctl daemon-reload &>/dev/null
-            msg ok "  - 已重载 systemd 配置"
-            
-            # 步骤 6: 完成
-            msg warn "[步骤 6/6] 卸载完成!"
-            msg ok "\n卸载完成！"
-            msg "已删除:"
-            msg "  - V2Ray 核心和脚本"
-            [[ -f /usr/local/bin/caddy ]] || msg "  - Caddy (如果已安装)"
-            [[ -f /usr/sbin/nginx ]] || msg "  - Nginx (如果已安装)"
-            msg "\n如需重新安装，请运行：./install.sh"
-            exit
-        fi
-    done
-
-    # 自动检测本地安装模式
+    ##
+    ## check if scripts exists locally.
+    ##
     if [[ -f ${PWD}/src/core.sh && -f ${PWD}/v2ray.sh ]]; then
         msg warn "检测到本地脚本，使用本地安装模式"
         local_install=1
     fi
 
-    # check old version
-    # 检查旧版本（提供交互式选项）
+    ##
+    ## check old version
+    ## 检查旧版本（提供交互式选项）
+    ##
     [[ -f $is_sh_bin && -d $is_core_dir/bin && -d $is_sh_dir && -d $is_conf_dir ]] && {
         echo
         echo -e "${yellow}检测到脚本已安装!${none}"
@@ -480,27 +414,43 @@ main() {
         done
     }
 
-    # check parameters
+    ##
+    ## check parameters
+    ## $# 表示传递给脚本的参数个数
+    ## -gt 表示 greater than，即大于
+    ##
     [[ $# -gt 0 ]] && pass_args $@
 
-    # show welcome msg
+    ##
+    ## show welcome msg
+    ##
     clear
     echo
     echo "........... $is_core_name script by $author .........."
     echo
 
-    # start installing...
+    ##
+    ## start installing...
+    ##
     msg warn "开始安装..."
     [[ $is_core_ver ]] && msg warn "${is_core_name} 版本: ${yellow}$is_core_ver${none}"
     [[ $proxy ]] && msg warn "使用代理: ${yellow}$proxy${none}"
-    # create tmpdir
+    
+    ##
+    ## create tmpdir
+    ##
     mkdir -p $tmpdir
-    # if is_core_file, copy file
+    
+    ##
+    ## if is_core_file, copy file
+    ##
     [[ $is_core_file ]] && {
         cp -f $is_core_file $is_core_ok
         msg warn "${yellow}${is_core_name} 文件使用 > $is_core_file${none}"
     }
-    # local dir install sh script
+    ##
+    ## local dir install sh script
+    ##
     [[ $local_install ]] && {
         >$is_sh_ok
         msg warn "${yellow}本地获取安装脚本 > $PWD ${none}"
@@ -782,27 +732,39 @@ main() {
 
     load core.sh
     
-    # 初始化 TLS 配置（Nginx 或 Caddy）
+    ##
+    ## 初始化 TLS 配置（Nginx 或 Caddy）
+    ##
     if [[ $is_install_nginx ]]; then
         msg warn "初始化 Nginx 配置..."
         create nginx new
-        # 设置 is_nginx 标志，避免端口占用警告
+
+        ##
+        ## 设置 is_nginx 标志，避免端口占用警告
+        ##
         is_nginx=1
     elif [[ $is_install_caddy ]]; then
         msg warn "初始化 Caddy 配置..."
         create caddy new
-        # 设置 is_caddy 标志
+        
+        ##
+        ## 设置 is_caddy 标志
+        ##
         is_caddy=1
     fi
 
-    # 安装完成后引导用户配置第一个节点（与 v2ray add 完全一致）
+    ##
+    ## 安装完成后引导用户配置第一个节点（与 v2ray add 完全一致）
+    ##
     echo
     echo "=========================================="
     echo "    安装完成！现在配置第一个 V2Ray 节点"
     echo "=========================================="
     echo
     
-    # 显示所有协议选项（与 v2ray add 命令完全一致）
+    ##
+    ## 显示所有协议选项（与 v2ray add 命令完全一致）
+    ##
     echo "请选择协议类型:"
     for i in "${!protocol_list[@]}"; do
         num=$((i + 1))
@@ -841,9 +803,13 @@ main() {
         msg warn "未输入域名，已跳过配置"
     fi
 
-    # remove tmp dir and exit.
+    ##
+    ## 删除临时文件并退出
+    ##
     exit_and_del_tmpdir ok
 }
 
-# start.
+##
+## start, input all parameters
+##
 main $@
