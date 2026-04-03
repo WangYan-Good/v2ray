@@ -122,9 +122,9 @@ download() {
         fi
         
         # 备份现有 Nginx 配置（如果有）
-        if [[ -f $is_nginxfile && ! -f ${is_nginxfile}.bak ]]; then
-            cp -f $is_nginxfile ${is_nginxfile}.bak
-            msg warn "已备份现有 nginx.conf 到 ${is_nginxfile}.bak"
+        if [[ -f $is_nginx_file && ! -f ${is_nginx_file}.bak ]]; then
+            cp -f $is_nginx_file ${is_nginx_file}.bak
+            msg warn "已备份现有 nginx.conf 到 ${is_nginx_file}.bak"
         fi
         
         # 设置开机自启

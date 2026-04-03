@@ -15,8 +15,8 @@ nginx_config() {
         mkdir -p /var/log/nginx /var/www/certbot
 
         # 检查是否已有主配置
-        if [[ ! -f $is_nginxfile ]]; then
-            cat >$is_nginxfile <<EOF
+        if [[ ! -f $is_nginx_file ]]; then
+            cat >$is_nginx_file <<EOF
 # Nginx 主配置文件
 # 由 V2Ray 脚本自动生成/管理
 # 更多相关请阅读：https://wangyan-good.github.io/v2ray/nginx-auto-tls/
@@ -64,10 +64,10 @@ http {
 EOF
         else
             # nginx.conf 已存在，检查是否需要添加 V2Ray 导入
-            if ! grep -q "include $is_nginx_conf/\*.conf" $is_nginxfile; then
+            if ! grep -q "include $is_nginx_conf/\*.conf" $is_nginx_file; then
                 # 备份原配置
-                cp -f $is_nginxfile ${is_nginxfile}.bak.$(date +%Y%m%d%H%M%S)
-                msg warn "检测到现有 Nginx 配置，已备份到 ${is_nginxfile}.bak.*"
+                cp -f $is_nginx_file ${is_nginx_file}.bak.$(date +%Y%m%d%H%M%S)
+                msg warn "检测到现有 Nginx 配置，已备份到 ${is_nginx_file}.bak.*"
 
                 # 在 http 块中添加 V2Ray 导入（在 http 块的最后一个 } 之前）
                 # 使用 awk 更可靠，避免 sed 转义问题
@@ -91,19 +91,19 @@ EOF
                     }
                     # 打印其他行
                     {print}
-                ' $is_nginxfile > $tmp_conf
+                ' $is_nginx_file > $tmp_conf
 
                 if [[ $? -eq 0 ]]; then
-                    mv -f $tmp_conf $is_nginxfile
-                    if grep -q "include $is_nginx_conf/\*.conf" $is_nginxfile; then
+                    mv -f $tmp_conf $is_nginx_file
+                    if grep -q "include $is_nginx_conf/\*.conf" $is_nginx_file; then
                         msg ok "已添加 V2Ray 配置导入到 nginx.conf"
                     else
-                        msg warn "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginxfile"
+                        msg warn "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginx_file"
                         msg warn "添加：include $is_nginx_conf/*.conf;"
                     fi
                 else
                     rm -f $tmp_conf
-                    msg warn "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginxfile"
+                    msg warn "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginx_file"
                     msg warn "添加：include $is_nginx_conf/*.conf;"
                 fi
             fi
@@ -651,9 +651,9 @@ install_nginx_certbot() {
     mkdir -p $is_nginx_dir $is_nginx_conf /var/www/certbot
     
     # 备份现有 nginx.conf（如果存在）
-    if [[ -f $is_nginxfile && ! -f ${is_nginxfile}.bak ]]; then
-        cp -f $is_nginxfile ${is_nginxfile}.bak
-        msg warn "已备份现有 nginx.conf 到 ${is_nginxfile}.bak"
+    if [[ -f $is_nginx_file && ! -f ${is_nginx_file}.bak ]]; then
+        cp -f $is_nginx_file ${is_nginx_file}.bak
+        msg warn "已备份现有 nginx.conf 到 ${is_nginx_file}.bak"
     fi
     
     # 设置开机自启

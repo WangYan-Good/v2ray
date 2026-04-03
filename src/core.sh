@@ -402,8 +402,8 @@ create() {
     caddy)
         load caddy.sh
         [[ $is_install_caddy ]] && caddy_config new
-        [[ ! $(grep "$is_caddy_conf" $is_caddyfile) ]] && {
-            msg "import $is_caddy_conf/*.conf" >>$is_caddyfile
+        [[ ! $(grep "$is_caddy_conf" $is_caddy_file) ]] && {
+            msg "import $is_caddy_conf/*.conf" >>$is_caddy_file
         }
         [[ ! -d $is_caddy_conf ]] && mkdir -p $is_caddy_conf
         caddy_config $2
@@ -1540,7 +1540,7 @@ $is_json_data_reality"
                 manage start caddy &>/dev/null
                 if [[ $is_run_fail == 'caddy' ]]; then
                     _red "Caddy 运行失败信息:"
-                    $is_caddy_bin run --config $is_caddyfile
+                    $is_caddy_bin run --config $is_caddy_file
                 else
                     _green "\n测试通过, 已启动 Caddy ..\n"
                 fi
