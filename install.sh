@@ -426,7 +426,6 @@ main() {
     ##
     ## show welcome msg
     ##
-    clear
     echo
     echo "........... $is_core_name script by $author .........."
     echo
@@ -732,6 +731,9 @@ main() {
         fi
     fi
 
+    ##
+    ## 加载 core.sh 脚本
+    ##
     load core.sh
     
     ##
@@ -775,6 +777,9 @@ main() {
     echo "$((${#protocol_list[@]} + 1))) 跳过，稍后手动配置"
     echo
 
+    ##
+    ## 处理用户协议选项
+    ##
     while :; do
         echo -ne "请输入选择 [1-$((${#protocol_list[@]} + 1))] (默认:1): "
         read protocol_choice
@@ -798,6 +803,10 @@ main() {
     if [[ $domain_input ]]; then
         echo
         msg warn "正在配置 ${yellow}$protocol_type${none} > ${yellow}$domain_input${none}..."
+        
+        ##
+        ## 添加 域名+协议 配置
+        ##
         add $protocol_type $domain_input
         echo
         msg ok "配置完成！使用 'v2ray info' 查看配置信息"

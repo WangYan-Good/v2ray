@@ -4,17 +4,41 @@
 # 支持多站点共存，共享 80/443 端口
 
 nginx_config() {
+    ##
+    ## /etc/nginx/v2ray/{host}.conf
+    ##
     is_nginx_site_file=$is_nginx_conf/${host}.conf
+
+    ##
+    ## /etc/nginx/ssl/{host}/fullchain.pem
+    ##
     is_ssl_cert=$is_nginx_dir/ssl/${host}/fullchain.pem
+    
+    ##
+    ## /etc/nginx/ssl/{host}/privkey.pem
+    ##
     is_ssl_key=$is_nginx_dir/ssl/${host}/privkey.pem
     
     case $1 in
     new)
-        # 创建目录结构
+        ##
+        ## 创建目录结构
+        ## - /etc/nginx
+        ## - /etc/nginx/ssl
+        ## - /etc/nginx/v2ray
+        ##
         mkdir -p $is_nginx_dir $is_nginx_dir/ssl $is_nginx_conf
+
+        ##
+        ## - /var/log/nginx
+        ## - /var/www/certbot
+        ##
         mkdir -p /var/log/nginx /var/www/certbot
 
-        # 检查是否已有主配置
+        ##
+        ## 检查是否已有主配置
+        ## /etc/nginx/nginx.conf
+        ##
         if [[ ! -f $is_nginx_file ]]; then
             cat >$is_nginx_file <<EOF
 # Nginx 主配置文件
@@ -63,16 +87,28 @@ http {
 }
 EOF
         else
-            # nginx.conf 已存在，检查是否需要添加 V2Ray 导入
+            ##
+            ## nginx.conf 已存在，检查是否需要添加 V2Ray 导入
+            ## 通过判断 /etc/nginx/v2ray/*.conf 来判断
+            ##
             if ! grep -q "include $is_nginx_conf/\*.conf" $is_nginx_file; then
-                # 备份原配置
+                
+                ##
+                ## 备份原配置
+                ##
                 cp -f $is_nginx_file ${is_nginx_file}.bak.$(date +%Y%m%d%H%M%S)
                 msg warn "检测到现有 Nginx 配置，已备份到 ${is_nginx_file}.bak.*"
 
-                # 在 http 块中添加 V2Ray 导入（在 http 块的最后一个 } 之前）
-                # 使用 awk 更可靠，避免 sed 转义问题
+                ##
+                ## 在 http 块中添加 V2Ray 导入（在 http 块的最后一个 } 之前）
+                ## 使用 awk 更可靠，避免 sed 转义问题
+                ## 创建一个安全的临时文件，把路径保存到本地变量 tmp_conf 中
+                ##
                 local tmp_conf=$(mktemp)
-                # 使用更健壮的正则表达式匹配 http 块
+                
+                ##
+                ## 使用更健壮的正则表达式匹配 http 块
+                ##
                 awk -v inc="    include $is_nginx_conf/*.conf;" '
                     # 匹配 http 块开始（允许行首空格，http 后空格，{ 前空格）
                     /^[[:space:]]*http[[:space:]]*\{/ {
@@ -92,9 +128,18 @@ EOF
                     # 打印其他行
                     {print}
                 ' $is_nginx_file > $tmp_conf
-
+                ##
+                ## v2ray 配置插入成功
+                ##
                 if [[ $? -eq 0 ]]; then
+                    ##
+                    ## 替换原配置文件
+                    ##
                     mv -f $tmp_conf $is_nginx_file
+                    
+                    ##
+                    ## 检查是否插入成功
+                    ##
                     if grep -q "include $is_nginx_conf/\*.conf" $is_nginx_file; then
                         msg ok "已添加 V2Ray 配置导入到 nginx.conf"
                     else
@@ -679,16 +724,33 @@ nginx_test() {
     return 1
 }
 
-# 重新加载 Nginx
+##
+## 重新加载 Nginx
+##
 nginx_reload() {
     if [[ -f $is_nginx_bin ]]; then
-        # 检查 Nginx 是否正在运行
+        ##
+        ## 检查 Nginx 是否正在运行
+        ## pgrep：查找进程
+        ## -f：匹配完整进程名
+        ## "nginx: master"：Nginx 主进程标识
+        ##
         if pgrep -f "nginx: master" &>/dev/null; then
-            # 运行中则重载
+            ##
+            ## 运行中则重载，安静重载 Nginx 配置，不打印日志、不弹提示
+            ##
             $is_nginx_bin -s reload &>/dev/null
+            
+            ##
+            ## 返回执行结果
+            ## - 0：成功
+            ## - !0: 失败
+            ##
             return $?
         else
-            # 未运行则启动
+            ##
+            ## 未运行则启动
+            ##
             msg warn "Nginx 未运行，正在启动..."
             systemctl start nginx &>/dev/null
             if pgrep -f "nginx: master" &>/dev/null; then
