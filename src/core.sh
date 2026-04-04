@@ -1476,7 +1476,7 @@ get() {
             all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.grpcSettings.serviceName // ""')")
 
             # host(3): grpc_host,ws_host,h2_host
-            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.grpcSettings.host // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.grpc_host // ""')")
             all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.wsSettings.headers.Host // ""')")
             all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.httpSettings.host[0] // ""')")
 
@@ -1486,7 +1486,7 @@ get() {
             all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.realitySettings.privateKey // ""')")
 
             # 变量映射表 (按数组顺序): 0-10 base, 11-19 more, 20-22 host, 23-25 reality
-            is_up_var_set=(is_protocol port uuid client_password ss_method door_addr door_port is_dynamic_port is_socks_user is_socks_pass _extra net is_security tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host is_servername is_public_key is_private_key)
+            is_up_var_set=(is_protocol port uuid client_password ss_method ss_password door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_security tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host is_servername is_public_key is_private_key)
 
             # 赋值变量
             for i in "${!all_json_output[@]}"; do
@@ -1502,8 +1502,6 @@ get() {
 
             # 兼容旧变量名
             [[ -n $client_password ]] && trojan_password=$client_password
-            # Shadowsocks 密码在 .settings.password 中（索引 5）
-            [[ -z $ss_password ]] && ss_password="${all_json_output[5]:-}"
 
             # 清理空值
             for v in ${is_up_var_set[@]}; do
