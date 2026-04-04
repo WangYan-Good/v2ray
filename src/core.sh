@@ -407,9 +407,121 @@ create() {
             if [[ $is_caddy ]]; then
                 msg warn "创建 caddy 配置 ${net}"
                 create caddy $net
+
+                ##
+                ## 配置一致性校验：检查 Caddy reverse_proxy 路径是否与 V2Ray path 匹配
+                ##
+                is_caddy_site_file=$is_caddy_conf/${host}.conf
+                if [[ -f $is_caddy_site_file ]]; then
+                    ##
+                    ## 从 Caddyfile 中提取 reverse_proxy 的路径 (例如 /uuid)
+                    ##
+                    is_caddy_path=$(grep -E '^\s*reverse_proxy\s+' "$is_caddy_site_file" | head -1 | awk '{print $2}')
+                    
+                    ##
+                    ## 从 V2Ray JSON 中提取 path
+                    ##
+                    is_v2ray_path=$(jq -r '.inbounds[0].streamSettings.httpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // empty' "$is_json_file" 2>/dev/null)
+
+                    ##
+                    ## 排除空值或 root (/) 的情况，进行精确匹配
+                    ##
+                    if [[ -n "$is_caddy_path" && -n "$is_v2ray_path" && "$is_caddy_path" != "$is_v2ray_path" ]]; then
+                        msg err "配置冲突：V2Ray 路径 ($is_v2ray_path) 与 Caddy reverse_proxy ($is_caddy_path) 不匹配！"
+                        msg warn "如果继续使用当前配置，客户端将无法连接。"
+                        echo
+                        echo "请选择:"
+                        echo "1) 重新生成并覆盖 Caddy 配置 (推荐)"
+                        echo "2) 放弃本次 V2Ray 配置更改 (保留旧配置)"
+                        echo "3) 继续（连接将失败，需手动修复）"
+                        while :; do
+                            read -p "请选择 [1-3] (默认:1): " is_caddy_conflict_choice
+                            [[ ! $is_caddy_conflict_choice ]] && is_caddy_conflict_choice=1
+                            case $is_caddy_conflict_choice in
+                            1)
+                                msg warn "重新生成 Caddy 配置..."
+                                create caddy $net
+                                break
+                                ;;
+                            2)
+                                rm -f "$is_json_file"
+                                [[ -f ${is_caddy_site_file}.bak ]] && {
+                                    cp -f ${is_caddy_site_file}.bak ${is_caddy_site_file}
+                                    msg warn "已放弃新 V2Ray 配置，恢复旧 Caddy 配置"
+                                } || msg warn "已放弃新 V2Ray 配置"
+                                manage restart caddy &
+                                return
+                                ;;
+                            3)
+                                msg warn "已继续，但请注意 V2Ray 与 Caddy 配置不一致"
+                                break
+                                ;;
+                            *)
+                                msg "输入无效，请输入 1-3"
+                                ;;
+                            esac
+                        done
+                    fi
+                fi
             elif [[ $is_nginx ]]; then
                 msg warn "创建 nginx 配置 ${net}"
                 create nginx $net
+
+                ##
+                ## 配置一致性校验：检查 Nginx location 路径是否与 V2Ray path 匹配
+                ##
+                is_nginx_site_file=$is_nginx_conf/${host}.conf
+                if [[ -f $is_nginx_site_file ]]; then
+                    ##
+                    ## 从 Nginx 配置中提取 location 路径
+                    ##
+                    is_nginx_location_path=$(grep -E '^\s+location\s+/' "$is_nginx_site_file" | head -1 | awk '{print $2}' | sed 's/{$//')
+                    
+                    ##
+                    ## 从 V2Ray JSON 中提取 path
+                    ##
+                    is_v2ray_path=$(jq -r '.inbounds[0].streamSettings.httpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // empty' "$is_json_file" 2>/dev/null)
+
+                    ##
+                    ## 排除空值或 root (/) 的情况，进行精确匹配
+                    ##
+                    if [[ -n "$is_nginx_location_path" && -n "$is_v2ray_path" && "$is_nginx_location_path" != "$is_v2ray_path" ]]; then
+                        msg err "配置冲突：V2Ray 路径 ($is_v2ray_path) 与 Nginx location ($is_nginx_location_path) 不匹配！"
+                        msg warn "如果继续使用当前配置，客户端将无法连接。"
+                        echo
+                        echo "请选择:"
+                        echo "1) 重新生成并覆盖 Nginx 配置 (推荐)"
+                        echo "2) 放弃本次 V2Ray 配置更改 (保留旧配置)"
+                        echo "3) 继续（连接将失败，需手动修复）"
+                        while :; do
+                            read -p "请选择 [1-3] (默认:1): " is_conflict_choice
+                            [[ ! $is_conflict_choice ]] && is_conflict_choice=1
+                            case $is_conflict_choice in
+                            1)
+                                msg warn "重新生成 Nginx 配置..."
+                                create nginx $net
+                                break
+                                ;;
+                            2)
+                                rm -f "$is_json_file"
+                                [[ -f ${is_nginx_site_file}.bak ]] && {
+                                    cp -f ${is_nginx_site_file}.bak ${is_nginx_site_file}
+                                    msg warn "已放弃新 V2Ray 配置，恢复旧 Nginx 配置"
+                                } || msg warn "已放弃新 V2Ray 配置"
+                                nginx_reload
+                                return
+                                ;;
+                            3)
+                                msg warn "已继续，但请注意 V2Ray 与 Nginx 配置不一致"
+                                break
+                                ;;
+                            *)
+                                msg "输入无效，请输入 1-3"
+                                ;;
+                            esac
+                        done
+                    fi
+                fi
             fi
         }
         # restart core
