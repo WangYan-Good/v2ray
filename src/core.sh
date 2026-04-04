@@ -1442,37 +1442,77 @@ get() {
         get file $2
         if [[ $is_config_file ]]; then
             is_json_str=$(cat $is_conf_dir/"$is_config_file")
-            is_json_data_base=$(jq -r '.inbounds[0]|.protocol//empty,.port//empty,.settings.clients[0].id//empty,.settings.clients[0].password//empty,.settings.method//empty,.settings.password//empty,.settings.address//empty,.settings.port//empty,.settings.detour.to//empty,.settings.accounts[0].user//empty,.settings.accounts[0].pass//empty' <<<$is_json_str)
             [[ $? != 0 ]] && err "无法读取此文件: $is_config_file"
-            is_json_data_more=$(jq -r '.inbounds[0].streamSettings | .network//empty,.security//empty,.tcpSettings.header.type//empty,.kcpSettings.seed//empty,.kcpSettings.header.type//empty,.quicSettings.header.type//empty,.wsSettings.path//empty,.httpSettings.path//empty,.grpcSettings.serviceName//empty' <<<$is_json_str)
-            is_json_data_host=$(jq -r '.inbounds[0].streamSettings | .grpc_host//empty,.wsSettings.headers.Host//empty,.httpSettings.host[0]//empty' <<<$is_json_str)
-            is_json_data_reality=$(jq -r '.inbounds[0].streamSettings | .realitySettings.serverNames[0]//empty,.realitySettings.publicKey//empty,.realitySettings.privateKey//empty' <<<$is_json_str)
-            # 变量映射表 (按 jq 输出顺序): 0-9 base, 10-18 more, 19-21 host, 22-24 reality
-            # base(10): protocol,port,uuid,password,method,address,port,detour,user,pass
-            # more(9): network,security,tcp_type,kcp_seed,kcp_type,quic_type,ws_path,h2_path,grpc_serviceName
+
+            ##
+            ## 修复：逐个字段提取，使用 // "" 确保空字段也输出空行
+            ## 原代码使用 .field//empty 会在字段不存在时跳过输出
+            ## 导致 while read 得到的行数少于预期，变量映射完全错位
+            ##
+            all_json_output=()
+
+            # base(11): protocol,port,uuid,client_password,ss_method,door_addr,door_port,is_dynamic_port,is_socks_user,is_socks_pass,_extra
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].protocol // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].port // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].settings.clients[0].id // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].settings.clients[0].password // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].settings.method // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].settings.password // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].settings.address // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].settings.port // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].settings.detour.to // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].settings.accounts[0].user // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].settings.accounts[0].pass // ""')")
+
+            # more(9): net,is_security,tcp_type,kcp_seed,kcp_type,quic_type,ws_path,h2_path,grpc_serviceName
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.network // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.security // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.tcpSettings.header.type // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.kcpSettings.seed // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.kcpSettings.header.type // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.quicSettings.header.type // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.wsSettings.path // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.httpSettings.path // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.grpcSettings.serviceName // ""')")
+
             # host(3): grpc_host,ws_host,h2_host
-            # reality(3): serverName,publicKey,privateKey
-            is_up_var_set=(is_protocol port uuid trojan_password ss_method door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_security tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host is_servername is_public_key is_private_key)
-            # 使用 readarray 保留空值（jq //empty 输出空行）
-            local -a all_json_output=()
-            while IFS= read -r line; do
-                all_json_output+=("$line")
-            done <<< "$is_json_data_base
-$is_json_data_more
-$is_json_data_host
-$is_json_data_reality"
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.grpcSettings.host // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.wsSettings.headers.Host // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.httpSettings.host[0] // ""')")
+
+            # reality(3): is_servername,is_public_key,is_private_key
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0] // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.realitySettings.publicKey // ""')")
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.realitySettings.privateKey // ""')")
+
+            # 变量映射表 (按数组顺序): 0-10 base, 11-19 more, 20-22 host, 23-25 reality
+            is_up_var_set=(is_protocol port uuid client_password ss_method door_addr door_port is_dynamic_port is_socks_user is_socks_pass _extra net is_security tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_serviceName grpc_host ws_host h2_host is_servername is_public_key is_private_key)
+
+            # 赋值变量
             for i in "${!all_json_output[@]}"; do
-                [[ $is_debug ]] && msg "$i-${is_up_var_set[$i]}: ${all_json_output[$i]}"
-                export ${is_up_var_set[$i]}="${all_json_output[$i]}"
-            done
-            for v in ${is_up_var_set[@]}; do
-                [[ -z "${!v}" || "${!v}" == "null" ]] && unset $v
+                if [[ $i -lt ${#is_up_var_set[@]} ]]; then
+                    var_name="${is_up_var_set[$i]}"
+                    var_val="${all_json_output[$i]}"
+                    if [[ -n "$var_name" && "$var_name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+                        [[ "$var_val" == "null" ]] && var_val=""
+                        export "${var_name}=${var_val}"
+                    fi
+                fi
             done
 
-            # 合并变量（如果从 JSON 读取失败，使用备用方式）
+            # 兼容旧变量名
+            [[ -n $client_password ]] && trojan_password=$client_password
+            # Shadowsocks 密码在 .settings.password 中（索引 5）
+            [[ -z $ss_password ]] && ss_password="${all_json_output[5]:-}"
+
+            # 清理空值
+            for v in ${is_up_var_set[@]}; do
+                [[ -z "${!v}" ]] && unset $v
+            done
+
+            # 合并变量
             [[ -z $host ]] && host="${grpc_host:-${ws_host:-${h2_host:-}}}"
-            # grpc 的 serviceName 存储在 grpc_serviceName 变量中，需要赋值给 path
-            [[ -z $path && $grpc_serviceName ]] && path="$grpc_serviceName"
+            [[ -z $path ]] && path="${h2_path:-${ws_path:-${grpc_serviceName:-}}}"
             [[ -z $is_https_port ]] && is_https_port=443
             header_type="${tcp_type:-}${kcp_type:-}${quic_type:-}"
             # 判断是否为 reality 协议
@@ -1482,6 +1522,9 @@ $is_json_data_reality"
             else
                 is_reality=
             fi
+            # 根据协议类型设置 net（Shadowsocks 和 Socks 没有 streamSettings.network）
+            [[ $is_protocol == 'shadowsocks' && -z $net ]] && net=ss
+            [[ $is_protocol == 'socks' && -z $net ]] && net=socks
             [[ ! $kcp_seed ]] && is_no_kcp_seed=1
             is_config_name=$is_config_file
             if [[ $is_dynamic_port ]]; then
@@ -1794,7 +1837,12 @@ info() {
     ## 总是从 JSON 文件读取配置信息，确保变量正确设置
     ##
     get info $1
-    
+
+    ##
+    ## 获取地址（优先使用 host，否则使用服务器 IP）
+    ##
+    get addr
+
     ##
     ## is_color=$(shuf -i 41-45 -n1)
     ##
