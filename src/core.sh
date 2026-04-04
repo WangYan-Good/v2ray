@@ -1416,9 +1416,22 @@ get() {
     file)
         is_file_str=$2
         [[ ! $is_file_str ]] && is_file_str='.json$'
+        
+        ##
+        ## is_conf_dir = /etc/v2ray/conf
+        ## 筛选、过滤、限制数量，把符合条件的配置文件存入数组
+        ##
         # is_all_json=("$(ls $is_conf_dir | grep -E $is_file_str)")
-        readarray -t is_all_json <<<"$(ls $is_conf_dir | grep -E -i "$is_file_str" | sed '/dynamic-port-.*-link/d' | head -233)" # limit max 233 lines for show.
-        [[ ! $is_all_json ]] && err "无法找到相关的配置文件: $2"
+        # readarray -t is_all_json <<<"$(ls $is_conf_dir | grep -E -i "$is_file_str" | sed '/dynamic-port-.*-link/d' | head -233)" # limit max 233 lines for show.
+        
+        ##
+        ## 修复后（增强通用性，兼容 H2/WS/gRPC/TCP 所有协议）
+        ##
+        readarray -t is_all_json <<<"$(ls -1 $is_conf_dir | grep -E '\.json$' | grep -i "$is_file_str" | sed '/dynamic-port-.*-link/d' | head -233)"
+        [[ ${#is_all_json[@]} -eq 0 ]] && {
+            is_all_json=($(ls -1 $is_conf_dir | grep -E '\.json$' | head -10))
+            [[ ${#is_all_json[@]} -eq 0 ]] && err "无法找到相关的配置文件: $2"
+        }
         [[ ${#is_all_json[@]} -eq 1 ]] && is_config_file=$is_all_json && is_auto_get_config=1
         [[ ! $is_config_file ]] && {
             [[ $is_dont_auto_exit ]] && return
