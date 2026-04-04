@@ -496,6 +496,40 @@ nginx_certbot() {
     local action=$1
     local domain=$2
 
+    ##
+    ## 创建证书软链接（处理已存在目录/文件的情况）
+    ##
+    _create_cert_link() {
+        local link_path="$is_nginx_dir/ssl/${domain}"
+        local target="/etc/letsencrypt/live/${domain}"
+
+        if [[ -L "$link_path" ]]; then
+            # 已是软链接，直接返回
+            return 0
+        elif [[ -e "$link_path" ]]; then
+            # 存在真实目录/文件，需要删除后重建
+            msg warn "检测到已存在的证书目录/文件：${link_path}"
+            msg warn "正在删除旧的自签名证书目录..."
+            rm -rf "$link_path"
+            if [[ $? -eq 0 ]]; then
+                msg ok "旧证书目录删除成功"
+            else
+                msg err "旧证书目录删除失败，请手动处理"
+                return 1
+            fi
+        fi
+
+        # 创建软链接
+        ln -sf "$target" "$link_path"
+        if [[ -L "$link_path" ]]; then
+            msg ok "证书软链接创建成功：${link_path} -> ${target}"
+            return 0
+        else
+            msg err "证书软链接创建失败"
+            return 1
+        fi
+    }
+
     case $action in
     issue)
         # 申请证书
@@ -524,8 +558,7 @@ nginx_certbot() {
                     if [[ ! -L $is_nginx_dir/ssl/${domain} ]]; then
                         msg warn "证书软链接不存在，正在创建..."
                         mkdir -p $is_nginx_dir/ssl
-                        ln -sf /etc/letsencrypt/live/${domain} $is_nginx_dir/ssl/${domain}
-                        msg ok "软链接创建成功"
+                        _create_cert_link
                     fi
                     # 启动或重载 Nginx
                     if pgrep -f "nginx: master" &>/dev/null; then
@@ -593,8 +626,7 @@ nginx_certbot() {
                 if [[ ! -L $is_nginx_dir/ssl/${domain} ]]; then
                     msg warn "创建证书软链接..."
                     mkdir -p $is_nginx_dir/ssl
-                    ln -sf /etc/letsencrypt/live/${domain} $is_nginx_dir/ssl/${domain}
-                    msg ok "软链接创建成功"
+                    _create_cert_link
                 fi
                 systemctl reload nginx &>/dev/null
                 return 0
@@ -632,8 +664,7 @@ nginx_certbot() {
                 # 创建软链接到 Nginx 配置目录
                 msg warn "创建证书软链接到 /etc/nginx/ssl/${domain}/..."
                 mkdir -p $is_nginx_dir/ssl
-                ln -sf /etc/letsencrypt/live/${domain} $is_nginx_dir/ssl/${domain}
-                msg ok "软链接创建成功"
+                _create_cert_link
                 # 启动 Nginx
                 systemctl start nginx
                 return 0
