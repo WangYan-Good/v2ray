@@ -1820,4 +1820,72 @@ GPL-3.0 License
 
 ---
 
+## 开发者指南
+
+### 如何发布新版本
+
+**1. 打包脚本代码**
+
+将 `v2ray.sh` 和 `src/` 目录打包成 `code.zip`（`install.sh` 运行时会自动下载并解压此文件）：
+
+```bash
+cd /path/to/v2ray
+zip -r code.zip v2ray.sh src/
+```
+
+**2. 创建 Release 并上传资产**
+
+使用 `gh` 命令行工具创建 Release 并上传 `install.sh` 和 `code.zip`：
+
+```bash
+# 创建 Release（同时创建 git tag）
+gh release create <version> \
+  --title "📦 <version> - v2ray <title>" \
+  --notes "# ✨ 主要功能\n\n- # 🐛 Bug 修复\n\n- # 🔧 技术改进" \
+  --target develop \
+  install.sh \
+  code.zip
+```
+
+**3. 推送 tag**
+
+```bash
+git push origin develop --tags
+```
+
+### 发布后验证
+
+发布完成后，以下链接会自动指向最新版本：
+
+| 资源 | URL |
+|------|-----|
+| Release 页面 | https://github.com/WangYan-Good/v2ray/releases/latest |
+| 安装脚本 | https://github.com/WangYan-Good/v2ray/releases/latest/download/install.sh |
+| 脚本代码 | https://github.com/WangYan-Good/v2ray/releases/latest/download/code.zip |
+
+这意味着**手动安装命令永远无需修改**，用户每次执行都会自动获取最新版本：
+
+```bash
+# 用户永远只需执行此命令即可安装最新版
+wget -O install.sh https://github.com/WangYan-Good/v2ray/releases/latest/download/install.sh
+chmod +x install.sh && ./install.sh
+```
+
+### 安装流程说明
+
+```
+用户下载 install.sh
+       │
+       ▼
+install.sh 从 releases/latest/download/code.zip 下载脚本代码
+       │
+       ▼
+解压到 /etc/v2ray/sh/
+       │
+       ▼
+安装完成
+```
+
+---
+
 *最后更新：2026 年*
