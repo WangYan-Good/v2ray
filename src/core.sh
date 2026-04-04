@@ -1523,6 +1523,8 @@ get() {
             # 根据协议类型设置 net（Shadowsocks 和 Socks 没有 streamSettings.network）
             [[ $is_protocol == 'shadowsocks' && -z $net ]] && net=ss
             [[ $is_protocol == 'socks' && -z $net ]] && net=socks
+            # 标记 Trojan 协议
+            [[ $is_protocol == 'trojan' ]] && is_trojan=1
             [[ ! $kcp_seed ]] && is_no_kcp_seed=1
             is_config_name=$is_config_file
             if [[ $is_dynamic_port ]]; then
