@@ -796,22 +796,155 @@ main() {
         fi
     done
 
-    echo
-    echo "请输入域名 (例如：v2ray.example.com):"
-    read -p "> " domain_input
+    ##
+    ## 根据协议类型决定是否输入域名
+    ## 如果协议是 TLS 类型，就标记需要域名；否则不需要
+    ## 自动判断协议是否需要域名（TLS 必须要）
+    ##
+    is_need_domain=
+    case ${protocol_type,,} in
+        *-tls) is_need_domain=1 ;;
+    esac
+
+    if [[ $is_need_domain ]]; then
+        echo
+        echo "请输入域名 (例如：v2ray.example.com):"
+
+        ##
+        ## 域名验证循环
+        ##
+        while :; do
+            read -p "> " domain_input
+
+            ##
+            ## 此协议需要域名，不能为空
+            ##
+            if [[ -z "$domain_input" ]]; then
+                msg err "此协议需要域名，不能为空"
+                continue
+            fi
+
+            ##
+            ## 验证域名格式：字母、数字、连字符、点号组成，且至少有一个点号，顶级域名至少2个字符
+            ##
+            if echo "$domain_input" | grep -E -q '^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$'; then
+                ##
+                ## 格式正确，退出循环
+                ##
+                break
+            else
+                msg err "无效的域名格式，请重新输入"
+            fi
+        done
+
+        ##
+        ## DNS 预检
+        ##
+        echo
+        msg warn "检查 DNS 解析..."
+
+        ##
+        ## 安静解析域名，拿到最后一个 IP 地址
+        ## nslookup "$domain_input"：解析域名查 IP
+        ## 2>/dev/null：屏蔽报错信息
+        ## grep -Eo 'IP正则'：只提取纯 IP
+        ## resolved_ip=...：把结果存入变量
+        ##
+        resolved_ip=$(nslookup "$domain_input" 2>/dev/null | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | tail -1)
+        if [[ "$resolved_ip" != "$ip" ]]; then
+            msg err "域名 $domain_input 未解析到服务器 IP: $ip"
+            msg warn "当前解析: ${resolved_ip:-无法解析}"
+            echo
+            echo "请选择:"
+            echo "1) 继续配置（可能失败）"
+            echo "2) 退出，配置 DNS 后重试"
+            read -p "请选择 [1-2] (默认:1): " dns_choice
+            [[ ! $dns_choice ]] && dns_choice=1
+            if [[ "$dns_choice" == "2" ]]; then
+                msg warn "安装已结束，配置 DNS 后请重新运行安装脚本"
+                exit_and_del_tmpdir
+            fi
+        else
+            msg ok "域名已正确解析到 $ip"
+        fi
+    else
+        msg "此协议不需要域名"
+        echo
+        echo "请选择配置方式:"
+        echo "1) 自动配置（随机生成端口、密码等参数）"
+        echo "2) 跳过，稍后手动配置"
+        read -p "请选择 [1-2] (默认:1): " config_choice
+        [[ ! $config_choice ]] && config_choice=1
+
+        if [[ $config_choice == "1" ]]; then
+            is_auto_config=1
+        else
+            is_skip_config=1
+        fi
+    fi
 
     if [[ $domain_input ]]; then
         echo
         msg warn "正在配置 ${yellow}$protocol_type${none} > ${yellow}$domain_input${none}..."
-        
+
         ##
         ## 添加 域名+协议 配置
         ##
         add $protocol_type $domain_input
         echo
-        msg ok "配置完成！使用 'v2ray info' 查看配置信息"
+
+        ##
+        ## 检查 V2Ray 服务是否正常运行
+        ##
+        if systemctl is-active --quiet $is_core; then
+            msg ok "配置完成！使用 'v2ray info' 查看配置信息"
+        else
+            msg err "配置生成失败！V2Ray 服务未能正常启动"
+            msg warn "您可以尝试以下操作："
+            msg warn "1. 检查域名 DNS 是否正确解析到服务器 IP: $ip"
+            msg warn "2. 检查 80/443 端口是否可访问"
+            msg warn "3. 使用 'v2ray logerr' 查看详细错误日志"
+            msg warn "4. 使用 'v2ray fix-all' 尝试自动修复"
+            msg warn "5. 使用 'v2ray add $protocol_type $domain_input' 重新配置"
+            exit_and_del_tmpdir
+        fi
+    elif [[ $is_auto_config ]]; then
+        echo
+        msg warn "正在自动配置 ${yellow}$protocol_type${none}..."
+
+        ##
+        ## 使用 auto 参数自动配置
+        ##
+        add $protocol_type auto
+        echo
+
+        ##
+        ## 检查 V2Ray 服务是否正常运行
+        ##
+        if systemctl is-active --quiet $is_core; then
+            msg ok "配置完成！使用 'v2ray info' 查看配置信息"
+        else
+            msg err "配置生成失败！V2Ray 服务未能正常启动"
+            msg warn "您可以尝试以下操作："
+            msg warn "1. 使用 'v2ray logerr' 查看详细错误日志"
+            msg warn "2. 使用 'v2ray fix-all' 尝试自动修复"
+            msg warn "3. 使用 'v2ray add $protocol_type' 重新配置"
+            exit_and_del_tmpdir
+        fi
     else
-        msg warn "未输入域名，已跳过配置"
+        msg warn "已跳过，安装后可以使用 'v2ray add' 命令添加配置"
+        echo
+        echo "=========================================="
+        echo "    安装完成"
+        echo "=========================================="
+        echo
+        echo "请使用以下命令添加配置："
+        echo "  v2ray add vmess-ws-tls yourdomain.com  # TLS 加密（推荐）"
+        echo "  v2ray add vmess-tcp                    # 非 TLS"
+        echo "  v2ray add ss                           # Shadowsocks"
+        echo "  v2ray add socks                        # Socks 代理"
+        echo "  v2ray help                             # 查看完整帮助"
+        echo
     fi
 
     ##
