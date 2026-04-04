@@ -323,17 +323,27 @@ ask() {
 create() {
     case $1 in
     server)
+        ##
+        ## - host
+        ## - port
+        ## - uuid
+        ##
         is_tls=none
         get new
 
-        # file name
+        ##
+        ## file name
+        ##
         if [[ $host ]]; then
             is_config_name=$2-${host}.json
         else
             is_config_name=$2-${port}.json
         fi
         is_json_file=$is_conf_dir/$is_config_name
-        # get json
+        
+        ##
+        ## get json
+        ##
         [[ $is_change || ! $json_str ]] && get protocol $2
         case $net in
         ws | h2 | grpc | http)
@@ -349,8 +359,15 @@ create() {
             [[ ! $is_dynamic_port_range ]] && get dynamic-port
             is_new_dynamic_port_json=$(jq '{inbounds:[{tag:'\"$is_config_name-link.json\"',port:'\"$is_dynamic_port_range\"','"$is_listen"',protocol:"vmess",'"$is_stream"','"$is_sniffing"',allocate:{strategy:"random"}}]}' <<<{})
         fi
-        [[ $is_test_json ]] && return # tmp test
-        # only show json, dont save to file.
+        
+        ##
+        ## tmp test
+        ##
+        [[ $is_test_json ]] && return
+        
+        ##
+        ## only show json, dont save to file.
+        ##
         [[ $is_gen ]] && {
             msg
             jq <<<$is_new_json
@@ -358,26 +375,40 @@ create() {
             [[ $is_new_dynamic_port_json ]] && jq <<<$is_new_dynamic_port_json && msg
             return
         }
-        # del old file
+
+        ##
+        ## del old file
+        ##
         [[ $is_config_file ]] && is_no_del_msg=1 && del $is_config_file
-        # save json to file
+        
+        ##
+        ## save json to file
+        ##
         cat <<<$is_new_json >$is_json_file
         [[ $is_new_dynamic_port_json ]] && {
             is_dynamic_port_link_file=$is_json_file-link.json
             cat <<<$is_new_dynamic_port_json >$is_dynamic_port_link_file
         }
         if [[ $is_new_install ]]; then
-            # config.json
+            
+            ##
+            ## config.json
+            ##
             create config.json
         else
             # use api add config
             api add $is_json_file $is_dynamic_port_link_file &>/dev/null
         fi
-        # auto tls (caddy or nginx)
+        
+        ##
+        ## auto tls (caddy or nginx)
+        ##
         [[ $host && ! $is_no_auto_tls ]] && {
             if [[ $is_caddy ]]; then
+                msg warn "创建 caddy 配置 ${net}"
                 create caddy $net
             elif [[ $is_nginx ]]; then
+                msg warn "创建 nginx 配置 ${net}"
                 create nginx $net
             fi
         }
@@ -1235,8 +1266,10 @@ add() {
     info
 }
 
-# get config info
-# or somes required args
+##
+## get config info
+## or somes required args
+##
 get() {
     case $1 in
     addr)
@@ -1333,7 +1366,14 @@ $is_json_data_reality"
         fi
         ;;
     protocol)
-        get addr # get host or server ip
+        ##
+        ## get host or server ip
+        ##
+        get addr
+        
+        ##
+        ## 将第二个参数转换成小写
+        ##
         is_lower=${2,,}
         net=
         case $is_lower in
@@ -1394,7 +1434,11 @@ $is_json_data_reality"
             err "无法识别协议: $is_config_file"
             ;;
         esac
-        [[ $net ]] && return # if net exist, dont need more json args
+        
+        ##
+        ## if net exist, dont need more json args
+        ##
+        [[ $net ]] && return
         case $is_lower in
         *tcp*)
             net=tcp

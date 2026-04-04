@@ -63,23 +63,23 @@ amd64 | x86_64)
     ;;
 esac
 
-is_core=v2ray
-is_core_name=V2Ray
-is_core_dir=/etc/$is_core
-is_core_bin=$is_core_dir/bin/$is_core
-is_core_repo=v2fly/$is_core-core
-is_conf_dir=$is_core_dir/conf
-is_log_dir=/var/log/$is_core
-is_sh_bin=/usr/local/bin/$is_core
-is_sh_dir=$is_core_dir/sh
-is_sh_repo=$author/$is_core
+is_core=v2ray                           # is_core      = v2ray
+is_core_name=V2Ray                      # is_core_name = V2Ray
+is_core_dir=/etc/$is_core               # is_core_dir  = /etc/v2ray
+is_core_bin=$is_core_dir/bin/$is_core   # is_core_bin  = /etc/v2ray/bin/v2ray
+is_core_repo=v2fly/$is_core-core        # is_core_repo = v2fly/v2ray-core
+is_conf_dir=$is_core_dir/conf           # is_conf_dir  = /etc/v2ray/conf
+is_log_dir=/var/log/$is_core            # is_log_dir   = /var/log/v2ray
+is_sh_bin=/usr/local/bin/$is_core       # is_sh_bin    = /usr/local/bin/v2ray
+is_sh_dir=$is_core_dir/sh               # is_sh_dir    = /etc/v2ray/sh
+is_sh_repo=$author/$is_core             # is_sh_repo   = WangYan-Good/v2ray
 is_pkg="wget unzip"
-is_config_json=$is_core_dir/config.json
+is_config_json=$is_core_dir/config.json # is_config_json = /etc/v2ray/config.json
 
 # Nginx 变量
-is_nginx_dir=/etc/nginx
-is_nginx_file=$is_nginx_dir/nginx.conf
-is_nginx_conf=$is_nginx_dir/v2ray
+is_nginx_dir=/etc/nginx                 # is_nginx_dir  = /etc/nginx
+is_nginx_file=$is_nginx_dir/nginx.conf  # is_nginx_file = /etc/nginx/nginx.conf
+is_nginx_conf=$is_nginx_dir/v2ray       # is_nginx_conf = /etc/nginx//v2ray
 
 # Caddy 变量
 is_caddy_dir=/etc/caddy
@@ -728,6 +728,27 @@ main() {
                     ;;
                 esac
             done
+        fi
+    fi
+
+    ##
+    ## 冲突预检：确保选定的方案端口不会被另一个运行中的服务占用
+    ##
+    if [[ $is_install_caddy ]]; then
+        if [[ $(systemctl is-active nginx) == "active" ]]; then
+            msg err "配置冲突：您选择了使用 Caddy，但 Nginx 正在运行中"
+            msg warn "Nginx 占用了 80/443 端口，这会导致 Caddy 无法启动或证书申请失败"
+            msg warn "请手动执行以下命令停止 Nginx，然后重新运行安装脚本："
+            echo -e "\n  ${yellow}systemctl stop nginx && systemctl disable nginx${none}\n"
+            exit 1
+        fi
+    elif [[ $is_install_nginx ]]; then
+        if [[ $(systemctl is-active caddy) == "active" ]]; then
+            msg err "配置冲突：您选择了使用 Nginx，但 Caddy 正在运行中"
+            msg warn "Caddy 占用了 80/443 端口，这会导致 Nginx 无法启动或证书申请失败"
+            msg warn "请手动执行以下命令停止 Caddy，然后重新运行安装脚本："
+            echo -e "\n  ${yellow}systemctl stop caddy && systemctl disable caddy${none}\n"
+            exit 1
         fi
     fi
 
