@@ -440,6 +440,14 @@ create() {
                             case $is_caddy_conflict_choice in
                             1)
                                 msg warn "重新生成 Caddy 配置..."
+                                ##
+                                ## 先备份并删除现有配置，避免 create caddy 再次弹出"是否覆盖"的选择
+                                ##
+                                [[ -f ${is_caddy_site_file} ]] && {
+                                    cp -f ${is_caddy_site_file} ${is_caddy_site_file}.bak
+                                    msg warn "已备份现有 Caddy 配置：${is_caddy_site_file}.bak"
+                                    rm -f ${is_caddy_site_file}
+                                }
                                 create caddy $net
                                 break
                                 ;;
@@ -499,6 +507,14 @@ create() {
                             case $is_conflict_choice in
                             1)
                                 msg warn "重新生成 Nginx 配置..."
+                                ##
+                                ## 先备份并删除现有配置，避免 create nginx 再次弹出"是否覆盖"的选择
+                                ##
+                                [[ -f ${is_nginx_site_file} ]] && {
+                                    cp -f ${is_nginx_site_file} ${is_nginx_site_file}.bak
+                                    msg warn "已备份现有 Nginx 配置：${is_nginx_site_file}.bak"
+                                    rm -f ${is_nginx_site_file}
+                                }
                                 create nginx $net
                                 break
                                 ;;
