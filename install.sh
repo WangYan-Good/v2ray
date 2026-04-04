@@ -838,34 +838,41 @@ main() {
         done
 
         ##
-        ## DNS 预检
+        ## DNS 预检 - 使用多种方式尝试解析域名
         ##
         echo
         msg warn "检查 DNS 解析..."
+        resolved_ip=
+        if [[ $(type -P nslookup) ]]; then
+            resolved_ip=$(nslookup "$domain_input" 2>/dev/null | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | tail -1)
+        elif [[ $(type -P getent) ]]; then
+            resolved_ip=$(getent hosts "$domain_input" 2>/dev/null | awk '{ print $1 }')
+        elif [[ $(type -P dig) ]]; then
+            resolved_ip=$(dig "$domain_input" +short 2>/dev/null | tail -1)
+        else
+            msg warn "未找到 DNS 检查工具 (nslookup/getent/dig)，跳过 DNS 预检"
+        fi
 
-        ##
-        ## 安静解析域名，拿到最后一个 IP 地址
-        ## nslookup "$domain_input"：解析域名查 IP
-        ## 2>/dev/null：屏蔽报错信息
-        ## grep -Eo 'IP正则'：只提取纯 IP
-        ## resolved_ip=...：把结果存入变量
-        ##
-        resolved_ip=$(nslookup "$domain_input" 2>/dev/null | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | tail -1)
-        if [[ "$resolved_ip" != "$ip" ]]; then
-            msg err "域名 $domain_input 未解析到服务器 IP: $ip"
-            msg warn "当前解析: ${resolved_ip:-无法解析}"
-            echo
-            echo "请选择:"
-            echo "1) 继续配置（可能失败）"
-            echo "2) 退出，配置 DNS 后重试"
-            read -p "请选择 [1-2] (默认:1): " dns_choice
-            [[ ! $dns_choice ]] && dns_choice=1
-            if [[ "$dns_choice" == "2" ]]; then
-                msg warn "安装已结束，配置 DNS 后请重新运行安装脚本"
-                exit_and_del_tmpdir
+        if [[ -n "$resolved_ip" ]]; then
+            if [[ "$resolved_ip" != "$ip" ]]; then
+                msg err "域名 $domain_input 未解析到服务器 IP: $ip"
+                msg warn "当前解析: $resolved_ip"
+                echo
+                echo "请选择:"
+                echo "1) 继续配置（可能失败）"
+                echo "2) 退出，配置 DNS 后重试"
+                read -p "请选择 [1-2] (默认:1): " dns_choice
+                [[ ! $dns_choice ]] && dns_choice=1
+                if [[ "$dns_choice" == "2" ]]; then
+                    msg warn "安装已结束，配置 DNS 后请重新运行安装脚本"
+                    exit_and_del_tmpdir
+                fi
+            else
+                msg ok "域名已正确解析到 $ip"
             fi
         else
-            msg ok "域名已正确解析到 $ip"
+            msg warn "无法获取域名 IP 地址，跳过 DNS 预检"
+            msg warn "请确保域名已正确解析到服务器 IP: $ip"
         fi
     else
         msg "此协议不需要域名"
