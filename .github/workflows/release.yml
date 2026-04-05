@@ -47,8 +47,9 @@ jobs:
 
       - name: Create code.zip
         run: |
-          echo "打包 v2ray.sh 和 src/ 目录..."
-          zip -r code.zip v2ray.sh src/
+          echo "打包完整安装文件..."
+          # 包含 install.sh, v2ray.sh 和 src/ 目录
+          zip -r code.zip install.sh v2ray.sh src/
           
           echo "文件信息："
           ls -lh code.zip
@@ -56,6 +57,19 @@ jobs:
           # 验证 zip 内容
           echo "包含文件："
           zipinfo code.zip
+          
+          # 确保关键文件存在
+          if ! zipinfo code.zip | grep -q "install.sh"; then
+            echo "❌ code.zip 中缺少 install.sh"
+            exit 1
+          fi
+          
+          if ! zipinfo code.zip | grep -q "v2ray.sh"; then
+            echo "❌ code.zip 中缺少 v2ray.sh"
+            exit 1
+          fi
+          
+          echo "✅ code.zip 包含完整的安装文件"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
