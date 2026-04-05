@@ -259,8 +259,14 @@ server {
         
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${host}; then
-            msg err "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
+            msg err "证书申请失败，正在清理生成的配置..."
             msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
+            msg warn "然后手动添加配置：v2ray add ${protocol_type} ${host}"
+
+            # 清理失败的配置
+            rm -f ${is_nginx_site_file} ${is_nginx_site_file}.add
+            msg ok "已清理 Nginx 配置文件"
+
             return 1
         fi
         return 0
@@ -357,8 +363,14 @@ server {
         
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${host}; then
-            msg err "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
+            msg err "证书申请失败，正在清理生成的配置..."
             msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
+            msg warn "然后手动添加配置：v2ray add ${protocol_type} ${host}"
+
+            # 清理失败的配置
+            rm -f ${is_nginx_site_file} ${is_nginx_site_file}.add
+            msg ok "已清理 Nginx 配置文件"
+
             return 1
         fi
         return 0
@@ -453,8 +465,14 @@ server {
         
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${host}; then
-            msg err "证书申请失败，已生成 Nginx 配置但无法启用 TLS"
+            msg err "证书申请失败，正在清理生成的配置..."
             msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
+            msg warn "然后手动添加配置：v2ray add ${protocol_type} ${host}"
+
+            # 清理失败的配置
+            rm -f ${is_nginx_site_file} ${is_nginx_site_file}.add
+            msg ok "已清理 Nginx 配置文件"
+
             return 1
         fi
         return 0
@@ -521,18 +539,37 @@ nginx_certbot() {
         local link_path="$is_nginx_dir/ssl/${domain}"
         local target="/etc/letsencrypt/live/${domain}"
 
+        # 验证证书文件是否存在且有效
+        if [[ ! -f "${target}/fullchain.pem" || ! -f "${target}/privkey.pem" ]]; then
+            msg err "证书文件不存在：${target}"
+            msg warn "Certbot 可能未正确完成，请检查 Certbot 日志"
+            return 1
+        fi
+
+        # 验证证书有效性（尝试解析）
+        if ! openssl x509 -noout -in "${target}/fullchain.pem" 2>/dev/null; then
+            msg err "证书文件损坏或无效：${target}/fullchain.pem"
+            return 1
+        fi
+
         if [[ -L "$link_path" ]]; then
-            # 已是软链接，直接返回
-            return 0
+            # 已是软链接，检查目标是否有效
+            local current_target=$(readlink -f "$link_path")
+            if [[ -f "${current_target}/fullchain.pem" ]]; then
+                return 0  # 已存在且有效
+            fi
+            # 软链接失效，需要重建
+            msg warn "检测到失效的软链接：${link_path}"
+            rm -f "$link_path"
         elif [[ -e "$link_path" ]]; then
             # 存在真实目录/文件，需要删除后重建
             msg warn "检测到已存在的证书目录/文件：${link_path}"
-            msg warn "正在删除旧的自签名证书目录..."
+            msg warn "正在删除旧文件..."
             rm -rf "$link_path"
             if [[ $? -eq 0 ]]; then
-                msg ok "旧证书目录删除成功"
+                msg ok "旧文件删除成功"
             else
-                msg err "旧证书目录删除失败，请手动处理"
+                msg err "旧文件删除失败，请手动处理"
                 return 1
             fi
         fi
@@ -540,8 +577,14 @@ nginx_certbot() {
         # 创建软链接
         ln -sf "$target" "$link_path"
         if [[ -L "$link_path" ]]; then
-            msg ok "证书软链接创建成功：${link_path} -> ${target}"
-            return 0
+            # 二次验证：确保链接目标有效
+            if [[ -f "${link_path}/fullchain.pem" && -f "${link_path}/privkey.pem" ]]; then
+                msg ok "证书软链接创建成功：${link_path} -> ${target}"
+                return 0
+            else
+                msg err "证书软链接创建成功，但目标文件不可访问"
+                return 1
+            fi
         else
             msg err "证书软链接创建失败"
             return 1
@@ -646,12 +689,24 @@ nginx_certbot() {
                 if [[ ! -L $is_nginx_dir/ssl/${domain} ]]; then
                     msg warn "创建证书软链接..."
                     mkdir -p $is_nginx_dir/ssl
-                    _create_cert_link
+                    if ! _create_cert_link; then
+                        msg err "证书软链接创建失败"
+                        return 1
+                    fi
                 fi
-                systemctl reload nginx &>/dev/null
+                if systemctl reload nginx &>/dev/null; then
+                    msg ok "Nginx 重载成功"
+                else
+                    msg warn "Nginx 重载失败，但证书已续期"
+                    msg warn "请手动检查：systemctl reload nginx"
+                fi
                 return 0
             else
                 msg err "证书续期失败"
+                msg warn "请检查:"
+                msg "  1. Nginx 是否正常运行"
+                msg "  2. 证书文件是否损坏"
+                msg "  3. 查看详细日志：tail -20 /var/log/letsencrypt/letsencrypt.log"
                 return 1
             fi
         else
@@ -683,13 +738,44 @@ nginx_certbot() {
             certbot_exit_code=${PIPESTATUS[0]}
             if [[ $certbot_exit_code -eq 0 ]]; then
                 msg ok "证书申请成功"
+
+                # 验证证书文件是否存在
+                if [[ ! -f "/etc/letsencrypt/live/${domain}/fullchain.pem" ]]; then
+                    msg err "证书文件未正确生成，请检查 Certbot 日志"
+                    msg warn "查看详细日志：tail -20 /var/log/letsencrypt/letsencrypt.log"
+                    return 1
+                fi
+
                 # 创建软链接到 Nginx 配置目录
-                msg warn "创建证书软链接到 /etc/nginx/ssl/${domain}/..."
+                msg warn "创建证书软链接..."
                 mkdir -p $is_nginx_dir/ssl
-                _create_cert_link
-                # 启动 Nginx
-                systemctl start nginx
-                return 0
+                if ! _create_cert_link; then
+                    msg err "证书软链接创建失败"
+                    return 1
+                fi
+
+                # 测试并启动 Nginx
+                msg warn "测试 Nginx 配置..."
+                if ! nginx -t 2>&1; then
+                    msg err "Nginx 配置测试失败"
+                    msg warn "已生成证书但 Nginx 配置有问题"
+                    msg warn "请检查：nginx -t"
+                    msg warn "查看详细错误：journalctl -u nginx -n 50"
+                    return 1
+                fi
+
+                if systemctl start nginx 2>&1; then
+                    msg ok "Nginx 启动成功"
+                    return 0
+                else
+                    msg err "Nginx 启动失败"
+                    msg warn "Nginx 配置可能有问题"
+                    msg warn "请检查：nginx -t"
+                    msg warn "查看详细错误：journalctl -u nginx -n 50"
+                    msg warn "证书已申请，修复配置后可手动启动："
+                    msg "  systemctl start nginx"
+                    return 1
+                fi
             else
                 msg err "证书申请失败"
                 msg warn "请检查:"
