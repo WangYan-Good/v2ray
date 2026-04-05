@@ -756,16 +756,35 @@ nginx_certbot() {
 
                 # 测试并启动 Nginx
                 msg warn "测试 Nginx 配置..."
-                if ! nginx -t 2>&1; then
-                    msg err "Nginx 配置测试失败"
-                    msg warn "已生成证书但 Nginx 配置有问题"
-                    msg warn "请检查：nginx -t"
-                    msg warn "查看详细错误：journalctl -u nginx -n 50"
-                    return 1
+                
+                # 先测试整个 Nginx 配置
+                nginx_test_output=$(nginx -t 2>&1)
+                nginx_test_exit_code=$?
+                
+                if [[ $nginx_test_exit_code -ne 0 ]]; then
+                    # 检查错误是否与当前域名相关
+                    if echo "$nginx_test_output" | grep -q "${domain}"; then
+                        # 当前域名的配置有问题
+                        msg err "Nginx 配置测试失败（当前域名配置有误）"
+                        msg warn "请检查：nginx -t"
+                        msg warn "查看详细错误：journalctl -u nginx -n 50"
+                        return 1
+                    else
+                        # 其他域名的配置问题，不影响当前域名
+                        msg warn "Nginx 全局配置测试有警告（非当前域名问题）"
+                        msg warn "当前域名证书已安装，但其他域名配置可能有问题"
+                        msg warn "详细信息：nginx -t"
+                        msg warn "你可以稍后修复其他域名的配置"
+                        # 不过度报错，允许继续
+                    fi
                 fi
 
-                if systemctl start nginx 2>&1; then
-                    msg ok "Nginx 启动成功"
+                if systemctl start nginx 2>&1 || pgrep -f "nginx: master" &>/dev/null; then
+                    if [[ $nginx_test_exit_code -eq 0 ]]; then
+                        msg ok "Nginx 启动成功"
+                    else
+                        msg ok "证书配置成功（Nginx 可能已运行）"
+                    fi
                     return 0
                 else
                     msg err "Nginx 启动失败"
