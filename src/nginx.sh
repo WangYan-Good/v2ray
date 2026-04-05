@@ -497,6 +497,24 @@ nginx_certbot() {
     local domain=$2
 
     ##
+    ## 检测 certbot 版本（旧版不支持 --key-type ecdsa）
+    ## --key-type ecdsa 在 Certbot 1.12.0 引入
+    ##
+    _is_certbot_support_ecdsa() {
+        local ver
+        ver=$(certbot --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+')
+        local major="${ver%%.*}"
+        local minor="${ver##*.}"
+        # 版本 >= 1.12 或 >= 2.0 都支持
+        if [[ "$major" -ge 2 ]]; then
+            return 0
+        elif [[ "$major" -eq 1 && "$minor" -ge 12 ]]; then
+            return 0
+        fi
+        return 1
+    }
+
+    ##
     ## 创建证书软链接（处理已存在目录/文件的情况）
     ##
     _create_cert_link() {
@@ -611,16 +629,18 @@ nginx_certbot() {
             msg ok "Nginx 配置验证通过"
 
             # 续期证书
-            if certbot certonly --webroot \
+            certbot certonly --webroot \
                 -w /var/www/certbot \
                 -d ${domain} \
                 --email admin@${domain} \
                 --agree-tos \
                 --non-interactive \
                 --force-renewal \
-                --key-type ecdsa 2>&1 | while IFS= read -r line; do
+                $(_is_certbot_support_ecdsa && echo "--key-type ecdsa") 2>&1 | while IFS= read -r line; do
                     [[ $line ]] && msg info "  $line"
-                done; then
+                done
+            certbot_exit_code=${PIPESTATUS[0]}
+            if [[ $certbot_exit_code -eq 0 ]]; then
                 msg ok "证书续期成功"
                 # 检查软链接是否存在
                 if [[ ! -L $is_nginx_dir/ssl/${domain} ]]; then
@@ -651,15 +671,17 @@ nginx_certbot() {
             fi
 
             # 申请证书
-            if certbot certonly --standalone \
+            certbot certonly --standalone \
                 -d ${domain} \
                 --email admin@${domain} \
                 --agree-tos \
                 --non-interactive \
                 --force-renewal \
-                --key-type ecdsa 2>&1 | while IFS= read -r line; do
+                $(_is_certbot_support_ecdsa && echo "--key-type ecdsa") 2>&1 | while IFS= read -r line; do
                     [[ $line ]] && msg info "  $line"
-                done; then
+                done
+            certbot_exit_code=${PIPESTATUS[0]}
+            if [[ $certbot_exit_code -eq 0 ]]; then
                 msg ok "证书申请成功"
                 # 创建软链接到 Nginx 配置目录
                 msg warn "创建证书软链接到 /etc/nginx/ssl/${domain}/..."

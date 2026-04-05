@@ -848,7 +848,7 @@ main() {
             ##
             ## 验证域名格式：字母、数字、连字符、点号组成，且至少有一个点号，顶级域名至少2个字符
             ##
-            if echo "$domain_input" | grep -E -q '^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$'; then
+            if echo "$domain_input" | grep -E -q '^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$'; then
                 ##
                 ## 格式正确，退出循环
                 ##
