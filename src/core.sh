@@ -1874,7 +1874,7 @@ info() {
         is_url="ss://$(echo -n ${ss_method}:${ss_password} | base64 -w 0)@${is_addr}:${port}#$net-${is_addr}"
         is_info_str=($is_protocol $is_addr $port $ss_password $ss_method)
         ;;
-    ws | h2 | grpc)
+    ws | h2 | grpc | xhttp)
         is_color=45
         is_can_change=(0 1 2 3 5)
         is_info_show=(0 1 2 3 4 6 7 8)
