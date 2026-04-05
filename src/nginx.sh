@@ -272,7 +272,7 @@ server {
         return 0
         ;;
 
-    *h2*)
+    *h2* | *xhttp* | *http*)
         # 检测配置冲突
         [[ -f ${is_nginx_site_file} ]] && {
             msg warn "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
