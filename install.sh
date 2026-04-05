@@ -64,10 +64,11 @@ amd64 | x86_64)
 esac
 
 is_core=v2ray                           # is_core      = v2ray
-is_core_name=V2Ray                      # is_core_name = V2Ray
+is_core_name=Xray                       # is_core_name = Xray (兼容 V2Ray 配置格式)
 is_core_dir=/etc/$is_core               # is_core_dir  = /etc/v2ray
 is_core_bin=$is_core_dir/bin/$is_core   # is_core_bin  = /etc/v2ray/bin/v2ray
-is_core_repo=v2fly/$is_core-core        # is_core_repo = v2fly/v2ray-core
+# 使用 Xray-core 替代 V2Ray-core，以支持 xhttp 等新特性
+is_core_repo=XTLS/Xray-core             # is_core_repo = XTLS/Xray-core
 is_conf_dir=$is_core_dir/conf           # is_conf_dir  = /etc/v2ray/conf
 is_log_dir=/var/log/$is_core            # is_log_dir   = /var/log/v2ray
 is_sh_bin=/usr/local/bin/$is_core       # is_sh_bin    = /usr/local/bin/v2ray
