@@ -342,13 +342,41 @@ pass_args() {
 # exit and remove tmpdir
 exit_and_del_tmpdir() {
     rm -rf $tmpdir
-    [[ ! $1 ]] && {
+
+    # 失败时回滚已安装的文件
+    if [[ ! $1 ]]; then
+        # 检查是否已安装到系统（通过检查关键文件是否存在）
+        if [[ -d $is_sh_dir || -d $is_core_dir/bin || -f $is_sh_bin ]]; then
+            msg warn "检测到部分安装文件，正在清理..."
+
+            # 清理 V2Ray 文件
+            [[ -d $is_sh_dir ]] && rm -rf $is_sh_dir && msg ok "  - 已清理脚本目录"
+            [[ -d $is_core_dir ]] && rm -rf $is_core_dir && msg ok "  - 已清理核心目录"
+            [[ -f $is_sh_bin ]] && rm -f $is_sh_bin && msg ok "  - 已清理命令链接"
+            [[ -d $is_log_dir ]] && rm -rf $is_log_dir && msg ok "  - 已清理日志目录"
+
+            # 清理 bashrc 配置
+            if grep -q "$is_core" /root/.bashrc 2>/dev/null; then
+                sed -i "/$is_core/d" /root/.bashrc
+                msg ok "  - 已清理 /root/.bashrc"
+            fi
+
+            # 清理 systemd 配置
+            if [[ -f /etc/systemd/system/$is_core.service ]]; then
+                rm -f /etc/systemd/system/$is_core.service
+                systemctl daemon-reload
+                msg ok "  - 已清理 systemd 配置"
+            fi
+
+            msg ok "失败回滚完成"
+        fi
+
         msg err "哦豁.."
         msg err "安装过程出现错误..."
         echo -e "反馈问题) https://github.com/${is_sh_repo}/issues"
         echo
         exit 1
-    }
+    fi
     exit
 }
 
