@@ -1472,13 +1472,15 @@ get() {
             all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.kcpSettings.header.type // ""')")
             all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.quicSettings.header.type // ""')")
             all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.wsSettings.path // ""')")
-            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.httpSettings.path // ""')")
+            # Support both httpSettings (old) and xhttpSettings (new)
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.httpSettings.path // .inbounds[0].streamSettings.xhttpSettings.path // ""')")
             all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.grpcSettings.serviceName // ""')")
 
-            # host(3): grpc_host,ws_host,h2_host
+            # host(3): grpc_host,ws_host,h2_host (plus xhttp)
             all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.grpc_host // ""')")
             all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.wsSettings.headers.Host // ""')")
-            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.httpSettings.host[0] // ""')")
+            # httpSettings.host is array [0], xhttpSettings.host is string
+            all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.httpSettings.host[0] // .inbounds[0].streamSettings.xhttpSettings.host // ""')")
 
             # reality(3): is_servername,is_public_key,is_private_key
             all_json_output+=("$(echo "$is_json_str" | jq -r '.inbounds[0].streamSettings.realitySettings.serverNames[0] // ""')")
