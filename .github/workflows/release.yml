@@ -1,0 +1,120 @@
+name: Release Auto Build
+
+on:
+  push:
+    tags:
+      - 'v*-release'
+      - 'v*.*.*'
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version info
+        id: version
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          
+          # 提取版本号（去掉 -release 后缀）
+          VERSION=${TAG_NAME%-release}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # 生成 release 标题
+          echo "title=$VERSION - v2ray Release" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # 获取上一个 release tag
+          PREV_TAG=$(git tag --sort=-creatordate | grep -E 'v[0-9]+\.[0-9]+\.[0-9]+' | head -2 | tail -1 || echo "")
+          
+          if [[ -n "$PREV_TAG" ]]; then
+            echo "### 更新内容" > changelog.md
+            echo "" >> changelog.md
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" >> changelog.md
+          else
+            echo "### 首次发布" > changelog.md
+          fi
+          
+          echo "changelog=$(cat changelog.md)" >> $GITHUB_OUTPUT
+
+      - name: Create code.zip
+        run: |
+          echo "打包 v2ray.sh 和 src/ 目录..."
+          zip -r code.zip v2ray.sh src/
+          
+          echo "文件信息："
+          ls -lh code.zip
+          
+          # 验证 zip 内容
+          echo "包含文件："
+          zipinfo code.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.version.outputs.title }}
+          tag_name: ${{ steps.version.outputs.tag_name }}
+          body: |
+            ## 版本 ${{ steps.version.outputs.version }}
+            
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ---
+            
+            ## 安装方式
+            
+            ```bash
+            # 一键安装
+            bash <(curl -Ls https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.version.outputs.tag_name }}/install.sh)
+            
+            # 备用地址（jsDelivr CDN 加速）
+            bash <(curl -Ls https://cdn.jsdelivr.net/gh/${{ github.repository }}@${{ steps.version.outputs.tag_name }}/install.sh)
+            
+            # 指定 TLS 方案
+            bash <(curl -Ls https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.version.outputs.tag_name }}/install.sh) --tls nginx
+            bash <(curl -Ls https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.version.outputs.tag_name }}/install.sh) --tls caddy
+            ```
+          files: |
+            code.zip
+            install.sh
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify release assets
+        run: |
+          echo "等待 release 创建完成..."
+          sleep 5
+          
+          # 使用 GitHub API 验证 assets
+          API_URL="https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.version.outputs.tag_name }}"
+          ASSETS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" $API_URL | jq -r '.assets[].name')
+          
+          echo "已上传的 assets:"
+          echo "$ASSETS"
+          
+          # 检查 code.zip 是否存在
+          if echo "$ASSETS" | grep -q "code.zip"; then
+            echo "✅ code.zip 已成功上传到 release"
+          else
+            echo "❌ code.zip 未找到"
+            exit 1
+          fi
+          
+          # 检查 install.sh 是否存在
+          if echo "$ASSETS" | grep -q "install.sh"; then
+            echo "✅ install.sh 已成功上传到 release"
+          else
+            echo "❌ install.sh 未找到"
+            exit 1
+          fi
