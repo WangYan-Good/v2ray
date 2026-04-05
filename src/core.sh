@@ -1659,11 +1659,11 @@ get() {
             json_str=''"$is_server_id_json"','"$is_stream"''
             ;;
         *h2* | *http*)
-            # 使用新版 xhttp 格式，兼容 V2Ray 5.x+ 和 Xray
-            # 新版 V2Ray/Xray 已移除旧版 h2，改用 xhttp 统一接口
+            # 使用新版 xhttp 格式，兼容 Xray-core
+            # host 字段是字符串（非数组），mode 指定传输模式
             net=xhttp
             [[ ! $path ]] && path="/$uuid"
-            is_stream='streamSettings:{network:"xhttp",security:'\"$is_tls\"',xhttpSettings:{path:'\"$path\"',host:['\"$host\"'],mode:"auto"}}'
+            is_stream='streamSettings:{network:"xhttp",security:'\"$is_tls\"',xhttpSettings:{path:'\"$path\"',host:'\"$host\"',mode:"auto"}}'
             json_str=''"$is_server_id_json"','"$is_stream"''
             ;;
         *reality*)
