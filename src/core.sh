@@ -1674,18 +1674,18 @@ get() {
             is_stream='streamSettings:{network:"grpc",grpc_host:'\"$host\"',security:'\"$is_tls\"',grpcSettings:{serviceName:'\"$path\"'}}'
             json_str=''"$is_server_id_json"','"$is_stream"''
             ;;
+        *xhttp*)
+            # XHTTP 协议 (Xray 原生支持，多路复用，必须放在 *http* 之前)
+            net=xhttp
+            [[ ! $path ]] && path="/$uuid"
+            is_stream='streamSettings:{network:"xhttp",security:'\"$is_tls\"',xhttpSettings:{path:'\"$path\"',host:'\"$host\"',mode:"auto"}}'
+            json_str=''"$is_server_id_json"','"$is_stream"''
+            ;;
         *h2* | *http*)
             # H2 使用 xhttp 网络 (Xray 中 H2 已被 xhttp 替代)
             net=xhttp
             [[ ! $path ]] && path="/$uuid"
             is_stream='streamSettings:{network:"xhttp",security:'\"$is_tls\"',xhttpSettings:{path:'\"$path\"',host:'\"$host\"',mode:"stream-one"}}'
-            json_str=''"$is_server_id_json"','"$is_stream"''
-            ;;
-        *xhttp*)
-            # XHTTP 协议 (Xray 原生支持，多路复用)
-            net=xhttp
-            [[ ! $path ]] && path="/$uuid"
-            is_stream='streamSettings:{network:"xhttp",security:'\"$is_tls\"',xhttpSettings:{path:'\"$path\"',host:'\"$host\"',mode:"auto"}}'
             json_str=''"$is_server_id_json"','"$is_stream"''
             ;;
         *reality*)
