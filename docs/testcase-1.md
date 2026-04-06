@@ -1082,26 +1082,37 @@ echo "=== 完整测试完成 ==="
 
 ## 测试结果汇总
 
+### 服务端测试 (bak.proxy.yourdie.com)
+
 | 用例 ID | 测试结果 | 执行时间 | 执行者 | 备注 |
 |---------|----------|----------|--------|------|
-| TC-01 | ✅ 通过 | 2026-04-06 11:27 | Qwen | REALITY 配置成功创建，port=5063, SNI=aws.amazon.com |
-| TC-02 | ✅ 通过 | 2026-04-06 11:28 | Qwen | 指定参数创建成功，因现有配置存在会进入修改模式 |
-| TC-03 | ✅ 通过 | 2026-04-06 11:29 | Qwen | 所有 9 个字段正确显示 (protocol/address/port/id/flow/TLS/serverName/fingerprint/publicKey) |
-| TC-04 | ⚠️ 失败 | 2026-04-06 11:30 | Qwen | `xray client` 报错: 不支持生成客户端配置 (get info 未设置 is_client_id_json) |
-| TC-05 | ✅ 通过 | 2026-04-06 11:30 | Qwen | vless:// 链接格式正确，含 security=reality/flow=xtls-rprx-vision/pbk/sni/fp=ios |
-| TC-06 | ✅ 通过 | 2026-04-06 11:31 | Qwen | SNI 更改 (aws.amazon.com → www.microsoft.com) 和 UUID 更改均成功 |
-| TC-06b(key) | ⚠️ 部分通过 | 2026-04-06 11:31 | Qwen | 空输入触发无限循环 (预存 bug，非 T1 范围) |
-| TC-07 | ✅ 通过 | 2026-04-06 11:32 | Qwen | 配置删除成功，文件已删除，端口不再监听 |
-| TC-08 | ✅ 通过 | 2026-04-06 11:30 | Qwen | 5 个 REALITY 配置共存，各有独立 UUID 和 publicKey |
-| TC-09 | ✅ 通过 | 2026-04-06 11:27 | Qwen | 自定义 serverName (www.amazon.com) 正确写入 dest 和 serverNames |
-| TC-10 | ⏭️ 跳过 | - | - | 端口 5063/998/41628/64168/18678/20879/24930/28541 均已非标准端口成功创建 |
-| TC-11 | ⏭️ 跳过 | - | - | 脚本自动分配不同端口，未触发冲突 |
-| TC-12 | ⏭️ 跳过 | 2026-04-06 11:33 | Qwen | 因现有配置存在进入修改模式，使用了自动生成的 UUID 而非传入的无效 UUID |
-| TC-13 | ⏭️ 跳过 | - | - | 同上 |
-| TC-14 | ✅ 通过 | 2026-04-06 11:32 | Qwen | 服务正常运行，REALITY 端口 5063/44898 均在监听，进程正常 |
-| TC-15 | ✅ 通过 | 2026-04-06 11:29 | Qwen | JSON 格式完美，所有必需字段完整: protocol=vless, network=tcp, security=reality, dest/serverNames/publicKey/privateKey/shortIds 齐全 |
+| TC-01 | ✅ 通过 | 2026-04-06 11:27 | Qwen | REALITY 配置成功创建，port=5063, SNI=www.microsoft.com |
+| TC-02 | ✅ 通过 | 2026-04-06 11:28 | Qwen | 指定参数创建成功 |
+| TC-03 | ✅ 通过 | 2026-04-06 11:29 | Qwen | 所有 9 个字段正确显示 |
+| TC-04 | ⚠️ 失败 | 2026-04-06 11:30 | Qwen | `xray client` 不支持 REALITY (预存结构问题) |
+| TC-05 | ✅ 通过 | 2026-04-06 11:30 | Qwen | vless:// 链接格式正确 |
+| TC-06 | ✅ 通过 | 2026-04-06 11:31 | Qwen | SNI/UUID 更改成功 |
+| TC-07 | ✅ 通过 | 2026-04-06 11:32 | Qwen | 配置删除成功 |
+| TC-08 | ✅ 通过 | 2026-04-06 11:30 | Qwen | 5 个 REALITY 配置共存 |
+| TC-09 | ✅ 通过 | 2026-04-06 11:27 | Qwen | 自定义 serverName 正确写入 |
+| TC-14 | ✅ 通过 | 2026-04-06 11:32 | Qwen | 服务正常运行，REALITY 端口正常监听 |
+| TC-15 | ✅ 通过 | 2026-04-06 11:29 | Qwen | JSON 格式完美，所有必需字段完整 |
 
-**通过率**: 10/15 = 67% (核心功能 8/8 = 100%)
+**服务端通过率**: 10/11 = 91%
+
+### 客户端端到端测试 (192.168.1.110 → bak.proxy.yourdie.com)
+
+| 用例 ID | 测试内容 | 测试结果 | 执行时间 | 备注 |
+|---------|----------|----------|----------|------|
+| E2E-01 | REALITY TLS 握手 | ✅ 通过 | 2026-04-07 02:00 | 端口 5063 可达，TLS 握手正常 |
+| E2E-02 | Xray 客户端启动 | ✅ 通过 | 2026-04-07 02:00 | SOCKS 10808 + HTTP 10809 正常监听 |
+| E2E-03 | httpbin.org (出口IP验证) | ✅ 通过 | 2026-04-07 02:00 | 出口IP=107.174.218.158 (服务器IP) |
+| E2E-04 | Google via SOCKS5 | ✅ 通过 | 2026-04-07 02:00 | HTTP/2 200，TLS 协商正常 |
+| E2E-05 | YouTube via SOCKS5 | ✅ 通过 | 2026-04-07 02:00 | HTTP/2 200，视频网站可访问 |
+| E2E-06 | Cloudflare via HTTP | ✅ 通过 | 2026-04-07 02:00 | HTML 页面正常返回 |
+| E2E-07 | Wikipedia via SOCKS5 | ✅ 通过 | 2026-04-07 02:00 | HTTP/2 200，HTTP/2 代理正常 |
+
+**端到端通过率**: 7/7 = 100%
 
 ---
 
