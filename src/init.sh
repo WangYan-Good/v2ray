@@ -51,7 +51,7 @@ warn() {
 
 ##
 ## load bash script.
-## 加载执行 /etc/v2ray/sh/src/ 下传参的第一个参数文件
+## 加载执行 /etc/xray/sh/src/ 下传参的第一个参数文件
 ##
 load() {
     . $is_sh_dir/src/$1
