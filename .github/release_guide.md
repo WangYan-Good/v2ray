@@ -3,7 +3,7 @@
 ## 概述
 
 当推送匹配 `v*.*.*` 或 `v*-release` 格式的 tag 时，GitHub Actions 会自动：
-1. 打包 `code.zip`（包含 `v2ray.sh` 和 `src/` 目录）
+1. 打包 `code.zip`（包含 `xray.sh` 和 `src/` 目录）
 2. 创建 GitHub Release
 3. 上传 `code.zip` 和 `install.sh` 作为 release assets
 4. 自动生成更新日志
@@ -54,7 +54,7 @@ Release 会自动创建，包含：
 - name: Create code.zip
   run: |
     # 修改这里来调整打包内容
-    zip -r code.zip v2ray.sh src/
+    zip -r code.zip xray.sh src/
 ```
 
 ## 故障排查
