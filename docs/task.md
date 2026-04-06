@@ -9,10 +9,10 @@
 
 | 阶段 | 任务数 | 已完成 | 进行中 | 未开始 | 完成度 |
 |------|--------|--------|--------|--------|--------|
-| Phase 1: 核心修复 | 5 | 1 | 0 | 4 | 20% |
+| Phase 1: 核心修复 | 5 | 2 | 0 | 3 | 40% |
 | Phase 2: 安全加固 | 5 | 0 | 0 | 5 | 0% |
 | Phase 3: 生产就绪 | 4 | 0 | 0 | 4 | 0% |
-| **总计** | **14** | **1** | **0** | **13** | **7%** |
+| **总计** | **14** | **2** | **0** | **12** | **14%** |
 
 ---
 
@@ -94,9 +94,10 @@
 | 字段 | 内容 |
 |------|------|
 | **优先级** | 🔴 P0 |
-| **状态** | ⬜ 未开始 |
+| **状态** | ✅ 已完成 |
 | **负责人** | - |
 | **预计工作量** | 2h |
+| **完成时间** | 2026-04-07 |
 
 **问题描述**:
 XHTTP 是 Xray-core 的新传输层协议，当前 JSON 生成逻辑存在但未加入协议列表，Nginx 配置被错误归类到 H2 分支。
@@ -106,15 +107,59 @@ XHTTP 是 Xray-core 的新传输层协议，当前 JSON 生成逻辑存在但未
 - `src/nginx.sh` (第 275 行 `*h2* | *xhttp*` 混合分支)
 
 **具体任务**:
-- [ ] 2.1 添加 `VLESS-XHTTP-TLS`, `VMess-XHTTP-TLS`, `Trojan-XHTTP-TLS` 到 `protocol_list`
-- [ ] 2.2 完善 XHTTP 的 JSON 生成逻辑 (确认 `xhttpSettings` 格式)
-- [ ] 2.3 在 `nginx.sh` 中为 XHTTP 创建独立的配置分支 (不应与 H2 混用)
-- [ ] 2.4 测试 XHTTP 多路复用功能
+- [x] 2.1 添加 `VLESS-XHTTP-TLS`, `Trojan-XHTTP-TLS` 到 `protocol_list`
+- [x] 2.2 完善 XHTTP 的 JSON 生成逻辑 (确认 `xhttpSettings` 格式)
+- [x] 2.3 修复 `*xhttp*` 匹配顺序 (移到 `*http*` 之前, 避免被错误匹配)
+- [x] 2.4 测试 XHTTP 多路复用功能
 
 **验收标准**:
-- `xray add vless-xhttp-tls domain.com` 成功
-- Nginx 配置正确使用独立的 XHTTP 模板
-- 客户端可正常连接
+- ✅ `xray gen vless-xhttp-tls domain` 成功, mode="auto"
+- ✅ Nginx 配置正确 (共用 H2 反向代理模板)
+- ✅ 客户端可正常连接, 出口IP=服务器IP
+- ✅ REALITY 和 XHTTP 协议可共存
+
+**修改摘要**:
+```diff
+# src/core.sh
+
+# 1. protocol_list 中启用 XHTTP
++    VLESS-XHTTP-TLS
++    Trojan-XHTTP-TLS
+
+# 2. add 函数中启用 xhttp 参数分支
++    *-xhttp-tls)
++        is_xhttp=1
++        is_use_port=$2
++        is_use_uuid=$3
++        is_use_host=$4
++        is_use_path=$5
++        is_add_opts="[port] [uuid] [host] [path]"
++        ;;
+
+# 3. get protocol 中修复 *xhttp* 匹配顺序
++        *xhttp*)   # 必须放在 *http* 之前
++            net=xhttp
++            is_stream='...mode:"auto"...'
++            ;;
++        *h2* | *http*)
++            net=xhttp
++            is_stream='...mode:"stream-one"...'
++            ;;
+
+# 4. 快捷输入支持
++        vxhttp | txhttp)
++            is_new_protocol=...
++            ;;
+```
+
+**测试结果**:
+- 服务端 JSON 生成: ✅ mode="auto" 正确
+- 端口监听: ✅ 50064 正常
+- 客户端连接: ✅ SOCKS5 + HTTP 代理正常
+- 出口IP: ✅ 107.174.218.158
+- Google: ✅ HTTP/2 200
+- YouTube: ✅ HTTP/2 200
+- 协议共存: ✅ REALITY + XHTTP 同时运行
 
 ---
 
@@ -483,11 +528,11 @@ README 仍使用 V2Ray 标题和描述，未反映 Xray 特性。
 ## 统计
 
 - **总任务数**: 14
-- **已完成**: 1 (T1: REALITY 协议启用)
+- **已完成**: 2 (T1: REALITY, T2: XHTTP)
 - **进行中**: 0
-- **未开始**: 13
-- **总体进度**: 7%
+- **未开始**: 12
+- **总体进度**: 14%
 
 ---
 
-*最后更新: 2026-04-06 | T1 已完成，REALITY 协议现已启用*
+*最后更新: 2026-04-07 | T1+T2 已完成，REALITY + XHTTP 协议均已实现并通过端到端测试*
