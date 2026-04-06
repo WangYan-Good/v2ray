@@ -1416,9 +1416,9 @@ get() {
     file)
         is_file_str=$2
         [[ ! $is_file_str ]] && is_file_str='.json$'
-        
+
         ##
-        ## is_conf_dir = /etc/v2ray/conf
+        ## is_conf_dir = /etc/xray/conf
         ## 筛选、过滤、限制数量，把符合条件的配置文件存入数组
         ##
         # is_all_json=("$(ls $is_conf_dir | grep -E $is_file_str)")
