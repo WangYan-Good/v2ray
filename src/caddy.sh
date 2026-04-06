@@ -5,9 +5,9 @@ caddy_config() {
         mkdir -p $is_caddy_dir $is_caddy_dir/sites $is_caddy_conf
         cat >$is_caddy_file <<-EOF
 # don't edit this file #
-# for more info, see https://wangyan-good.github.io/v2ray/caddy-auto-tls/
+# for more info, see https://wangyan-good.github.io/xray/caddy-auto-tls/
 # 不要编辑这个文件 #
-# 更多相关请阅读此文章: https://wangyan-good.github.io/v2ray/caddy-auto-tls/
+# 更多相关请阅读此文章: https://wangyan-good.github.io/xray/caddy-auto-tls/
 # https://caddyserver.com/docs/caddyfile/options
 {
   admin off

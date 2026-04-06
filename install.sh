@@ -1,7 +1,7 @@
 #!/bin/bash
 
 author=WangYan-Good
-# github=https://github.com/WangYan-Good/v2ray
+# github=https://github.com/WangYan-Good/xray
 
 # bash fonts colors
 red='\e[31m'

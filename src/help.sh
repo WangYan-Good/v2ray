@@ -75,7 +75,7 @@ show_help() {
         done
         msg "谨慎使用 del, ddel, 此选项会直接删除配置; 无需确认"
         msg "反馈问题) $(msg_ul https://github.com/${is_sh_repo}/issues) "
-        msg "文档 (doc) $(msg_ul https://wangyan-good.github.io/v2ray/$is_core-script/)"
+        msg "文档 (doc) $(msg_ul https://wangyan-good.github.io/xray/$is_core-script/)"
         ;;
 
     esac
@@ -83,9 +83,9 @@ show_help() {
 
 about() {
     msg
-    msg "网站：https://wangyan-good.github.io/v2ray/"
-    msg "Github: https://github.com/WangYan-Good/v2ray"
-    msg "$is_core_name site: https://www.v2fly.org"
-    msg "$is_core_name core: https://github.com/v2fly/v2ray-core"
+    msg "网站：https://wangyan-good.github.io/xray/"
+    msg "Github: https://github.com/WangYan-Good/xray"
+    msg "$is_core_name site: https://xtls.github.io/"
+    msg "$is_core_name core: https://github.com/XTLS/Xray-core"
     msg
 }

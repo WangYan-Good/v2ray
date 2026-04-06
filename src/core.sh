@@ -10,7 +10,7 @@ protocol_list=(
     VLESS-H2-TLS
     VLESS-WS-TLS
     VLESS-gRPC-TLS
-    # VLESS-XTLS-uTLS-REALITY
+    VLESS-XTLS-uTLS-REALITY
     Trojan-H2-TLS
     Trojan-WS-TLS
     Trojan-gRPC-TLS
@@ -1108,9 +1108,9 @@ add() {
         ws | h2 | grpc | vws | vh2 | vgrpc | tws | th2 | tgrpc)
             is_new_protocol=$(sed -E "s/^V/VLESS-/;s/^T/Trojan-/;/^(W|H|G)/{s/^/VMess-/};s/G/g/" <<<${is_lower^^})-TLS
             ;;
-        # r | reality)
-        #     is_new_protocol=VLESS-XTLS-uTLS-REALITY
-        #     ;;
+        r | reality)
+            is_new_protocol=VLESS-XTLS-uTLS-REALITY
+            ;;
         ss)
             is_new_protocol=Shadowsocks
             ;;
@@ -1157,12 +1157,13 @@ add() {
             is_add_opts="[port] [uuid] [type]"
         fi
         ;;
-    # *reality*)
-    #     is_reality=1
-    #     is_use_port=$2
-    #     is_use_uuid=$3
-    #     is_use_servername=$4
-    #     ;;
+    reality)
+        is_reality=1
+        is_use_port=$2
+        is_use_uuid=$3
+        is_use_servername=$4
+        is_add_opts="[port] [uuid] [servername]"
+        ;;
     shadowsocks)
         is_use_port=$2
         is_use_pass=$3
