@@ -5,7 +5,7 @@
 
 nginx_config() {
     ##
-    ## /etc/nginx/v2ray/{host}.conf
+    ## /etc/nginx/xray/{host}.conf
     ##
     is_nginx_site_file=$is_nginx_conf/${host}.conf
 
@@ -13,19 +13,19 @@ nginx_config() {
     ## /etc/nginx/ssl/{host}/fullchain.pem
     ##
     is_ssl_cert=$is_nginx_dir/ssl/${host}/fullchain.pem
-    
+
     ##
     ## /etc/nginx/ssl/{host}/privkey.pem
     ##
     is_ssl_key=$is_nginx_dir/ssl/${host}/privkey.pem
-    
+
     case $1 in
     new)
         ##
         ## 创建目录结构
         ## - /etc/nginx
         ## - /etc/nginx/ssl
-        ## - /etc/nginx/v2ray
+        ## - /etc/nginx/xray
         ##
         mkdir -p $is_nginx_dir $is_nginx_dir/ssl $is_nginx_conf
 
@@ -88,8 +88,8 @@ http {
 EOF
         else
             ##
-            ## nginx.conf 已存在，检查是否需要添加 V2Ray 导入
-            ## 通过判断 /etc/nginx/v2ray/*.conf 来判断
+            ## nginx.conf 已存在，检查是否需要添加 Xray 导入
+            ## 通过判断 /etc/nginx/xray/*.conf 来判断
             ##
             if ! grep -q "include $is_nginx_conf/\*.conf" $is_nginx_file; then
                 
