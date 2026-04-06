@@ -409,7 +409,7 @@ create() {
                 create caddy $net
 
                 ##
-                ## 配置一致性校验：检查 Caddy reverse_proxy 路径是否与 V2Ray path 匹配
+                ## 配置一致性校验：检查 Caddy reverse_proxy 路径是否与 Xray path 匹配
                 ##
                 is_caddy_site_file=$is_caddy_conf/${host}.conf
                 if [[ -f $is_caddy_site_file ]]; then
@@ -417,22 +417,22 @@ create() {
                     ## 从 Caddyfile 中提取 reverse_proxy 的路径 (例如 /uuid)
                     ##
                     is_caddy_path=$(grep -E '^\s*reverse_proxy\s+' "$is_caddy_site_file" | head -1 | awk '{print $2}')
-                    
+
                     ##
-                    ## 从 V2Ray JSON 中提取 path
+                    ## 从 Xray JSON 中提取 path
                     ##
-                    is_v2ray_path=$(jq -r '.inbounds[0].streamSettings.httpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // empty' "$is_json_file" 2>/dev/null)
+                    is_xray_path=$(jq -r '.inbounds[0].streamSettings.httpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // empty' "$is_json_file" 2>/dev/null)
 
                     ##
                     ## 排除空值或 root (/) 的情况，进行精确匹配
                     ##
-                    if [[ -n "$is_caddy_path" && -n "$is_v2ray_path" && "$is_caddy_path" != "$is_v2ray_path" ]]; then
-                        msg err "配置冲突：V2Ray 路径 ($is_v2ray_path) 与 Caddy reverse_proxy ($is_caddy_path) 不匹配！"
+                    if [[ -n "$is_caddy_path" && -n "$is_xray_path" && "$is_caddy_path" != "$is_xray_path" ]]; then
+                        msg err "配置冲突：Xray 路径 ($is_xray_path) 与 Caddy reverse_proxy ($is_caddy_path) 不匹配！"
                         msg warn "如果继续使用当前配置，客户端将无法连接。"
                         echo
                         echo "请选择:"
                         echo "1) 重新生成并覆盖 Caddy 配置 (推荐)"
-                        echo "2) 放弃本次 V2Ray 配置更改 (保留旧配置)"
+                        echo "2) 放弃本次 Xray 配置更改 (保留旧配置)"
                         echo "3) 继续（连接将失败，需手动修复）"
                         while :; do
                             read -p "请选择 [1-3] (默认:1): " is_caddy_conflict_choice
@@ -455,13 +455,13 @@ create() {
                                 rm -f "$is_json_file"
                                 [[ -f ${is_caddy_site_file}.bak ]] && {
                                     cp -f ${is_caddy_site_file}.bak ${is_caddy_site_file}
-                                    msg warn "已放弃新 V2Ray 配置，恢复旧 Caddy 配置"
-                                } || msg warn "已放弃新 V2Ray 配置"
+                                    msg warn "已放弃新 Xray 配置，恢复旧 Caddy 配置"
+                                } || msg warn "已放弃新 Xray 配置"
                                 manage restart caddy &
                                 return
                                 ;;
                             3)
-                                msg warn "已继续，但请注意 V2Ray 与 Caddy 配置不一致"
+                                msg warn "已继续，但请注意 Xray 与 Caddy 配置不一致"
                                 break
                                 ;;
                             *)
@@ -476,7 +476,7 @@ create() {
                 create nginx $net
 
                 ##
-                ## 配置一致性校验：检查 Nginx location 路径是否与 V2Ray path 匹配
+                ## 配置一致性校验：检查 Nginx location 路径是否与 Xray path 匹配
                 ##
                 is_nginx_site_file=$is_nginx_conf/${host}.conf
                 if [[ -f $is_nginx_site_file ]]; then
@@ -484,22 +484,22 @@ create() {
                     ## 从 Nginx 配置中提取 location 路径
                     ##
                     is_nginx_location_path=$(grep -E '^\s+location\s+/' "$is_nginx_site_file" | head -1 | awk '{print $2}' | sed 's/{$//')
-                    
+
                     ##
-                    ## 从 V2Ray JSON 中提取 path
+                    ## 从 Xray JSON 中提取 path
                     ##
-                    is_v2ray_path=$(jq -r '.inbounds[0].streamSettings.httpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // empty' "$is_json_file" 2>/dev/null)
+                    is_xray_path=$(jq -r '.inbounds[0].streamSettings.httpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // empty' "$is_json_file" 2>/dev/null)
 
                     ##
                     ## 排除空值或 root (/) 的情况，进行精确匹配
                     ##
-                    if [[ -n "$is_nginx_location_path" && -n "$is_v2ray_path" && "$is_nginx_location_path" != "$is_v2ray_path" ]]; then
-                        msg err "配置冲突：V2Ray 路径 ($is_v2ray_path) 与 Nginx location ($is_nginx_location_path) 不匹配！"
+                    if [[ -n "$is_nginx_location_path" && -n "$is_xray_path" && "$is_nginx_location_path" != "$is_xray_path" ]]; then
+                        msg err "配置冲突：Xray 路径 ($is_xray_path) 与 Nginx location ($is_nginx_location_path) 不匹配！"
                         msg warn "如果继续使用当前配置，客户端将无法连接。"
                         echo
                         echo "请选择:"
                         echo "1) 重新生成并覆盖 Nginx 配置 (推荐)"
-                        echo "2) 放弃本次 V2Ray 配置更改 (保留旧配置)"
+                        echo "2) 放弃本次 Xray 配置更改 (保留旧配置)"
                         echo "3) 继续（连接将失败，需手动修复）"
                         while :; do
                             read -p "请选择 [1-3] (默认:1): " is_conflict_choice
@@ -522,13 +522,13 @@ create() {
                                 rm -f "$is_json_file"
                                 [[ -f ${is_nginx_site_file}.bak ]] && {
                                     cp -f ${is_nginx_site_file}.bak ${is_nginx_site_file}
-                                    msg warn "已放弃新 V2Ray 配置，恢复旧 Nginx 配置"
-                                } || msg warn "已放弃新 V2Ray 配置"
+                                    msg warn "已放弃新 Xray 配置，恢复旧 Nginx 配置"
+                                } || msg warn "已放弃新 Xray 配置"
                                 nginx_reload
                                 return
                                 ;;
                             3)
-                                msg warn "已继续，但请注意 V2Ray 与 Nginx 配置不一致"
+                                msg warn "已继续，但请注意 Xray 与 Nginx 配置不一致"
                                 break
                                 ;;
                             *)
@@ -578,23 +578,23 @@ create() {
         ## 加载 nginx.sh 脚本
         ##
         load nginx.sh
-        
+
         ##
-        ## 在 nginx 主配置文件中添加 v2ray 配置
+        ## 在 nginx 主配置文件中添加 xray 配置
         ##
         [[ $is_install_nginx ]] && nginx_config new
-        
+
         ##
-        ## 创建 v2ray 配置文件
+        ## 创建 xray 配置文件
         ##
         [[ ! -d $is_nginx_conf ]] && mkdir -p $is_nginx_conf
-        
+
         ##
         ## create nginx new
         ##
         if ! nginx_config $2; then
             msg err "Nginx 配置生成失败，证书申请未成功"
-            msg warn "V2Ray 配置已生成，但 TLS 尚未启用"
+            msg warn "Xray 配置已生成，但 TLS 尚未启用"
             msg warn "你可以稍后手动申请证书并重载 Nginx"
             is_api_fail=1
         fi
