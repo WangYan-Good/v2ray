@@ -10,10 +10,12 @@ protocol_list=(
     VLESS-H2-TLS
     VLESS-WS-TLS
     VLESS-gRPC-TLS
+    VLESS-XHTTP-TLS
     VLESS-XTLS-uTLS-REALITY
     Trojan-H2-TLS
     Trojan-WS-TLS
     Trojan-gRPC-TLS
+    Trojan-XHTTP-TLS
     Shadowsocks
     # Dokodemo-Door
     VMess-TCP-dynamic-port
@@ -1108,6 +1110,9 @@ add() {
         ws | h2 | grpc | vws | vh2 | vgrpc | tws | th2 | tgrpc)
             is_new_protocol=$(sed -E "s/^V/VLESS-/;s/^T/Trojan-/;/^(W|H|G)/{s/^/VMess-/};s/G/g/" <<<${is_lower^^})-TLS
             ;;
+        vxhttp | txhttp)
+            is_new_protocol=$(sed -E "s/^V/VLESS-/;s/^T/Trojan-/" <<<${is_lower^^})
+            ;;
         r | reality)
             is_new_protocol=VLESS-XTLS-uTLS-REALITY
             ;;
@@ -1156,6 +1161,14 @@ add() {
         else
             is_add_opts="[port] [uuid] [type]"
         fi
+        ;;
+    *-xhttp-tls)
+        is_xhttp=1
+        is_use_port=$2
+        is_use_uuid=$3
+        is_use_host=$4
+        is_use_path=$5
+        is_add_opts="[port] [uuid] [host] [path]"
         ;;
     reality)
         is_reality=1
@@ -1662,8 +1675,14 @@ get() {
             json_str=''"$is_server_id_json"','"$is_stream"''
             ;;
         *h2* | *http*)
-            # 使用新版 xhttp 格式，兼容 Xray-core
-            # host 字段是字符串（非数组），mode 指定传输模式
+            # H2 使用 xhttp 网络 (Xray 中 H2 已被 xhttp 替代)
+            net=xhttp
+            [[ ! $path ]] && path="/$uuid"
+            is_stream='streamSettings:{network:"xhttp",security:'\"$is_tls\"',xhttpSettings:{path:'\"$path\"',host:'\"$host\"',mode:"stream-one"}}'
+            json_str=''"$is_server_id_json"','"$is_stream"''
+            ;;
+        *xhttp*)
+            # XHTTP 协议 (Xray 原生支持，多路复用)
             net=xhttp
             [[ ! $path ]] && path="/$uuid"
             is_stream='streamSettings:{network:"xhttp",security:'\"$is_tls\"',xhttpSettings:{path:'\"$path\"',host:'\"$host\"',mode:"auto"}}'
