@@ -72,7 +72,7 @@
 │   │   ├── log.sh          # 日志管理
 │   │   ├── dns.sh          # DNS 配置
 │   │   └── bbr.sh          # BBR 优化
-│   └── v2ray.sh            # 主入口
+│   └── xray.sh            # 主入口
 ├── conf/                   # V2Ray 配置文件
 │   ├── VMess-WS-8080.json
 │   └── VLESS-gRPC-443.json
@@ -109,7 +109,7 @@
 用户命令 (v2ray xxx)
     │
     ▼
-v2ray.sh (入口)
+xray.sh (入口)
     │
     ▼
 init.sh (初始化)
@@ -199,7 +199,7 @@ v2ray update.sh
 cp -rf /path/to/v2ray/src/* /etc/v2ray/sh/src/
 
 # 2. 复制主脚本
-cp /path/to/v2ray/v2ray.sh /etc/v2ray/sh/
+cp /path/to/v2ray/xray.sh /etc/xray/sh/
 
 # 3. 验证版本
 v2ray version
@@ -1826,11 +1826,11 @@ GPL-3.0 License
 
 **1. 打包脚本代码**
 
-将 `v2ray.sh` 和 `src/` 目录打包成 `code.zip`（`install.sh` 运行时会自动下载并解压此文件）：
+将 `xray.sh` 和 `src/` 目录打包成 `code.zip`（`install.sh` 运行时会自动下载并解压此文件）：
 
 ```bash
 cd /path/to/v2ray
-zip -r code.zip v2ray.sh src/
+zip -r code.zip xray.sh src/
 ```
 
 **2. 创建 Release 并上传资产**
