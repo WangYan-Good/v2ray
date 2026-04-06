@@ -87,18 +87,20 @@ amd64 | x86_64)
     ;;
 esac
 
-is_core=v2ray
-is_core_name=V2Ray
-is_core_dir=/etc/$is_core
-is_core_bin=$is_core_dir/bin/$is_core
-is_core_repo=v2fly/$is_core-core
-is_conf_dir=$is_core_dir/conf
-is_log_dir=/var/log/$is_core
-is_sh_bin=/usr/local/bin/$is_core
-is_sh_dir=$is_core_dir/sh
-is_sh_repo=$author/$is_core
+# Xray-core 变量定义
+is_core=xray                            # is_core      = xray
+is_core_name=Xray                       # is_core_name = Xray
+is_core_dir=/etc/$is_core               # is_core_dir  = /etc/xray
+is_core_bin=$is_core_dir/bin/$is_core   # is_core_bin  = /etc/xray/bin/xray
+# 使用 Xray-core 替代 V2Ray-core，以支持 xhttp、REALITY 等新特性
+is_core_repo=XTLS/Xray-core             # is_core_repo = XTLS/Xray-core
+is_conf_dir=$is_core_dir/conf           # is_conf_dir  = /etc/xray/conf
+is_log_dir=/var/log/$is_core            # is_log_dir   = /var/log/xray
+is_sh_bin=/usr/local/bin/$is_core       # is_sh_bin    = /usr/local/bin/xray
+is_sh_dir=$is_core_dir/sh               # is_sh_dir    = /etc/xray/sh
+is_sh_repo=$author/$is_core             # is_sh_repo   = WangYan-Good/xray
 is_pkg="wget unzip jq qrencode"
-is_config_json=$is_core_dir/config.json
+is_config_json=$is_core_dir/config.json # is_config_json = /etc/xray/config.json
 is_caddy_bin=/usr/local/bin/caddy
 is_caddy_dir=/etc/caddy
 is_caddy_repo=caddyserver/caddy
@@ -109,7 +111,7 @@ is_nginx_bin=/usr/sbin/nginx
 is_nginx_dir=/etc/nginx
 is_nginx_repo=nginx/nginx
 is_nginx_file=$is_nginx_dir/nginx.conf
-is_nginx_conf=$is_nginx_dir/v2ray
+is_nginx_conf=$is_nginx_dir/xray        # 从 v2ray 改为 xray，保持目录一致性
 is_nginx_service=$(systemctl list-units --full -all | grep nginx.service)
 is_http_port=80
 is_https_port=443
@@ -122,14 +124,14 @@ is_core_ver=$($is_core_bin version | head -n1 | cut -d " " -f1-2)
 if [[ $(grep -o ^[0-9] <<<${is_core_ver#* }) -lt 5 ]]; then
     # core version less than 5, e.g, v4.45.2
     is_core_ver_lt_5=1
-    if [[ $(grep 'run -config' /lib/systemd/system/v2ray.service) ]]; then
-        sed -i 's/run //' /lib/systemd/system/v2ray.service
+    if [[ $(grep 'run -config' /lib/systemd/system/$is_core.service) ]]; then
+        sed -i 's/run //' /lib/systemd/system/$is_core.service
         systemctl daemon-reload
     fi
 else
     is_with_run_arg=run
-    if [[ ! $(grep 'run -config' /lib/systemd/system/v2ray.service) ]]; then
-        sed -i 's/-config/run -config/' /lib/systemd/system/v2ray.service
+    if [[ ! $(grep 'run -config' /lib/systemd/system/$is_core.service) ]]; then
+        sed -i 's/-config/run -config/' /lib/systemd/system/$is_core.service
         systemctl daemon-reload
     fi
 fi

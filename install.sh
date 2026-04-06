@@ -63,17 +63,18 @@ amd64 | x86_64)
     ;;
 esac
 
-is_core=v2ray                           # is_core      = v2ray
-is_core_name=Xray                       # is_core_name = Xray (兼容 V2Ray 配置格式)
-is_core_dir=/etc/$is_core               # is_core_dir  = /etc/v2ray
-is_core_bin=$is_core_dir/bin/$is_core   # is_core_bin  = /etc/v2ray/bin/v2ray
+# Xray-core 变量定义
+is_core=xray                            # is_core      = xray
+is_core_name=Xray                       # is_core_name = Xray
+is_core_dir=/etc/$is_core               # is_core_dir  = /etc/xray
+is_core_bin=$is_core_dir/bin/$is_core   # is_core_bin  = /etc/xray/bin/xray
 # 使用 Xray-core 替代 V2Ray-core，以支持 xhttp 等新特性
 is_core_repo=XTLS/Xray-core             # is_core_repo = XTLS/Xray-core
-is_conf_dir=$is_core_dir/conf           # is_conf_dir  = /etc/v2ray/conf
-is_log_dir=/var/log/$is_core            # is_log_dir   = /var/log/v2ray
-is_sh_bin=/usr/local/bin/$is_core       # is_sh_bin    = /usr/local/bin/v2ray
-is_sh_dir=$is_core_dir/sh               # is_sh_dir    = /etc/v2ray/sh
-is_sh_repo=$author/$is_core             # is_sh_repo   = WangYan-Good/v2ray
+is_conf_dir=$is_core_dir/conf           # is_conf_dir  = /etc/xray/conf
+is_log_dir=/var/log/$is_core            # is_log_dir   = /var/log/xray
+is_sh_bin=/usr/local/bin/$is_core       # is_sh_bin    = /usr/local/bin/xray
+is_sh_dir=$is_core_dir/sh               # is_sh_dir    = /etc/xray/sh
+is_sh_repo=$author/$is_core             # is_sh_repo   = WangYan-Good/xray
 is_pkg="wget unzip"
 is_config_json=$is_core_dir/config.json # is_config_json = /etc/v2ray/config.json
 
@@ -176,8 +177,14 @@ install_pkg() {
 download() {
     case $1 in
     core)
-        link=https://github.com/${is_core_repo}/releases/latest/download/${is_core}-linux-${is_core_arch}.zip
-        [[ $is_core_ver ]] && link="https://github.com/${is_core_repo}/releases/download/${is_core_ver}/${is_core}-linux-${is_core_arch}.zip"
+        # Xray-core 使用 Xray 作为文件名，V2Ray-core 使用 v2ray
+        if [[ "$is_core_repo" == *"XTLS/Xray-core"* ]]; then
+            core_file_name="Xray-linux-${is_core_arch}.zip"
+        else
+            core_file_name="${is_core}-linux-${is_core_arch}.zip"
+        fi
+        link=https://github.com/${is_core_repo}/releases/latest/download/${core_file_name}
+        [[ $is_core_ver ]] && link="https://github.com/${is_core_repo}/releases/download/${is_core_ver}/${core_file_name}"
         name=$is_core_name
         tmpfile=$tmpcore
         is_ok=$is_core_ok
