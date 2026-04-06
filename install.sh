@@ -76,12 +76,12 @@ is_sh_bin=/usr/local/bin/$is_core       # is_sh_bin    = /usr/local/bin/xray
 is_sh_dir=$is_core_dir/sh               # is_sh_dir    = /etc/xray/sh
 is_sh_repo=$author/$is_core             # is_sh_repo   = WangYan-Good/xray
 is_pkg="wget unzip"
-is_config_json=$is_core_dir/config.json # is_config_json = /etc/v2ray/config.json
+is_config_json=$is_core_dir/config.json # is_config_json = /etc/xray/config.json
 
 # Nginx 变量
 is_nginx_dir=/etc/nginx                 # is_nginx_dir  = /etc/nginx
 is_nginx_file=$is_nginx_dir/nginx.conf  # is_nginx_file = /etc/nginx/nginx.conf
-is_nginx_conf=$is_nginx_dir/v2ray       # is_nginx_conf = /etc/nginx//v2ray
+is_nginx_conf=$is_nginx_dir/$is_core    # is_nginx_conf = /etc/nginx/xray
 
 # Caddy 变量
 is_caddy_dir=/etc/caddy
@@ -315,12 +315,12 @@ pass_args() {
             ;;
         --uninstall)
             # 执行卸载
-            if [[ -f /usr/local/bin/v2ray ]]; then
-                v2ray uninstall
+            if [[ -f $is_sh_bin ]]; then
+                $is_sh_bin uninstall
             else
                 # 直接删除文件
-                rm -rf /etc/v2ray /var/log/v2ray /usr/local/bin/v2ray
-                sed -i '/v2ray/d' /root/.bashrc
+                rm -rf $is_core_dir $is_log_dir $is_sh_bin
+                sed -i "/$is_core/d" /root/.bashrc
                 # 如果选择了卸载 caddy/nginx
                 if [[ -f /usr/local/bin/caddy ]]; then
                     systemctl stop caddy &>/dev/null
@@ -395,7 +395,7 @@ main() {
     ##
     ## check if scripts exists locally.
     ##
-    if [[ -f ${PWD}/src/core.sh && -f ${PWD}/v2ray.sh ]]; then
+    if [[ -f ${PWD}/src/core.sh && -f ${PWD}/$is_core.sh ]]; then
         msg warn "检测到本地脚本，使用本地安装模式"
         local_install=1
     fi
@@ -430,8 +430,8 @@ main() {
                 ;;
             2)
                 msg warn "执行卸载..."
-                if [[ -f /usr/local/bin/v2ray ]]; then
-                    v2ray uninstall
+                if [[ -f $is_sh_bin ]]; then
+                    $is_sh_bin uninstall
                 else
                     rm -rf $is_sh_dir $is_core_dir $is_conf_dir $is_log_dir
                     sed -i "/$is_core/d" /root/.bashrc
