@@ -184,7 +184,7 @@ fi
 load core.sh
 
 ##
-## old sh ver
+## old sh ver (旧版本 v2ray 备份路径，用于从旧版本迁移)
 ##
 is_old_dir=/etc/v2ray/old_backup
 is_old_conf=/etc/v2ray/v2ray_backup.conf
