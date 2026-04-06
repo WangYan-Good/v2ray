@@ -144,7 +144,7 @@ show_help() {
     echo -e "  -p, --proxy <addr>              使用代理下载, e.g., -p http://127.0.0.1:2333"
     echo -e "  -v, --core-version <ver>        自定义 $is_core_name 版本, e.g., -v v5.4.1"
     echo -e "  --tls <caddy|nginx>             选择 TLS 方案，e.g., --tls nginx"
-    echo -e "  --uninstall                     卸载 V2Ray 和相关组件"
+    echo -e "  --uninstall                     卸载 Xray 和相关组件"
     echo -e "  -h, --help                      显示此帮助界面\n"
 
     exit 0
@@ -534,7 +534,7 @@ main() {
     # [步骤 5/10] 下载必要文件
     msg warn "[步骤 5/10] 下载必要文件..."
     [[ $is_wget ]] && {
-        [[ ! $is_core_file ]] && { download core & msg ok "  - 开始下载 V2Ray 核心"; }
+        [[ ! $is_core_file ]] && { download core & msg ok "  - 开始下载 Xray 核心"; }
         [[ ! $local_install ]] && { download sh & msg ok "  - 开始下载脚本"; }
         [[ $jq_not_found ]] && { download jq & msg ok "  - 开始下载 jq"; }
         get_ip
@@ -819,7 +819,7 @@ main() {
     ##
     echo
     echo "=========================================="
-    echo "    安装完成！现在配置第一个 V2Ray 节点"
+    echo "    安装完成！现在配置第一个 Xray 节点"
     echo "=========================================="
     echo
     
@@ -846,7 +846,7 @@ main() {
             protocol_type=${protocol_list[$((protocol_choice - 1))]}
             break
         elif [[ $protocol_choice -eq $((${#protocol_list[@]} + 1)) ]]; then
-            msg ok "已跳过，安装后可以使用 'v2ray add' 命令添加配置"
+            msg ok "已跳过，安装后可以使用 '$is_core add' 命令添加配置"
             exit_and_del_tmpdir ok
         else
             echo "输入无效，请输入 1-$((${#protocol_list[@]} + 1))"
@@ -865,7 +865,7 @@ main() {
 
     if [[ $is_need_domain ]]; then
         echo
-        echo "请输入域名 (例如：v2ray.example.com):"
+        echo "请输入域名 (例如：xray.example.com):"
 
         ##
         ## 域名验证循环
@@ -958,18 +958,18 @@ main() {
         echo
 
         ##
-        ## 检查 V2Ray 服务是否正常运行
+        ## 检查 Xray 服务是否正常运行
         ##
         if systemctl is-active --quiet $is_core; then
-            msg ok "配置完成！使用 'v2ray info' 查看配置信息"
+            msg ok "配置完成！使用 '$is_core info' 查看配置信息"
         else
-            msg err "配置生成失败！V2Ray 服务未能正常启动"
+            msg err "配置生成失败！Xray 服务未能正常启动"
             msg warn "您可以尝试以下操作："
             msg warn "1. 检查域名 DNS 是否正确解析到服务器 IP: $ip"
             msg warn "2. 检查 80/443 端口是否可访问"
-            msg warn "3. 使用 'v2ray logerr' 查看详细错误日志"
-            msg warn "4. 使用 'v2ray fix-all' 尝试自动修复"
-            msg warn "5. 使用 'v2ray add $protocol_type $domain_input' 重新配置"
+            msg warn "3. 使用 '$is_core logerr' 查看详细错误日志"
+            msg warn "4. 使用 '$is_core fix-all' 尝试自动修复"
+            msg warn "5. 使用 '$is_core add $protocol_type $domain_input' 重新配置"
             exit_and_del_tmpdir
         fi
     elif [[ $is_auto_config ]]; then
@@ -983,31 +983,31 @@ main() {
         echo
 
         ##
-        ## 检查 V2Ray 服务是否正常运行
+        ## 检查 Xray 服务是否正常运行
         ##
         if systemctl is-active --quiet $is_core; then
-            msg ok "配置完成！使用 'v2ray info' 查看配置信息"
+            msg ok "配置完成！使用 '$is_core info' 查看配置信息"
         else
-            msg err "配置生成失败！V2Ray 服务未能正常启动"
+            msg err "配置生成失败！Xray 服务未能正常启动"
             msg warn "您可以尝试以下操作："
-            msg warn "1. 使用 'v2ray logerr' 查看详细错误日志"
-            msg warn "2. 使用 'v2ray fix-all' 尝试自动修复"
-            msg warn "3. 使用 'v2ray add $protocol_type' 重新配置"
+            msg warn "1. 使用 '$is_core logerr' 查看详细错误日志"
+            msg warn "2. 使用 '$is_core fix-all' 尝试自动修复"
+            msg warn "3. 使用 '$is_core add $protocol_type' 重新配置"
             exit_and_del_tmpdir
         fi
     else
-        msg warn "已跳过，安装后可以使用 'v2ray add' 命令添加配置"
+        msg warn "已跳过，安装后可以使用 '$is_core add' 命令添加配置"
         echo
         echo "=========================================="
         echo "    安装完成"
         echo "=========================================="
         echo
         echo "请使用以下命令添加配置："
-        echo "  v2ray add vmess-ws-tls yourdomain.com  # TLS 加密（推荐）"
-        echo "  v2ray add vmess-tcp                    # 非 TLS"
-        echo "  v2ray add ss                           # Shadowsocks"
-        echo "  v2ray add socks                        # Socks 代理"
-        echo "  v2ray help                             # 查看完整帮助"
+        echo "  $is_core add vmess-ws-tls yourdomain.com  # TLS 加密（推荐）"
+        echo "  $is_core add vmess-tcp                    # 非 TLS"
+        echo "  $is_core add ss                           # Shadowsocks"
+        echo "  $is_core add socks                        # Socks 代理"
+        echo "  $is_core help                             # 查看完整帮助"
         echo
     fi
 
