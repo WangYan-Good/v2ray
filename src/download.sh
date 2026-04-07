@@ -79,7 +79,8 @@ get_latest_version() {
     esac
     latest_ver=$(_wget -qO- $url | grep tag_name | grep -E -o 'v([0-9.]+)')
     [[ ! $latest_ver ]] && {
-        err "获取 ${name} 最新版本失败."
+        error_out "DOWNLOAD" "获取 ${name} 最新版本失败，请检查网络连接" "1. 检查网络: ping github.com  2. 配置代理: export https_proxy=http://127.0.0.1:7890  3. 重试命令"
+        exit $ERR_DOWNLOAD
     }
     unset name url
 }
@@ -106,7 +107,8 @@ download() {
                 msg ok "${name} 文件完整性验证通过"
             else
                 rm -rf $tmpdir
-                err "${name} 文件校验和不匹配. 请检查下载链接: $link"
+                error_out "CHECKSUM" "${name} 文件校验和不匹配，可能存在安全风险" "请检查下载链接: $link 或手动下载后使用 -f 参数安装"
+                exit $ERR_CHECKSUM
             fi
         else
             msg warn "无法获取 ${name} 校验和，跳过验证"
@@ -152,7 +154,8 @@ download() {
                     msg ok "${name} 文件完整性验证通过"
                 else
                     rm -rf $tmpdir
-                    err "${name} 文件校验和不匹配. 请检查下载链接: $link"
+                    error_out "CHECKSUM" "${name} 文件校验和不匹配，可能存在安全风险" "请检查下载链接: $link 或手动下载"
+                    exit $ERR_CHECKSUM
                 fi
             else
                 msg warn "无法获取 ${name} 校验和，跳过验证"
@@ -160,7 +163,8 @@ download() {
 
             [[ ! $(type -P tar) ]] && {
                 rm -rf $tmpdir
-                err "请安装 tar"
+                error_out "DEPENDENCY" "系统缺少 tar 命令" "请安装: apt-get install tar 或 yum install tar"
+                exit $ERR_DEPENDENCY
             }
             tar zxf $tmpfile -C $tmpdir
             cp -f $tmpdir/caddy $is_caddy_bin
@@ -170,7 +174,7 @@ download() {
     nginx)
         name="Nginx + Certbot"
         msg warn "配置 Nginx + Certbot..."
-        
+
         # 检测是否已安装 Nginx
         if [[ $(type -P nginx) ]]; then
             msg warn "检测到 Nginx 已安装，使用现有 Nginx"
@@ -186,10 +190,11 @@ download() {
             fi
             if [[ ! $(type -P nginx) ]]; then
                 rm -rf $tmpdir
-                err "Nginx 安装失败"
+                error_out "DEPENDENCY" "Nginx 安装失败" "请检查包管理器配置或手动安装: apt-get install nginx"
+                exit $ERR_DEPENDENCY
             fi
         fi
-        
+
         # 检测是否已安装 Certbot
         if [[ $(type -P certbot) ]]; then
             msg warn "检测到 Certbot 已安装，使用现有 Certbot"
@@ -202,20 +207,21 @@ download() {
             fi
             if [[ ! $(type -P certbot) ]]; then
                 rm -rf $tmpdir
-                err "Certbot 安装失败"
+                error_out "DEPENDENCY" "Certbot 安装失败" "请检查包管理器配置或手动安装: apt-get install certbot"
+                exit $ERR_DEPENDENCY
             fi
         fi
-        
+
         # 备份现有 Nginx 配置（如果有）
         if [[ -f $is_nginx_file && ! -f ${is_nginx_file}.bak ]]; then
             cp -f $is_nginx_file ${is_nginx_file}.bak
             msg warn "已备份现有 nginx.conf 到 ${is_nginx_file}.bak"
         fi
-        
+
         # 设置开机自启
         systemctl enable nginx &>/dev/null
         systemctl daemon-reload
-        
+
         rm -rf $tmpdir
         ;;
     esac
@@ -225,6 +231,7 @@ download() {
 download_file() {
     if ! _wget -t 5 -c $link -O $tmpfile; then
         rm -rf $tmpdir
-        err "\n下载 ${name} 失败.\n"
+        error_out "DOWNLOAD" "下载 ${name} 失败" "1. 检查网络连接: ping github.com  2. 配置代理: export https_proxy=http://127.0.0.1:7890  3. 重试命令"
+        exit $ERR_DOWNLOAD
     fi
 }
