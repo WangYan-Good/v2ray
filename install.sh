@@ -297,11 +297,11 @@ check_status() {
     else
         [[ ! $is_fail ]] && {
             is_wget=1
-            [[ ! $is_core_file ]] && download core &
-            [[ ! $local_install ]] && download sh &
-            [[ $jq_not_found ]] && download jq &
+            # 顺序下载替代并行 & (避免竞态条件 T7)
+            [[ ! $is_core_file ]] && download core
+            [[ ! $local_install ]] && download sh
+            [[ $jq_not_found ]] && download jq
             get_ip
-            wait
             check_status
         }
     fi
@@ -587,16 +587,28 @@ main() {
     # [步骤 5/10] 下载必要文件
     msg warn "[步骤 5/10] 下载必要文件..."
     [[ $is_wget ]] && {
-        [[ ! $is_core_file ]] && { download core & msg ok "  - 开始下载 Xray 核心"; }
-        [[ ! $local_install ]] && { download sh & msg ok "  - 开始下载脚本"; }
-        [[ $jq_not_found ]] && { download jq & msg ok "  - 开始下载 jq"; }
+        # 顺序下载替代并行 & (避免竞态条件 T7)
+        if [[ ! $is_core_file ]]; then
+            msg warn "  - 开始下载 Xray 核心..."
+            download core
+            msg ok "  - Xray 核心下载完成"
+        fi
+        if [[ ! $local_install ]]; then
+            msg warn "  - 开始下载脚本..."
+            download sh
+            msg ok "  - 脚本下载完成"
+        fi
+        if [[ $jq_not_found ]]; then
+            msg warn "  - 开始下载 jq..."
+            download jq
+            msg ok "  - jq 下载完成"
+        fi
         get_ip
         msg ok "  - 已获取服务器 IP"
     }
 
-    # [步骤 6/10] 等待下载完成
-    msg warn "[步骤 6/10] 等待下载完成..."
-    wait
+    # [步骤 6/10] 检查下载状态
+    msg warn "[步骤 6/10] 检查下载状态..."
     msg ok "  - 所有文件下载完成"
 
     # [步骤 7/10] 检查下载状态
