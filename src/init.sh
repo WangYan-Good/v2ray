@@ -58,11 +58,11 @@ load() {
 }
 
 ##
-## wget add --no-check-certificate
+## wget add --secure-protocol=TLSv1_2 (默认验证 SSL 证书)
 ##
 _wget() {
     # [[ $proxy ]] && export https_proxy=$proxy
-    wget --no-check-certificate "$@"
+    wget --secure-protocol=TLSv1_2 "$@"
 }
 
 ##

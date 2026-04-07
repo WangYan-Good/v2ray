@@ -113,10 +113,10 @@ load() {
     . $is_sh_dir/src/$1
 }
 
-# wget add --no-check-certificate
+# wget: 默认验证 SSL 证书，TLS 1.2+
 _wget() {
     [[ $proxy ]] && export https_proxy=$proxy
-    wget --no-check-certificate $*
+    wget --secure-protocol=TLSv1_2 "$@"
 }
 
 # print a mesage
