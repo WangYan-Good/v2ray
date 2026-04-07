@@ -87,10 +87,13 @@ cat /etc/xray/conf/VLESS-XTLS-uTLS-REALITY-*.json | jq .
 
 | 字段 | 内容 |
 |------|------|
-| 退出码 | - |
-| 配置文件路径 | - |
-| 测试结果 | ⬜ 通过 / ⬜ 失败 |
-| 备注 | - |
+| 退出码 | 0 |
+| 配置文件路径 | /etc/xray/conf/VLESS-XTLS-uTLS-REALITY-43071.json |
+| 测试结果 | ✅ 通过 |
+| 备注 | 成功生成配置，服务启动正常 |
+
+**测试日期**: 2026-04-08
+**测试环境**: root@bak.proxy.yourdie.com
 
 ---
 
