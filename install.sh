@@ -205,6 +205,28 @@ download() {
 
     msg warn "下载 ${name} > ${link}"
     if _wget -t 3 -q -c $link -O $tmpfile; then
+        ## SHA256 校验 (仅 Xray-core)
+        if [[ $1 == "core" ]]; then
+            dgst_link="${link}.dgst"
+            dgst_tmp=$(mktemp)
+            if _wget -t 3 -q -c "$dgst_link" -O "$dgst_tmp" 2>/dev/null; then
+                expected_sha=$(grep 'SHA2-256=' "$dgst_tmp" 2>/dev/null | awk '{print $2}' | tr -d '[:space:]')
+                if [[ -n "$expected_sha" ]]; then
+                    actual_sha=$(sha256sum "$tmpfile" | awk '{print $1}')
+                    if [[ "$actual_sha" == "$expected_sha" ]]; then
+                        msg ok "${name} 文件完整性验证通过"
+                    else
+                        rm -f "$dgst_tmp"
+                        err "${name} 文件校验和不匹配."
+                    fi
+                else
+                    msg warn "无法获取 ${name} 校验和，跳过验证"
+                fi
+            else
+                msg warn "无法获取 ${name} 校验文件，跳过验证"
+            fi
+            rm -f "$dgst_tmp"
+        fi
         mv -f $tmpfile $is_ok
     fi
 }
