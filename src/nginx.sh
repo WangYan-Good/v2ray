@@ -41,9 +41,9 @@ nginx_config() {
         ##
         if [[ ! -f $is_nginx_file ]]; then
             cat >$is_nginx_file <<EOF
-# Nginx 主配置文件
-# 由 V2Ray 脚本自动生成/管理
-# 更多相关请阅读：https://wangyan-good.github.io/v2ray/nginx-auto-tls/
+# Xray 主配置文件
+# 由 Xray 脚本自动生成/管理
+# 更多相关请阅读：https://wangyan-good.github.io/xray/nginx-auto-tls/
 
 user root;
 worker_processes auto;
@@ -79,7 +79,7 @@ http {
     gzip_comp_level 6;
     gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/rss+xml font/truetype font/opentype application/vnd.ms-fontobject image/svg+xml;
 
-    # 导入 V2Ray 配置（自动 TLS 站点）
+    # 导入 Xray 配置（自动 TLS 站点）
     include $is_nginx_conf/*.conf;
 
     # 导入其他站点配置（用户自定义）
@@ -92,7 +92,7 @@ EOF
             ## 通过判断 /etc/nginx/xray/*.conf 来判断
             ##
             if ! grep -q "include $is_nginx_conf/\*.conf" $is_nginx_file; then
-                
+
                 ##
                 ## 备份原配置
                 ##
@@ -100,12 +100,12 @@ EOF
                 msg warn "检测到现有 Nginx 配置，已备份到 ${is_nginx_file}.bak.*"
 
                 ##
-                ## 在 http 块中添加 V2Ray 导入（在 http 块的最后一个 } 之前）
+                ## 在 http 块中添加 Xray 导入（在 http 块的最后一个 } 之前）
                 ## 使用 awk 更可靠，避免 sed 转义问题
                 ## 创建一个安全的临时文件，把路径保存到本地变量 tmp_conf 中
                 ##
                 local tmp_conf=$(mktemp)
-                
+
                 ##
                 ## 使用更健壮的正则表达式匹配 http 块
                 ##
@@ -118,7 +118,7 @@ EOF
                     }
                     # 在 http 块内的 } 前插入（允许行首空格）
                     in_http && /^[[:space:]]*\}[[:space:]]*$/ {
-                        print "    # 导入 V2Ray 配置（自动 TLS 站点）"
+                        print "    # 导入 Xray 配置（自动 TLS 站点）"
                         print inc
                         print ""
                         print
@@ -129,26 +129,26 @@ EOF
                     {print}
                 ' $is_nginx_file > $tmp_conf
                 ##
-                ## v2ray 配置插入成功
+                ## Xray 配置插入成功
                 ##
                 if [[ $? -eq 0 ]]; then
                     ##
                     ## 替换原配置文件
                     ##
                     mv -f $tmp_conf $is_nginx_file
-                    
+
                     ##
                     ## 检查是否插入成功
                     ##
                     if grep -q "include $is_nginx_conf/\*.conf" $is_nginx_file; then
-                        msg ok "已添加 V2Ray 配置导入到 nginx.conf"
+                        msg ok "已添加 Xray 配置导入到 nginx.conf"
                     else
-                        msg warn "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginx_file"
+                        msg warn "无法自动添加 Xray 配置导入，请手动编辑 $is_nginx_file"
                         msg warn "添加：include $is_nginx_conf/*.conf;"
                     fi
                 else
                     rm -f $tmp_conf
-                    msg warn "无法自动添加 V2Ray 配置导入，请手动编辑 $is_nginx_file"
+                    msg warn "无法自动添加 Xray 配置导入，请手动编辑 $is_nginx_file"
                     msg warn "添加：include $is_nginx_conf/*.conf;"
                 fi
             fi
@@ -189,8 +189,8 @@ EOF
         }
         # WebSocket 配置 (VMess/VLESS/Trojan)
         cat >${is_nginx_site_file} <<<"
-# ${host} - V2Ray WebSocket
-# 由 V2Ray 脚本自动生成 - 请勿手动编辑
+# ${host} - Xray WebSocket
+# 由 Xray 脚本自动生成 - 请勿手动编辑
 
 server {
     listen 80;
@@ -261,7 +261,7 @@ server {
         if ! nginx_certbot issue ${host}; then
             msg err "证书申请失败，正在清理生成的配置..."
             msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
-            msg warn "然后手动添加配置：v2ray add ${protocol_type} ${host}"
+            msg warn "然后手动添加配置：xray add ${protocol_type} ${host}"
 
             # 清理失败的配置
             rm -f ${is_nginx_site_file} ${is_nginx_site_file}.add
@@ -306,8 +306,8 @@ server {
         }
         # HTTP/2 配置
         cat >${is_nginx_site_file} <<<"
-# ${host} - V2Ray HTTP/2
-# 由 V2Ray 脚本自动生成 - 请勿手动编辑
+# ${host} - Xray HTTP/2
+# 由 Xray 脚本自动生成 - 请勿手动编辑
 
 server {
     listen 80;
@@ -365,7 +365,7 @@ server {
         if ! nginx_certbot issue ${host}; then
             msg err "证书申请失败，正在清理生成的配置..."
             msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
-            msg warn "然后手动添加配置：v2ray add ${protocol_type} ${host}"
+            msg warn "然后手动添加配置：xray add ${protocol_type} ${host}"
 
             # 清理失败的配置
             rm -f ${is_nginx_site_file} ${is_nginx_site_file}.add
@@ -410,8 +410,8 @@ server {
         }
         # gRPC 配置
         cat >${is_nginx_site_file} <<<"
-# ${host} - V2Ray gRPC
-# 由 V2Ray 脚本自动生成 - 请勿手动编辑
+# ${host} - Xray gRPC
+# 由 Xray 脚本自动生成 - 请勿手动编辑
 
 server {
     listen 80;
@@ -467,7 +467,7 @@ server {
         if ! nginx_certbot issue ${host}; then
             msg err "证书申请失败，正在清理生成的配置..."
             msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
-            msg warn "然后手动添加配置：v2ray add ${protocol_type} ${host}"
+            msg warn "然后手动添加配置：xray add ${protocol_type} ${host}"
 
             # 清理失败的配置
             rm -f ${is_nginx_site_file} ${is_nginx_site_file}.add

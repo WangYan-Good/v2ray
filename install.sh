@@ -68,7 +68,7 @@ is_core=xray                            # is_core      = xray
 is_core_name=Xray                       # is_core_name = Xray
 is_core_dir=/etc/$is_core               # is_core_dir  = /etc/xray
 is_core_bin=$is_core_dir/bin/$is_core   # is_core_bin  = /etc/xray/bin/xray
-# 使用 Xray-core 替代 V2Ray-core，以支持 xhttp 等新特性
+# Xray-core 支持 xhttp、REALITY 等新特性
 is_core_repo=XTLS/Xray-core             # is_core_repo = XTLS/Xray-core
 is_conf_dir=$is_core_dir/conf           # is_conf_dir  = /etc/xray/conf
 is_log_dir=/var/log/$is_core            # is_log_dir   = /var/log/xray
@@ -177,7 +177,7 @@ install_pkg() {
 download() {
     case $1 in
     core)
-        # Xray-core 使用 Xray 作为文件名，V2Ray-core 使用 v2ray
+        # Xray-core 使用 Xray 作为文件名
         if [[ "$is_core_repo" == *"XTLS/Xray-core"* ]]; then
             core_file_name="Xray-linux-${is_core_arch}.zip"
         else
@@ -357,7 +357,7 @@ exit_and_del_tmpdir() {
         if [[ -d $is_sh_dir || -d $is_core_dir/bin || -f $is_sh_bin ]]; then
             msg warn "检测到部分安装文件，正在清理..."
 
-            # 清理 V2Ray 文件
+            # 清理 Xray 文件
             [[ -d $is_sh_dir ]] && rm -rf $is_sh_dir && msg ok "  - 已清理脚本目录"
             [[ -d $is_core_dir ]] && rm -rf $is_core_dir && msg ok "  - 已清理核心目录"
             [[ -f $is_sh_bin ]] && rm -f $is_sh_bin && msg ok "  - 已清理命令链接"
@@ -815,16 +815,16 @@ main() {
     fi
 
     ##
-    ## 安装完成后引导用户配置第一个节点（与 v2ray add 完全一致）
+    ## 安装完成后引导用户配置第一个节点（与 xray add 完全一致）
     ##
     echo
     echo "=========================================="
     echo "    安装完成！现在配置第一个 Xray 节点"
     echo "=========================================="
     echo
-    
+
     ##
-    ## 显示所有协议选项（与 v2ray add 命令完全一致）
+    ## 显示所有协议选项（与 xray add 命令完全一致）
     ##
     echo "请选择协议类型:"
     for i in "${!protocol_list[@]}"; do

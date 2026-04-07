@@ -1323,7 +1323,7 @@ add() {
                 get_port
                 is_https_port=$tmp_port
                 warn "端口 (80 或 443) 已经被占用, 你也可以考虑使用 no-auto-tls"
-                msg "\e[41m no-auto-tls 帮助(help)\e[0m: $(msg_ul https://wangyan-good.github.io/v2ray/no-auto-tls/)\n"
+                msg "\e[41m no-auto-tls 帮助(help)\e[0m: $(msg_ul https://wangyan-good.github.io/xray/no-auto-tls/)\n"
                 msg "\n Caddy 将使用非标准端口实现自动配置 TLS, HTTP:$is_http_port HTTPS:$is_https_port\n"
                 msg "请确定是否继续???"
                 pause
@@ -1954,7 +1954,7 @@ info() {
         msg "$a $tt= \e[${is_color}m${is_info_str[$i]}\e[0m"
     done
     if [[ $is_new_install ]]; then
-        warn "首次安装请查看脚本帮助文档: $(msg_ul https://wangyan-good.github.io/v2ray/$is_core-script/)"
+        warn "首次安装请查看脚本帮助文档: $(msg_ul https://wangyan-good.github.io/xray/$is_core-script/)"
     fi
     if [[ $is_url ]]; then
         msg "------------- ${info_list[12]} -------------"
@@ -1966,7 +1966,7 @@ info() {
         msg "------------- no-auto-tls INFO -------------"
         msg "端口(port): $port"
         msg "路径(path): $is_tmp_path"
-        msg "\e[41m帮助(help)\e[0m: $(msg_ul https://wangyan-good.github.io/v2ray/no-auto-tls/)"
+        msg "\e[41m帮助(help)\e[0m: $(msg_ul https://wangyan-good.github.io/xray/no-auto-tls/)"
     fi
     footer_msg
 }
@@ -1977,7 +1977,7 @@ footer_msg() {
     [[ $is_caddy_stop && $host ]] && warn "Caddy 当前处于停止状态."
     [[ $is_nginx_stop && $host ]] && warn "Nginx 当前处于停止状态."
     msg "------------- END -------------"
-    # msg "文档(doc): $(msg_ul https://wangyan-good.github.io/v2ray/$is_core-script/)"
+    # msg "文档(doc): $(msg_ul https://wangyan-good.github.io/xray/$is_core-script/)"
 }
 
 ##

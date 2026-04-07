@@ -141,6 +141,6 @@ reverse_proxy https://$proxy_site {
         ;;
     esac
     [[ $1 != "new" && $1 != 'proxy' ]] && {
-        [[ ! -f ${is_caddy_site_file}.add ]] && echo "# see https://wangyan-good.github.io/v2ray/caddy-auto-tls/" >${is_caddy_site_file}.add
+        [[ ! -f ${is_caddy_site_file}.add ]] && echo "# see https://wangyan-good.github.io/xray/caddy-auto-tls/" >${is_caddy_site_file}.add
     }
 }

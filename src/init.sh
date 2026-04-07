@@ -92,7 +92,7 @@ is_core=xray                            # is_core      = xray
 is_core_name=Xray                       # is_core_name = Xray
 is_core_dir=/etc/$is_core               # is_core_dir  = /etc/xray
 is_core_bin=$is_core_dir/bin/$is_core   # is_core_bin  = /etc/xray/bin/xray
-# 使用 Xray-core 替代 V2Ray-core，以支持 xhttp、REALITY 等新特性
+# Xray-core 支持 xhttp、REALITY 等新特性
 is_core_repo=XTLS/Xray-core             # is_core_repo = XTLS/Xray-core
 is_conf_dir=$is_core_dir/conf           # is_conf_dir  = /etc/xray/conf
 is_log_dir=/var/log/$is_core            # is_log_dir   = /var/log/xray
@@ -111,7 +111,7 @@ is_nginx_bin=/usr/sbin/nginx
 is_nginx_dir=/etc/nginx
 is_nginx_repo=nginx/nginx
 is_nginx_file=$is_nginx_dir/nginx.conf
-is_nginx_conf=$is_nginx_dir/xray        # 从 v2ray 改为 xray，保持目录一致性
+is_nginx_conf=$is_nginx_dir/xray        # Xray Nginx 配置目录
 is_nginx_service=$(systemctl list-units --full -all | grep nginx.service)
 is_http_port=80
 is_https_port=443
@@ -184,7 +184,7 @@ fi
 load core.sh
 
 ##
-## old sh ver (旧版本 v2ray 备份路径，用于从旧版本迁移)
+## old sh ver (旧版本备份路径，用于从旧版本迁移)
 ##
 is_old_dir=/etc/v2ray/old_backup
 is_old_conf=/etc/v2ray/v2ray_backup.conf
