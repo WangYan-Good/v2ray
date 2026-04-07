@@ -9,6 +9,7 @@
 # IDE
 .vscode/
 .idea/
+.qwen/
 *.swp
 *.swo
 

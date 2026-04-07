@@ -23,6 +23,18 @@ _red_bg() { echo -e "\e[41m$@${none}"; }
 is_err=$(_red_bg 错误!)
 is_warn=$(_red_bg 警告!)
 
+##
+## 错误码常量 (T8: 统一错误处理)
+##
+ERR_DOWNLOAD=1
+ERR_CHECKSUM=2
+ERR_PERMISSION=3
+ERR_ARCH=4
+ERR_DEPENDENCY=5
+ERR_CERT=6
+ERR_CONFIG=7
+ERR_SERVICE=8
+
 err() {
     echo -e "\n$is_err $@\n" && exit 1
 }
@@ -31,18 +43,40 @@ warn() {
     echo -e "\n$is_warn $@\n"
 }
 
+##
+## 错误输出函数 (T8)
+##
+error_out() {
+    local code="$1"
+    local msg="$2"
+    local suggestion="${3:-请查看帮助文档或运行 xray help}"
+    echo -e "\n${red}[ERR_${code}] 错误! ${msg}${none}"
+    echo -e "${yellow}建议: ${suggestion}${none}\n"
+}
+
+warn_out() {
+    echo -e "\n${yellow}[WARN] 警告! $@${none}\n"
+}
+
 ## >>> start: TODO 修复BUG #1:安全：强制 ROOT 权限
 # root
-[[ $EUID != 0 ]] && err "当前非 ${yellow}ROOT用户.${none}"
+[[ $EUID != 0 ]] && {
+    error_out "PERMISSION" "当前非 ROOT 用户，无法继续安装" "请使用 sudo 或切换到 ROOT 用户执行: sudo bash $0"
+    exit $ERR_PERMISSION
+}
 ## <<< end
 
 # yum or apt-get, ubuntu/debian/centos
 cmd=$(type -P apt-get || type -P yum)
-[[ ! $cmd ]] && err "此脚本仅支持 ${yellow}(Ubuntu or Debian or CentOS)${none}."
+[[ ! $cmd ]] && {
+    error_out "DEPENDENCY" "不支持的操作系统，仅支持 Ubuntu/Debian/CentOS" "请确认系统版本: cat /etc/os-release"
+    exit $ERR_DEPENDENCY
+}
 
 # systemd
 [[ ! $(type -P systemctl) ]] && {
-    err "此系统缺少 ${yellow}(systemctl)${none}, 请尝试执行:${yellow} ${cmd} update -y;${cmd} install systemd -y ${none}来修复此错误."
+    error_out "DEPENDENCY" "系统缺少 systemctl，请尝试执行: ${cmd} update -y; ${cmd} install systemd -y"
+    exit $ERR_DEPENDENCY
 }
 
 # wget installed or none
@@ -59,7 +93,8 @@ amd64 | x86_64)
     is_core_arch="arm64-v8a"
     ;;
 *)
-    err "此脚本仅支持 64 位系统..."
+    error_out "ARCH" "不支持的系统架构: $(uname -m)，脚本仅支持 x86_64 或 ARM64" "请使用 64 位系统运行脚本"
+    exit $ERR_ARCH
     ;;
 esac
 
@@ -241,23 +276,22 @@ get_ip() {
 check_status() {
     # dependent pkg install fail
     [[ ! -f $is_pkg_ok ]] && {
-        msg err "安装依赖包失败"
-        msg err "请尝试手动安装依赖包: $cmd update -y; $cmd install -y $is_pkg"
+        error_out "DEPENDENCY" "安装依赖包失败" "请尝试手动安装: $cmd update -y; $cmd install -y $is_pkg"
         is_fail=1
     }
 
     # download file status
     if [[ $is_wget ]]; then
         [[ ! -f $is_core_ok ]] && {
-            msg err "下载 ${is_core_name} 失败"
+            error_out "DOWNLOAD" "下载 ${is_core_name} 失败" "检查网络或配置代理后重试"
             is_fail=1
         }
         [[ ! -f $is_sh_ok ]] && {
-            msg err "下载 ${is_core_name} 脚本失败"
+            error_out "DOWNLOAD" "下载 ${is_core_name} 脚本失败" "检查网络或配置代理后重试"
             is_fail=1
         }
         [[ ! -f $is_jq_ok ]] && {
-            msg err "下载 jq 失败"
+            error_out "DOWNLOAD" "下载 jq 失败" "检查网络或配置代理后重试"
             is_fail=1
         }
     else
@@ -401,11 +435,8 @@ exit_and_del_tmpdir() {
             msg ok "失败回滚完成"
         fi
 
-        msg err "哦豁.."
-        msg err "安装过程出现错误..."
-        echo -e "反馈问题) https://github.com/${is_sh_repo}/issues"
-        echo
-        exit 1
+        error_out "CONFIG" "安装过程出现错误" "查看详细日志: tail -50 /var/log/xray/install.log (如有) 或反馈问题: https://github.com/${is_sh_repo}/issues"
+        exit $ERR_CONFIG
     fi
     exit
 }
@@ -578,14 +609,14 @@ main() {
     if [[ $is_core_file ]]; then
         unzip -qo $is_core_ok -d $tmpdir/testzip &>/dev/null
         [[ $? != 0 ]] && {
-            msg err "  - 核心文件解压失败"
+            error_out "CONFIG" "核心文件解压失败" "检查核心文件是否损坏: $is_core_file"
             exit_and_del_tmpdir
         }
         for i in ${is_core} geoip.dat geosite.dat; do
             [[ ! -f $tmpdir/testzip/$i ]] && is_file_err=1 && break
         done
         [[ $is_file_err ]] && {
-            msg err "  - 核心文件不完整"
+            error_out "CONFIG" "核心文件不完整" "请重新下载核心文件或检查文件来源"
             exit_and_del_tmpdir
         }
         msg ok "  - 核心文件测试通过"
@@ -596,7 +627,7 @@ main() {
     # [步骤 9/10] 获取服务器 IP
     msg warn "[步骤 9/10] 获取服务器 IP..."
     [[ ! $ip ]] && {
-        msg err "  - 获取服务器 IP 失败"
+        error_out "CONFIG" "获取服务器 IP 失败" "1. 检查网络: ping 1.1.1.1  2. 检查 DNS 配置  3. 手动指定 IP"
         exit_and_del_tmpdir
     }
     msg ok "  - 服务器 IP: $ip"
@@ -794,18 +825,12 @@ main() {
     ##
     if [[ $is_install_caddy ]]; then
         if [[ $(systemctl is-active nginx) == "active" ]]; then
-            msg err "配置冲突：您选择了使用 Caddy，但 Nginx 正在运行中"
-            msg warn "Nginx 占用了 80/443 端口，这会导致 Caddy 无法启动或证书申请失败"
-            msg warn "请手动执行以下命令停止 Nginx，然后重新运行安装脚本："
-            echo -e "\n  ${yellow}systemctl stop nginx && systemctl disable nginx${none}\n"
+            error_out "CONFIG" "您选择了使用 Caddy，但 Nginx 正在运行中，占用了 80/443 端口" "执行以下命令停止 Nginx 后重试: systemctl stop nginx && systemctl disable nginx"
             exit 1
         fi
     elif [[ $is_install_nginx ]]; then
         if [[ $(systemctl is-active caddy) == "active" ]]; then
-            msg err "配置冲突：您选择了使用 Nginx，但 Caddy 正在运行中"
-            msg warn "Caddy 占用了 80/443 端口，这会导致 Nginx 无法启动或证书申请失败"
-            msg warn "请手动执行以下命令停止 Caddy，然后重新运行安装脚本："
-            echo -e "\n  ${yellow}systemctl stop caddy && systemctl disable caddy${none}\n"
+            error_out "CONFIG" "您选择了使用 Nginx，但 Caddy 正在运行中，占用了 80/443 端口" "执行以下命令停止 Caddy 后重试: systemctl stop caddy && systemctl disable caddy"
             exit 1
         fi
     fi
@@ -899,7 +924,7 @@ main() {
             ## 此协议需要域名，不能为空
             ##
             if [[ -z "$domain_input" ]]; then
-                msg err "此协议需要域名，不能为空"
+                error_out "DOMAIN" "此协议需要域名，请输入" "格式示例: example.com"
                 continue
             fi
 
@@ -912,7 +937,7 @@ main() {
                 ##
                 break
             else
-                msg err "无效的域名格式，请重新输入"
+                error_out "DOMAIN" "无效的域名格式: $domain_input" "格式示例: example.com (字母、数字、连字符、点号)"
             fi
         done
 
@@ -934,7 +959,7 @@ main() {
 
         if [[ -n "$resolved_ip" ]]; then
             if [[ "$resolved_ip" != "$ip" ]]; then
-                msg err "域名 $domain_input 未解析到服务器 IP: $ip"
+                error_out "DOMAIN" "域名 $domain_input 未解析到服务器 IP: $ip (当前: $resolved_ip)" "1. 添加 DNS A 记录指向 $ip  2. 等待 DNS 生效  3. 继续配置(可能失败)"
                 msg warn "当前解析: $resolved_ip"
                 echo
                 echo "请选择:"
@@ -985,13 +1010,7 @@ main() {
         if systemctl is-active --quiet $is_core; then
             msg ok "配置完成！使用 '$is_core info' 查看配置信息"
         else
-            msg err "配置生成失败！Xray 服务未能正常启动"
-            msg warn "您可以尝试以下操作："
-            msg warn "1. 检查域名 DNS 是否正确解析到服务器 IP: $ip"
-            msg warn "2. 检查 80/443 端口是否可访问"
-            msg warn "3. 使用 '$is_core logerr' 查看详细错误日志"
-            msg warn "4. 使用 '$is_core fix-all' 尝试自动修复"
-            msg warn "5. 使用 '$is_core add $protocol_type $domain_input' 重新配置"
+            error_out "SERVICE" "Xray 服务启动失败" "1. 检查 DNS: nslookup $domain_input | grep $ip  2. 检查端口: ss -tlnp | grep :80  3. 查看日志: $is_core logerr  4. 重试: $is_core add $protocol_type $domain_input"
             exit_and_del_tmpdir
         fi
     elif [[ $is_auto_config ]]; then
@@ -1010,11 +1029,7 @@ main() {
         if systemctl is-active --quiet $is_core; then
             msg ok "配置完成！使用 '$is_core info' 查看配置信息"
         else
-            msg err "配置生成失败！Xray 服务未能正常启动"
-            msg warn "您可以尝试以下操作："
-            msg warn "1. 使用 '$is_core logerr' 查看详细错误日志"
-            msg warn "2. 使用 '$is_core fix-all' 尝试自动修复"
-            msg warn "3. 使用 '$is_core add $protocol_type' 重新配置"
+            error_out "SERVICE" "Xray 服务启动失败" "1. 查看日志: $is_core logerr  2. 修复: $is_core fix-all  3. 重试: $is_core add $protocol_type"
             exit_and_del_tmpdir
         fi
     else
