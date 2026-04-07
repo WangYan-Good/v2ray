@@ -1,9 +1,9 @@
-# V2Ray 脚本完整文档
+# Xray 脚本完整文档
 
-> 一个支持多站点共存的 V2Ray 一键安装和管理脚本
+> 一个支持多站点共存的 Xray 一键安装和管理脚本
 
-> **本项目 Fork 自**: [233boy/v2ray](https://github.com/233boy/v2ray)  
-> **主要改进**: 添加 Nginx + Certbot 多站点共存支持
+> **本项目 Fork 自**: [233boy/v2ray](https://github.com/233boy/v2ray)
+> **主要改进**: 添加 Nginx + Certbot 多站点共存支持，支持 REALITY / XHTTP 等新特性
 
 ---
 
@@ -26,7 +26,7 @@
 
 ### 简介
 
-这是一个 **V2Ray 一键安装脚本和管理脚本**，支持两种 TLS 方案：
+这是一个 **Xray 一键安装脚本和管理脚本**，支持两种 TLS 方案：
 - **Caddy** - 简洁易用，适合单站点
 - **Nginx + Certbot** - 灵活强大，适合多站点共存
 
@@ -55,9 +55,9 @@
 ### 目录结构
 
 ```
-/etc/v2ray/
-├── bin/                    # V2Ray 核心二进制
-│   ├── v2ray
+/etc/xray/
+├── bin/                    # Xray 核心二进制
+│   ├── xray
 │   ├── geoip.dat
 │   └── geosite.dat
 ├── sh/                     # 脚本源码
@@ -73,7 +73,7 @@
 │   │   ├── dns.sh          # DNS 配置
 │   │   └── bbr.sh          # BBR 优化
 │   └── xray.sh            # 主入口
-├── conf/                   # V2Ray 配置文件
+├── conf/                   # Xray 配置文件
 │   ├── VMess-WS-8080.json
 │   └── VLESS-gRPC-443.json
 └── config.json             # 主配置文件
@@ -82,13 +82,13 @@
 ├── nginx.conf              # 主配置
 ├── ssl/                    # SSL 证书
 │   └── 域名/
-├── v2ray/                  # V2Ray 站点配置
+├── xray/                   # Xray 站点配置
 │   └── 域名.conf
 └── sites-enabled/          # 其他站点配置
 
 /etc/caddy/                 # Caddy 方案目录
 ├── Caddyfile               # 主配置
-└── v2ray/                  # V2Ray 站点配置
+└── xray/                   # Xray 站点配置
     └── 域名.conf
 ```
 
@@ -106,7 +106,7 @@
 ### 数据流
 
 ```
-用户命令 (v2ray xxx)
+用户命令 (xray xxx)
     │
     ▼
 xray.sh (入口)
@@ -114,7 +114,7 @@ xray.sh (入口)
     ▼
 init.sh (初始化)
     │
-    ├─► 检测 V2Ray 状态
+    ├─► 检测 Xray 状态
     ├─► 检测 Caddy 状态
     ├─► 检测 Nginx 状态
     │
@@ -144,24 +144,24 @@ core.sh (核心逻辑)
 
 ```bash
 # v1.0.2 一键安装（使用 curl）
-bash <(curl -Ls https://raw.githubusercontent.com/WangYan-Good/v2ray/v1.0.2/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/WangYan-Good/xray/v1.0.2/install.sh)
 
 # 备用地址（使用 jsDelivr CDN 加速）
-bash <(curl -Ls https://cdn.jsdelivr.net/gh/WangYan-Good/v2ray@v1.0.2/install.sh)
+bash <(curl -Ls https://cdn.jsdelivr.net/gh/WangYan-Good/xray@v1.0.2/install.sh)
 
 # 或使用 wget
-bash <(wget -qO- https://raw.githubusercontent.com/WangYan-Good/v2ray/v1.0.2/install.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/WangYan-Good/xray/v1.0.2/install.sh)
 
 # 指定 TLS 方案
-bash <(curl -Ls https://raw.githubusercontent.com/WangYan-Good/v2ray/v1.0.2/install.sh) --tls nginx
-bash <(curl -Ls https://raw.githubusercontent.com/WangYan-Good/v2ray/v1.0.2/install.sh) --tls caddy
+bash <(curl -Ls https://raw.githubusercontent.com/WangYan-Good/xray/v1.0.2/install.sh) --tls nginx
+bash <(curl -Ls https://raw.githubusercontent.com/WangYan-Good/xray/v1.0.2/install.sh) --tls caddy
 ```
 
 **手动下载安装**
 
 ```bash
 # 下载安装脚本
-wget -O install.sh https://github.com/WangYan-Good/v2ray/releases/latest/download/install.sh
+wget -O install.sh https://github.com/WangYan-Good/xray/releases/latest/download/install.sh
 chmod +x install.sh
 
 # 执行安装（交互式选择 TLS 方案，带详细步骤日志）
@@ -181,7 +181,7 @@ chmod +x install.sh
 
 **方式 1：使用 update.sh 命令（推荐）**
 ```bash
-v2ray update.sh
+xray update.sh
 ```
 
 **方式 2：重新安装**
@@ -196,13 +196,13 @@ v2ray update.sh
 **方式 3：手动更新（保留配置）**
 ```bash
 # 1. 复制最新脚本到安装目录
-cp -rf /path/to/v2ray/src/* /etc/v2ray/sh/src/
+cp -rf /path/to/xray/src/* /etc/xray/sh/src/
 
 # 2. 复制主脚本
-cp /path/to/v2ray/xray.sh /etc/xray/sh/
+cp /path/to/xray/xray.sh /etc/xray/sh/
 
 # 3. 验证版本
-v2ray version
+xray version
 ```
 
 ### 安装过程示例
@@ -218,7 +218,7 @@ v2ray version
 [步骤 4/10] 检查 jq...
   - jq 已安装
 [步骤 5/10] 下载必要文件...
-  - 开始下载 V2Ray 核心
+  - 开始下载 Xray 核心
   - 开始下载脚本
   - 已获取服务器 IP
 [步骤 6/10] 等待下载完成...
@@ -243,11 +243,11 @@ v2ray version
 ### 卸载过程示例
 
 ```
-开始卸载 V2Ray 和相关组件...
-[步骤 1/6] 删除 V2Ray 文件...
-  - 已删除 /etc/v2ray
-  - 已删除 /var/log/v2ray
-  - 已删除 /usr/local/bin/v2ray
+开始卸载 Xray 和相关组件...
+[步骤 1/6] 删除 Xray 文件...
+  - 已删除 /etc/xray
+  - 已删除 /var/log/xray
+  - 已删除 /usr/local/bin/xray
 [步骤 2/6] 清理 bashrc 配置...
   - 已清理 /root/.bashrc
 [步骤 3/6] 检测到 Caddy，停止并卸载...
@@ -266,7 +266,7 @@ v2ray version
 ### 安装参数
 
 ```bash
-# 自定义 V2Ray 版本
+# 自定义 Xray 版本
 ./install.sh -v v5.10.0
 
 # 使用代理下载
@@ -276,7 +276,7 @@ v2ray version
 ./install.sh -l
 
 # 自定义核心文件
-./install.sh -f /root/v2ray-linux-64.zip
+./install.sh -f /root/xray-linux-64.zip
 
 # 选择 TLS 方案
 ./install.sh --tls nginx   # Nginx + Certbot（多站点共存）
@@ -348,7 +348,7 @@ v2ray version
 - ✅ 使用现有 Nginx
 - ✅ 使用现有 Certbot（如果已安装）
 - ✅ 备份现有 `nginx.conf` 到 `nginx.conf.bak`
-- ✅ 在现有配置中添加 `include` 导入 V2Ray 配置
+- ✅ 在现有配置中添加 `include` 导入 Xray 配置
 
 ```bash
 # 直接安装，脚本自动检测
@@ -377,7 +377,7 @@ v2ray version
 
 #### Nginx 已安装但想使用 Caddy
 
-如果主机已安装 Nginx，但想改用 Caddy 部署 V2Ray：
+如果主机已安装 Nginx，但想改用 Caddy 部署 Xray：
 
 **方案 1：停止 Nginx 并安装 Caddy（推荐）**
 
@@ -389,7 +389,7 @@ systemctl disable nginx
 # 2. 备份 Nginx 配置（可选）
 cp -rf /etc/nginx /etc/nginx.bak
 
-# 3. 安装 Caddy + V2Ray
+# 3. 安装 Caddy + Xray
 ./install.sh --tls caddy
 
 # 输出示例:
@@ -452,7 +452,7 @@ systemctl stop nginx
 systemctl disable nginx
 rm -rf /etc/nginx /lib/systemd/system/nginx.service
 
-# 3. 安装 Caddy + V2Ray
+# 3. 安装 Caddy + Xray
 ./install.sh --tls caddy
 
 # 4. 将原有 Nginx 站点迁移到 Caddy
@@ -487,7 +487,7 @@ systemctl restart caddy
 
 #### Caddy 已安装但想使用 Nginx
 
-如果主机已安装 Caddy，但想改用 Nginx 部署 V2Ray：
+如果主机已安装 Caddy，但想改用 Nginx 部署 Xray：
 
 **方案 1：停止 Caddy 并安装 Nginx（推荐）**
 
@@ -563,7 +563,7 @@ systemctl stop caddy
 systemctl disable caddy
 rm -rf /etc/caddy /usr/local/bin/caddy /lib/systemd/system/caddy.service
 
-# 3. 安装 Nginx + V2Ray
+# 3. 安装 Nginx + Xray
 ./install.sh --tls nginx
 
 # 4. 将原有 Caddy 站点迁移到 Nginx
@@ -641,11 +641,11 @@ systemctl disable apache2
 假设已有 WordPress 站点在 `blog.example.com`：
 
 ```bash
-# 1. 安装 V2Ray（使用 Nginx）
+# 1. 安装 Xray（使用 Nginx）
 ./install.sh --tls nginx
 
-# 2. 添加 V2Ray 配置
-v2ray add vmess-ws-tls v2ray.example.com
+# 2. 添加 Xray 配置
+xray add vmess-ws-tls xray.example.com
 
 # 3. 手动添加 WordPress 配置（如果脚本没有自动添加）
 cat > /etc/nginx/sites-enabled/blog.example.com.conf << 'EOF'
@@ -684,17 +684,17 @@ systemctl reload nginx
 ```
 
 **推荐选择：**
-- 单 V2Ray 域名 → **Caddy**
+- 单 Xray 域名 → **Caddy**
 - 多域名或已有其他网站 → **Nginx**
 
 ### 安装后验证
 
 ```bash
 # 查看状态
-v2ray status
+xray status
 
 # 预期输出:
-# V2Ray v5.x.x: running
+# Xray v5.x.x: running
 # Nginx v1.x.x: running (如果选择 Nginx)
 # 或 Caddy v2.x.x: running (如果选择 Caddy)
 ```
@@ -706,7 +706,7 @@ v2ray status
 ### 命令帮助
 
 ```bash
-v2ray help
+xray help
 ```
 
 ### 基本命令
@@ -715,195 +715,195 @@ v2ray help
 
 ```bash
 # VMess-WS-TLS (推荐)
-v2ray add vmess-ws-tls example.com
+xray add vmess-ws-tls example.com
 
 # VLESS-gRPC-TLS
-v2ray add vless-grpc-tls grpc.example.com
+xray add vless-grpc-tls grpc.example.com
 
 # Trojan-WS-TLS
-v2ray add trojan-ws-tls trojan.example.com
+xray add trojan-ws-tls trojan.example.com
 
 # VMess-TCP (无 TLS)
-v2ray add vmess-tcp
+xray add vmess-tcp
 
 # Shadowsocks (简单快速)
-v2ray add ss
+xray add ss
 # 或指定端口、密码、加密方式
-v2ray add ss 8388 mypassword aes-256-gcm
+xray add ss 8388 mypassword aes-256-gcm
 
 # Socks (代理协议)
-v2ray add socks
+xray add socks
 # 或指定端口、用户名、密码
-v2ray add socks 1080 myuser mypass
+xray add socks 1080 myuser mypass
 
 # 使用自动参数
-v2ray add vmess-ws-tls auto
+xray add vmess-ws-tls auto
 ```
 
 #### 查看配置
 
 ```bash
 # 列出所有配置
-v2ray info
+xray info
 
 # 查看特定配置
-v2ray info VMess-WS-example.com.json
+xray info VMess-WS-example.com.json
 
 # 查看二维码
-v2ray qr VMess-WS-example.com.json
+xray qr VMess-WS-example.com.json
 
 # 查看 URL 链接
-v2ray url VMess-WS-example.com.json
+xray url VMess-WS-example.com.json
 ```
 
 #### 更改配置
 
 ```bash
 # 更改端口
-v2ray port VMess-WS-example.com.json 8443
+xray port VMess-WS-example.com.json 8443
 
 # 更改域名
-v2ray host VMess-WS-example.com.com newdomain.com
+xray host VMess-WS-example.com.com newdomain.com
 
 # 更改路径
-v2ray path VMess-WS-example.com.json /newpath
+xray path VMess-WS-example.com.json /newpath
 
 # 更改 UUID
-v2ray id VMess-WS-example.com.json $(v2ray uuid)
+xray id VMess-WS-example.com.json $(xray uuid)
 
 # 更改密码 (Shadowsocks/Trojan)
-v2ray passwd VMess-WS-example.com.json newpassword
+xray passwd VMess-WS-example.com.json newpassword
 
 # 更改伪装类型
-v2ray type VMess-TCP-8080.json http
+xray type VMess-TCP-8080.json http
 
 # 更改伪装网站
-v2ray web VMess-WS-example.com.json https://www.google.com
+xray web VMess-WS-example.com.json https://www.google.com
 
 # 更改协议
-v2ray new VMess-WS-example.com.json trojan-ws-tls
+xray new VMess-WS-example.com.json trojan-ws-tls
 
 # 一次性更改多个参数
-v2ray full VMess-WS-example.com.json trojan-ws-tls 443 newpassword
+xray full VMess-WS-example.com.json trojan-ws-tls 443 newpassword
 ```
 
 #### 删除配置
 
 ```bash
 # 删除单个配置
-v2ray del VMess-WS-example.com.json
+xray del VMess-WS-example.com.json
 
 # 删除多个配置
-v2ray ddel config1.json config2.json config3.json
+xray ddel config1.json config2.json config3.json
 ```
 
 ### 管理命令
 
 ```bash
 # 查看状态
-v2ray status
+xray status
 
-# 启动/停止/重启 V2Ray
-v2ray start
-v2ray stop
-v2ray restart
+# 启动/停止/重启 Xray
+xray start
+xray stop
+xray restart
 
 # 启动/停止/重启 Nginx
-v2ray restart nginx
-v2ray stop nginx
+xray restart nginx
+xray stop nginx
 
 # 启动/停止/重启 Caddy
-v2ray restart caddy
-v2ray stop caddy
+xray restart caddy
+xray stop caddy
 
 # 测试运行
-v2ray test
+xray test
 
 # 查看日志
-v2ray log       # 访问日志
-v2ray logerr    # 错误日志
+xray log       # 访问日志
+xray logerr    # 错误日志
 
 # 设置日志级别
-v2ray log warning
-v2ray log error
-v2ray log none  # 禁用日志
-v2ray log del   # 删除日志文件
+xray log warning
+xray log error
+xray log none  # 禁用日志
+xray log del   # 删除日志文件
 ```
 
 ### 更新命令
 
 ```bash
-# 更新 V2Ray 核心
-v2ray update core
+# 更新 Xray 核心
+xray update core
 
 # 更新脚本
-v2ray update.sh
+xray update.sh
 
 # 更新 Nginx
-v2ray update nginx
+xray update nginx
 
 # 更新 Caddy
-v2ray update caddy
+xray update caddy
 
 # 更新 geo 数据库
-v2ray update dat
+xray update dat
 
 # 更新到指定版本
-v2ray update core v5.10.0
+xray update core v5.10.0
 ```
 
 ### 其他命令
 
 ```bash
 # 设置 DNS
-v2ray dns 1.1.1.1
-v2ray dns 8.8.8.8
-v2ray dns https://dns.google/dns-query
+xray dns 1.1.1.1
+xray dns 8.8.8.8
+xray dns https://dns.google/dns-query
 
 # 启用 BBR
-v2ray bbr
+xray bbr
 
 # 获取可用端口
-v2ray get-port
+xray get-port
 
 # 获取 UUID
-v2ray uuid
+xray uuid
 
 # 获取服务器 IP
-v2ray ip
+xray ip
 
 # 修复配置
-v2ray fix config.json
-v2ray fix-all
-v2ray fix-nginxfile
-v2ray fix-caddyfile
+xray fix config.json
+xray fix-all
+xray fix-nginxfile
+xray fix-caddyfile
 
 # 卸载
-v2ray uninstall
+xray uninstall
 
 # 重装
-v2ray reinstall
+xray reinstall
 ```
 
 ### 高级命令
 
 ```bash
 # 生成客户端配置
-v2ray client VMess-WS-example.com.json
+xray client VMess-WS-example.com.json
 
 # 生成完整客户端配置（含路由）
-v2ray client VMess-WS-example.com.json --full
+xray client VMess-WS-example.com.json --full
 
 # 测试生成配置（不保存）
-v2ray gen vmess-ws-tls example.com
+xray gen vmess-ws-tls example.com
 
 # 禁止自动 TLS
-v2ray no-auto-tls add vmess-ws-tls example.com
+xray no-auto-tls add vmess-ws-tls example.com
 
-# 使用 V2Ray 原生命令
-v2ray bin version
-v2ray api stats
-v2ray tls --cert /path/to/cert
+# 使用 Xray 原生命令
+xray bin version
+xray api stats
+xray tls --cert /path/to/cert
 ```
 
 ---
@@ -914,8 +914,8 @@ v2ray tls --cert /path/to/cert
 
 | 场景 | Caddy | Nginx |
 |------|-------|-------|
-| 单 V2Ray 域名 | ✅ 推荐 | ⚠️ 可用 |
-| 多 V2Ray 域名 | ❌ 不推荐 | ✅ 推荐 |
+| 单 Xray 域名 | ✅ 推荐 | ⚠️ 可用 |
+| 多 Xray 域名 | ❌ 不推荐 | ✅ 推荐 |
 | 与其他网站共存 | ❌ 困难 | ✅ 完美 |
 | 共享 80/443 端口 | ❌ 不支持 | ✅ 支持 |
 | 配置灵活性 | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
@@ -927,30 +927,30 @@ v2ray tls --cert /path/to/cert
 /etc/nginx/
 ├── nginx.conf              # 主配置（脚本管理）
 ├── ssl/                    # SSL 证书目录
-│   ├── v2ray.example.com/
+│   ├── xray.example.com/
 │   │   ├── fullchain.pem
 │   │   └── privkey.pem
 │   ├── blog.example.com/
 │   └── api.example.com/
-├── v2ray/                  # V2Ray 站点配置
-│   ├── v2ray.example.com.conf
-│   └── v2ray.example.com.conf.add
+├── xray/                  # Xray 站点配置
+│   ├── xray.example.com.conf
+│   └── xray.example.com.conf.add
 └── sites-enabled/          # 其他站点配置（用户管理）
     ├── blog.example.com.conf
     └── api.example.com.conf
 ```
 
-### 添加 V2Ray 站点
+### 添加 Xray 站点
 
 ```bash
-# 添加第一个 V2Ray 配置
-v2ray add vmess-ws-tls v2ray.example.com
+# 添加第一个 Xray 配置
+xray add vmess-ws-tls xray.example.com
 
-# 添加第二个 V2Ray 配置
-v2ray add vless-grpc-tls grpc.example.com
+# 添加第二个 Xray 配置
+xray add vless-grpc-tls grpc.example.com
 
 # 脚本会自动:
-# 1. 生成 V2Ray 配置文件
+# 1. 生成 Xray 配置文件
 # 2. 生成 Nginx 配置文件
 # 3. 申请 Let's Encrypt 证书
 # 4. 重载 Nginx
@@ -1064,7 +1064,7 @@ EOF
 
 ```bash
 # 编辑伪装配置
-vim /etc/nginx/v2ray/v2ray.example.com.conf.add
+vim /etc/nginx/xray/xray.example.com.conf.add
 ```
 
 内容示例：
@@ -1127,7 +1127,7 @@ certbot certificates --name example.com
 
 ## 配置参考
 
-### V2Ray 配置文件示例
+### Xray 配置文件示例
 
 #### VMess-WS-TLS
 
@@ -1249,17 +1249,17 @@ firewall-cmd --list-all
 
 ## 故障排查
 
-### V2Ray 无法启动
+### Xray 无法启动
 
 ```bash
 # 查看状态
-systemctl status v2ray
+systemctl status xray
 
 # 查看日志
-journalctl -u v2ray -f
+journalctl -u xray -f
 
 # 测试配置
-v2ray bin run -config /etc/v2ray/config.json -confdir /etc/v2ray/conf
+xray bin run -config /etc/xray/config.json -confdir /etc/xray/conf
 
 # 检查端口占用
 netstat -tlnp | grep :端口号
@@ -1305,11 +1305,11 @@ tail -f /var/log/letsencrypt/letsencrypt.log
 ### WebSocket 连接失败
 
 ```bash
-# 检查 V2Ray 是否运行
-systemctl status v2ray
+# 检查 Xray 是否运行
+systemctl status xray
 
 # 检查 Nginx 配置
-cat /etc/nginx/v2ray/example.com.conf
+cat /etc/nginx/xray/example.com.conf
 
 # 测试本地连接
 curl -i -H "Upgrade: websocket" -H "Connection: Upgrade" -H "Sec-WebSocket-Key: test" -H "Sec-WebSocket-Version: 13" http://127.0.0.1:端口/path
@@ -1322,7 +1322,7 @@ tail -f /var/log/nginx/access.log
 
 1. **检查服务器状态**
    ```bash
-   v2ray status
+   xray status
    ```
 
 2. **检查防火墙**
@@ -1332,7 +1332,7 @@ tail -f /var/log/nginx/access.log
 
 3. **检查端口**
    ```bash
-   netstat -tlnp | grep v2ray
+   netstat -tlnp | grep xray
    ```
 
 4. **检查证书**
@@ -1342,7 +1342,7 @@ tail -f /var/log/nginx/access.log
 
 5. **重新生成配置**
    ```bash
-   v2ray fix 配置名.json
+   xray fix 配置名.json
    ```
 
 ---
@@ -1358,8 +1358,8 @@ tail -f /var/log/nginx/access.log
 **A:** 
 ```bash
 # 卸载当前方案
-v2ray uninstall
-# 选择卸载 V2Ray + Caddy/Nginx
+xray uninstall
+# 选择卸载 Xray + Caddy/Nginx
 
 # 重新安装
 ./install.sh
@@ -1378,8 +1378,8 @@ v2ray uninstall
 
 **A:**
 ```bash
-# 备份 V2Ray 配置
-tar czf v2ray-backup.tar.gz /etc/v2ray/
+# 备份 Xray 配置
+tar czf xray-backup.tar.gz /etc/xray/
 
 # 备份 Nginx 配置
 tar czf nginx-backup.tar.gz /etc/nginx/
@@ -1404,14 +1404,14 @@ tar czf caddy-backup.tar.gz /etc/caddy/
 
 **A:**
 ```bash
-v2ray log none
+xray log none
 ```
 
 ### Q: 如何查看客户端配置？
 
 **A:**
 ```bash
-v2ray client 配置名.json
+xray client 配置名.json
 ```
 
 ### Q: 支持 Cloudflare 代理吗？
@@ -1422,7 +1422,7 @@ v2ray client 配置名.json
 ```bash
 # 1. Cloudflare DNS 设置：DNS only (灰色云) ☁️
 # 2. 添加配置
-v2ray add vmess-ws-tls your-domain.com
+xray add vmess-ws-tls your-domain.com
 # 3. 脚本自动申请 Let's Encrypt 证书
 ```
 
@@ -1500,17 +1500,17 @@ dig your-domain.com
 > - **阶段 1（申请证书）**: Cloudflare 必须设为 **DNS only (灰色云)** ☁️
 > - **阶段 2（正常使用）**: Cloudflare 可以设为 **Proxied (橙色云)** 🌩️
 
-#### 步骤 1: 添加 V2Ray 配置
+#### 步骤 1: 添加 Xray 配置
 
 ```bash
 # 推荐：VMess + WebSocket + TLS
-v2ray add vmess-ws-tls your-domain.com
+xray add vmess-ws-tls your-domain.com
 
 # 或：VLESS + gRPC + TLS
-v2ray add vless-grpc-tls grpc.your-domain.com
+xray add vless-grpc-tls grpc.your-domain.com
 
 # 或：Trojan + WebSocket + TLS
-v2ray add trojan-ws-tls trojan.your-domain.com
+xray add trojan-ws-tls trojan.your-domain.com
 ```
 
 #### 步骤 2: 配置 Cloudflare DNS（阶段 1 - 申请证书）
@@ -1537,14 +1537,14 @@ A       your-domain.com   x.x.x.x       DNS only ☁️
 #### 步骤 3: 运行脚本添加配置
 
 ```bash
-v2ray add vmess-ws-tls your-domain.com
+xray add vmess-ws-tls your-domain.com
 ```
 
 脚本会自动：
 - ✅ 验证域名解析
 - ✅ 申请 Let's Encrypt 证书
 - ✅ 配置 Nginx/Caddy
-- ✅ 生成 V2Ray 配置
+- ✅ 生成 Xray 配置
 
 #### 步骤 4: 开启 Cloudflare 代理（阶段 2 - 正常使用）
 
@@ -1756,13 +1756,13 @@ tail -20 /var/log/letsencrypt/letsencrypt.log
 
 **解决**:
 ```bash
-# 检查 V2Ray 状态
-v2ray status
+# 检查 Xray 状态
+xray status
 
 # 检查 Nginx/Caddy 状态
-v2ray status nginx
+xray status nginx
 # 或
-v2ray status caddy
+xray status caddy
 
 # 检查防火墙
 ufw status
@@ -1775,7 +1775,7 @@ netstat -tlnp | grep :443
 
 **检查 Nginx 配置**:
 ```bash
-cat /etc/nginx/v2ray/your-domain.com.conf
+cat /etc/nginx/xray/your-domain.com.conf
 ```
 
 确保包含 WebSocket 升级头:
@@ -1804,9 +1804,9 @@ proxy_set_header Connection "upgrade";
 
 ### 相关链接
 
-- **GitHub**: https://github.com/WangYan-Good/v2ray
-- **文档**: https://wangyan-good.github.io/v2ray/
-- **V2Ray 官方**: https://www.v2fly.org
+- **GitHub**: https://github.com/WangYan-Good/xray
+- **文档**: https://wangyan-good.github.io/xray/
+- **Xray 官方**: https://www.v2fly.org
 - **Nginx 官方**: https://nginx.org
 - **Certbot 官方**: https://certbot.eff.org
 
@@ -1829,7 +1829,7 @@ GPL-3.0 License
 将 `xray.sh` 和 `src/` 目录打包成 `code.zip`（`install.sh` 运行时会自动下载并解压此文件）：
 
 ```bash
-cd /path/to/v2ray
+cd /path/to/xray
 zip -r code.zip xray.sh src/
 ```
 
@@ -1840,7 +1840,7 @@ zip -r code.zip xray.sh src/
 ```bash
 # 创建 Release（同时创建 git tag）
 gh release create <version> \
-  --title "📦 <version> - v2ray <title>" \
+  --title "📦 <version> - xray <title>" \
   --notes "# ✨ 主要功能\n\n- # 🐛 Bug 修复\n\n- # 🔧 技术改进" \
   --target develop \
   install.sh \
@@ -1859,15 +1859,15 @@ git push origin develop --tags
 
 | 资源 | URL |
 |------|-----|
-| Release 页面 | https://github.com/WangYan-Good/v2ray/releases/latest |
-| 安装脚本 | https://github.com/WangYan-Good/v2ray/releases/latest/download/install.sh |
-| 脚本代码 | https://github.com/WangYan-Good/v2ray/releases/latest/download/code.zip |
+| Release 页面 | https://github.com/WangYan-Good/xray/releases/latest |
+| 安装脚本 | https://github.com/WangYan-Good/xray/releases/latest/download/install.sh |
+| 脚本代码 | https://github.com/WangYan-Good/xray/releases/latest/download/code.zip |
 
 这意味着**手动安装命令永远无需修改**，用户每次执行都会自动获取最新版本：
 
 ```bash
 # 用户永远只需执行此命令即可安装最新版
-wget -O install.sh https://github.com/WangYan-Good/v2ray/releases/latest/download/install.sh
+wget -O install.sh https://github.com/WangYan-Good/xray/releases/latest/download/install.sh
 chmod +x install.sh && ./install.sh
 ```
 
@@ -1880,7 +1880,7 @@ chmod +x install.sh && ./install.sh
 install.sh 从 releases/latest/download/code.zip 下载脚本代码
        │
        ▼
-解压到 /etc/v2ray/sh/
+解压到 /etc/xray/sh/
        │
        ▼
 安装完成

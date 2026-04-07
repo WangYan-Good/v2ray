@@ -1,8 +1,7 @@
 install_service() {
     case $1 in
-    xray | v2ray)
+    xray)
         is_doc_site=https://xtls.github.io/
-        [[ $1 == 'v2ray' ]] && is_doc_site=https://www.v2fly.org/
         cat >/lib/systemd/system/$is_core.service <<<"
 [Unit]
 Description=$is_core_name Service
