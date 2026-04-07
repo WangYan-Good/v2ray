@@ -39,6 +39,7 @@ get_xray_checksum() {
 
 ##
 ## 获取 Caddy 的 SHA256 校验和 (从 checksums.txt 文件)
+## checksums.txt 格式: 第一行=hash, 第二行=文件名 (两行一组)
 ## 用法: get_caddy_checksum <版本> <架构>
 ## 输出: SHA256 字符串 或 空
 ##
@@ -50,7 +51,8 @@ get_caddy_checksum() {
     local tmp_checksum=$(mktemp)
 
     if _wget -t 3 -q -c "$checksum_url" -O "$tmp_checksum" 2>/dev/null; then
-        grep "caddy_${ver#v}_linux_${arch}.tar.gz" "$tmp_checksum" 2>/dev/null | awk '{print $1}'
+        # 两行一组: 第一行=hash, 第二行=文件名
+        grep -A1 "caddy_${ver#v}_linux_${arch}.tar.gz" "$tmp_checksum" 2>/dev/null | head -1
     fi
     rm -f "$tmp_checksum"
 }
