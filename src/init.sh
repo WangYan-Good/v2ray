@@ -36,15 +36,96 @@ _mkdir() {
     mkdir -p "$@"
 }
 
+##
+## 错误码常量 (统一错误处理机制 T8)
+##
+ERR_DOWNLOAD=1
+ERR_CHECKSUM=2
+ERR_PERMISSION=3
+ERR_ARCH=4
+ERR_DEPENDENCY=5
+ERR_CERT=6
+ERR_CONFIG=7
+ERR_SERVICE=8
+ERR_PORT=9
+ERR_UUID=10
+ERR_JSON=11
+ERR_NGINX=12
+ERR_CADDY=13
+ERR_PROTOCOL=14
+ERR_API=15
+ERR_UNKNOWN=99
+
+##
+## 统一错误输出函数
+## 用法: error_out <错误码名称> <错误信息> [修复建议]
+## 示例: error_out "CERT" "证书申请失败" "1. 检查域名 2. 检查防火墙"
+## 输出: [ERR_CERT:6] 错误! 证书申请失败
+##
+error_out() {
+    local code_name="$1"
+    local msg="$2"
+    local suggestion="${3:-请查看帮助文档: https://wangyan-good.github.io/xray/ 或运行 xray help}"
+    local log_file="/var/log/xray/install.log"
+    local timestamp=$(date +'%Y-%m-%d %H:%M:%S')
+    # 尝试获取数字错误码 (从 ERR_ 常量)
+    local code_var="ERR_${code_name}"
+    local code_num="${!code_var:-}"
+    local display_code="${code_name}"
+    if [[ -n "$code_num" ]]; then
+        display_code="${code_name}:${code_num}"
+    fi
+    # 写入日志文件 (如果目录存在)
+    if [[ -d "$(dirname "$log_file")" ]]; then
+        echo "[${timestamp}] [ERR_${display_code}] ${msg}" >> "$log_file"
+        echo "[${timestamp}] [SUGGESTION] ${suggestion}" >> "$log_file"
+    fi
+    echo -e "\n${red}[ERR_${display_code}] 错误! ${msg}${none}"
+    echo -e "${yellow}建议: ${suggestion}${none}\n"
+}
+
+##
+## 统一信息日志函数
+## 用法: log_info <信息>
+##
+log_info() {
+    local log_file="/var/log/xray/install.log"
+    local timestamp=$(date +'%Y-%m-%d %H:%M:%S')
+    if [[ -d "$(dirname "$log_file")" ]]; then
+        echo "[${timestamp}] [INFO] $*" >> "$log_file"
+    fi
+}
+
+##
+## 统一警告输出函数
+## 用法: warn_out <警告信息>
+##
+warn_out() {
+    local log_file="/var/log/xray/install.log"
+    local timestamp=$(date +'%Y-%m-%d %H:%M:%S')
+    if [[ -d "$(dirname "$log_file")" ]]; then
+        echo "[${timestamp}] [WARN] $*" >> "$log_file"
+    fi
+    echo -e "\n${yellow}[WARN] 警告! $@${none}\n"
+}
+
 is_err=$(_red_bg 错误!)
 is_warn=$(_red_bg 警告!)
 
+##
+## 旧 err() 函数 (向后兼容，逐步迁移到 error_out)
+## 用法: err <错误信息>
+## 注意: 新代码推荐使用 error_out <错误码> <错误信息> <修复建议>
+##
 err() {
     echo -e "\n$is_err $@\n"
     [[ $is_dont_auto_exit ]] && return
     exit 1
 }
 
+##
+## 旧 warn() 函数 (向后兼容，逐步迁移到 warn_out)
+##
 warn() {
     echo -e "\n$is_warn $@\n"
 }

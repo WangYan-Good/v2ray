@@ -259,7 +259,7 @@ server {
         
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${host}; then
-            msg err "证书申请失败，正在清理生成的配置..."
+            error_out "CERT" "证书申请失败，正在清理生成的配置..." "1. 手动申请证书: certbot certonly --webroot -w /var/www/certbot -d ${host}  2. 查看日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
             msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
             msg warn "然后手动添加配置：xray add ${protocol_type} ${host}"
 
@@ -363,7 +363,7 @@ server {
         
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${host}; then
-            msg err "证书申请失败，正在清理生成的配置..."
+            error_out "CERT" "证书申请失败，正在清理生成的配置..." "1. 手动申请证书: certbot certonly --webroot -w /var/www/certbot -d ${host}  2. 查看日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
             msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
             msg warn "然后手动添加配置：xray add ${protocol_type} ${host}"
 
@@ -465,7 +465,7 @@ server {
         
         # 自动申请 Certbot 证书
         if ! nginx_certbot issue ${host}; then
-            msg err "证书申请失败，正在清理生成的配置..."
+            error_out "CERT" "证书申请失败，正在清理生成的配置..." "1. 手动申请证书: certbot certonly --webroot -w /var/www/certbot -d ${host}  2. 查看日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
             msg warn "你可以稍后手动申请证书：certbot certonly --webroot -w /var/www/certbot -d ${host}"
             msg warn "然后手动添加配置：xray add ${protocol_type} ${host}"
 
@@ -541,14 +541,14 @@ nginx_certbot() {
 
         # 验证证书文件是否存在且有效
         if [[ ! -f "${target}/fullchain.pem" || ! -f "${target}/privkey.pem" ]]; then
-            msg err "证书文件不存在：${target}"
+            error_out "CERT" "证书文件不存在：${target}" "1. 检查 Certbot 日志: tail -20 /var/log/letsencrypt/letsencrypt.log  2. 重新申请证书: certbot certonly --webroot -w /var/www/certbot -d ${domain}"
             msg warn "Certbot 可能未正确完成，请检查 Certbot 日志"
             return 1
         fi
 
         # 验证证书有效性（尝试解析）
         if ! openssl x509 -noout -in "${target}/fullchain.pem" 2>/dev/null; then
-            msg err "证书文件损坏或无效：${target}/fullchain.pem"
+            error_out "CERT" "证书文件损坏或无效：${target}/fullchain.pem" "1. 重新申请证书: certbot certonly --webroot -w /var/www/certbot -d ${domain}"
             return 1
         fi
 
@@ -569,7 +569,7 @@ nginx_certbot() {
             if [[ $? -eq 0 ]]; then
                 msg ok "旧文件删除成功"
             else
-                msg err "旧文件删除失败，请手动处理"
+                error_out "CERT" "旧文件删除失败，请手动处理: ${link_path}" "1. 手动删除: rm -rf ${link_path}  2. 检查文件权限: ls -la ${link_path}"
                 return 1
             fi
         fi
@@ -582,11 +582,11 @@ nginx_certbot() {
                 msg ok "证书软链接创建成功：${link_path} -> ${target}"
                 return 0
             else
-                msg err "证书软链接创建成功，但目标文件不可访问"
+                error_out "CERT" "证书软链接创建成功，但目标文件不可访问" "1. 检查 Let's Encrypt 目录: ls -la /etc/letsencrypt/live/${domain}/"
                 return 1
             fi
         else
-            msg err "证书软链接创建失败"
+            error_out "CERT" "证书软链接创建失败" "1. 检查权限: ls -la $is_nginx_dir/ssl/  2. 手动创建: ln -sf $target $link_path"
             return 1
         fi
     }
@@ -643,14 +643,14 @@ nginx_certbot() {
             systemctl start nginx &>/dev/null
             sleep 2
             if ! pgrep -f "nginx: master" &>/dev/null; then
-                msg err "Nginx 启动失败，无法申请证书"
+                error_out "SERVICE" "Nginx 启动失败，无法申请证书" "1. 检查 Nginx 配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
                 return 1
             fi
             msg ok "Nginx 已启动"
 
             # 测试 Nginx 配置并重载
             if ! nginx -t &>/dev/null; then
-                msg err "Nginx 配置测试失败"
+                error_out "NGINX" "Nginx 配置测试失败" "1. 查看详细错误: nginx -t 2>&1  2. 检查配置文件: cat $is_nginx_file"
                 nginx -t 2>&1 | tail -5
                 return 1
             fi
@@ -664,7 +664,7 @@ nginx_certbot() {
             echo "test" > $test_file
             sleep 1
             if ! curl -s --connect-timeout 3 "http://localhost/.well-known/acme-challenge/test" | grep -q "test"; then
-                msg err "Nginx 配置验证失败：无法访问挑战文件"
+                error_out "NGINX" "Nginx 配置验证失败：无法访问挑战文件" "1. 检查 Nginx 是否正常运行: systemctl status nginx  2. 检查挑战目录: ls -la /var/www/certbot/.well-known/acme-challenge/"
                 rm -f $test_file
                 return 1
             fi
@@ -690,7 +690,7 @@ nginx_certbot() {
                     msg warn "创建证书软链接..."
                     mkdir -p $is_nginx_dir/ssl
                     if ! _create_cert_link; then
-                        msg err "证书软链接创建失败"
+                        error_out "CERT" "证书软链接创建失败" "1. 检查证书文件: ls -la /etc/letsencrypt/live/${domain}/  2. 重新申请证书"
                         return 1
                     fi
                 fi
@@ -702,7 +702,7 @@ nginx_certbot() {
                 fi
                 return 0
             else
-                msg err "证书续期失败"
+                error_out "CERT" "证书续期失败" "1. 检查 Nginx 是否正常运行  2. 检查证书文件是否损坏  3. 查看详细日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
                 msg warn "请检查:"
                 msg "  1. Nginx 是否正常运行"
                 msg "  2. 证书文件是否损坏"
@@ -719,7 +719,7 @@ nginx_certbot() {
 
             # 检查 80 端口是否被占用
             if ss -tlnp | grep -q ':80 '; then
-                msg err "80 端口被占用，无法申请证书"
+                error_out "PORT" "80 端口被占用，无法申请证书" "1. 查看占用进程: ss -tlnp | grep :80  2. 停止占用服务后重试"
                 ss -tlnp | grep ':80'
                 msg warn "请关闭占用 80 端口的服务后重试"
                 return 1
@@ -732,7 +732,7 @@ nginx_certbot() {
             # 检查 firewalld
             if command -v firewall-cmd &>/dev/null && firewall-cmd --state &>/dev/null; then
                 if ! firewall-cmd --query-service=http &>/dev/null && ! firewall-cmd --query-port=80/tcp &>/dev/null; then
-                    msg err "firewalld 未开放 80 端口"
+                    error_out "DEPENDENCY" "firewalld 未开放 80 端口" "执行: firewall-cmd --permanent --add-service=http && firewall-cmd --permanent --add-service=https && firewall-cmd --reload"
                     msg warn "请执行以下命令开放端口："
                     msg "  firewall-cmd --permanent --add-service=http"
                     msg "  firewall-cmd --permanent --add-service=https"
@@ -740,11 +740,11 @@ nginx_certbot() {
                     firewall_issue=1
                 fi
             fi
-            
+
             # 检查 ufw
             if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
                 if ! ufw status | grep -qE "80/tcp|http"; then
-                    msg err "ufw 防火墙未开放 80 端口"
+                    error_out "DEPENDENCY" "ufw 防火墙未开放 80 端口" "执行: ufw allow 80/tcp && ufw allow 443/tcp"
                     msg warn "请执行以下命令开放端口："
                     msg "  ufw allow 80/tcp"
                     msg "  ufw allow 443/tcp"
@@ -762,7 +762,7 @@ nginx_certbot() {
             fi
             
             if [[ $firewall_issue ]]; then
-                msg err "防火墙配置不正确，证书申请将失败"
+                error_out "DEPENDENCY" "防火墙配置不正确，证书申请将失败" "1. 根据上方提示开放 80/443 端口  2. 重新运行安装"
                 msg warn "请先修复防火墙配置，然后重新运行安装"
                 return 1
             fi
@@ -783,7 +783,7 @@ nginx_certbot() {
 
                 # 验证证书文件是否存在
                 if [[ ! -f "/etc/letsencrypt/live/${domain}/fullchain.pem" ]]; then
-                    msg err "证书文件未正确生成，请检查 Certbot 日志"
+                    error_out "CERT" "证书文件未正确生成，请检查 Certbot 日志" "1. 查看详细日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
                     msg warn "查看详细日志：tail -20 /var/log/letsencrypt/letsencrypt.log"
                     return 1
                 fi
@@ -792,7 +792,7 @@ nginx_certbot() {
                 msg warn "创建证书软链接..."
                 mkdir -p $is_nginx_dir/ssl
                 if ! _create_cert_link; then
-                    msg err "证书软链接创建失败"
+                    error_out "CERT" "证书软链接创建失败" "1. 检查证书文件: ls -la /etc/letsencrypt/live/${domain}/  2. 重新申请证书"
                     return 1
                 fi
 
@@ -807,7 +807,7 @@ nginx_certbot() {
                     # 检查错误是否与当前域名相关
                     if echo "$nginx_test_output" | grep -q "${domain}"; then
                         # 当前域名的配置有问题
-                        msg err "Nginx 配置测试失败（当前域名配置有误）"
+                        error_out "NGINX" "Nginx 配置测试失败（当前域名配置有误）" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
                         msg warn "请检查：nginx -t"
                         msg warn "查看详细错误：journalctl -u nginx -n 50"
                         return 1
@@ -829,7 +829,7 @@ nginx_certbot() {
                     fi
                     return 0
                 else
-                    msg err "Nginx 启动失败"
+                    error_out "SERVICE" "Nginx 启动失败" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50  3. 证书已申请，修复后可手动启动: systemctl start nginx"
                     msg warn "Nginx 配置可能有问题"
                     msg warn "请检查：nginx -t"
                     msg warn "查看详细错误：journalctl -u nginx -n 50"
@@ -838,7 +838,7 @@ nginx_certbot() {
                     return 1
                 fi
             else
-                msg err "证书申请失败"
+                error_out "CERT" "证书申请失败" "1. 检查域名解析  2. 检查防火墙80端口  3. 查看日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
                 msg warn "请检查:"
                 msg "  1. 域名是否正确解析到服务器 IP"
                 msg "  2. 防火墙是否开放 80 端口"
@@ -883,12 +883,12 @@ install_nginx_certbot() {
     
     # 检查安装
     if [[ ! $(type -P nginx) ]]; then
-        msg err "Nginx 安装失败"
+        error_out "NGINX" "Nginx 安装失败" "1. 检查包管理器: $cmd update -y  2. 手动安装: $cmd install nginx"
         return 1
     fi
-    
+
     if [[ ! $(type -P certbot) ]]; then
-        msg err "Certbot 安装失败"
+        error_out "DEPENDENCY" "Certbot 安装失败" "1. 检查包管理器  2. 手动安装: $cmd install certbot python3-certbot-nginx"
         return 1
     fi
     
@@ -957,7 +957,7 @@ nginx_reload() {
                 msg ok "Nginx 启动成功"
                 return 0
             else
-                msg err "Nginx 启动失败，请检查配置"
+                error_out "SERVICE" "Nginx 启动失败，请检查配置" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
                 return 1
             fi
         fi

@@ -429,7 +429,7 @@ create() {
                     ## 排除空值或 root (/) 的情况，进行精确匹配
                     ##
                     if [[ -n "$is_caddy_path" && -n "$is_xray_path" && "$is_caddy_path" != "$is_xray_path" ]]; then
-                        msg err "配置冲突：Xray 路径 ($is_xray_path) 与 Caddy reverse_proxy ($is_caddy_path) 不匹配！"
+                        error_out "CONFIG" "配置冲突：Xray 路径 ($is_xray_path) 与 Caddy reverse_proxy ($is_caddy_path) 不匹配！" "1. 重新生成并覆盖 Caddy 配置  2. 查看 Caddy 配置: cat $is_caddy_site_file"
                         msg warn "如果继续使用当前配置，客户端将无法连接。"
                         echo
                         echo "请选择:"
@@ -496,7 +496,7 @@ create() {
                     ## 排除空值或 root (/) 的情况，进行精确匹配
                     ##
                     if [[ -n "$is_nginx_location_path" && -n "$is_xray_path" && "$is_nginx_location_path" != "$is_xray_path" ]]; then
-                        msg err "配置冲突：Xray 路径 ($is_xray_path) 与 Nginx location ($is_nginx_location_path) 不匹配！"
+                        error_out "CONFIG" "配置冲突：Xray 路径 ($is_xray_path) 与 Nginx location ($is_nginx_location_path) 不匹配！" "1. 重新生成并覆盖 Nginx 配置  2. 查看 Nginx 配置: cat $is_nginx_site_file"
                         msg warn "如果继续使用当前配置，客户端将无法连接。"
                         echo
                         echo "请选择:"
@@ -595,7 +595,7 @@ create() {
         ## create nginx new
         ##
         if ! nginx_config $2; then
-            msg err "Nginx 配置生成失败，证书申请未成功"
+            error_out "CERT" "Nginx 配置生成失败，证书申请未成功" "1. 稍后手动申请证书: certbot certonly --webroot -w /var/www/certbot -d $2  2. 查看 Certbot 日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
             msg warn "Xray 配置已生成，但 TLS 尚未启用"
             msg warn "你可以稍后手动申请证书并重载 Nginx"
             is_api_fail=1
@@ -1298,7 +1298,7 @@ add() {
                     msg "\t\t$v"
                 done
                 msg "$is_err_tips\n"
-                exit 1
+                return $ERR_UNKNOWN
             }
             ss_method=$is_tmp_use_type
             header_type=$is_tmp_use_type
