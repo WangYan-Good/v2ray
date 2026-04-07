@@ -712,16 +712,58 @@ nginx_certbot() {
         else
             # 首次申请：使用 standalone 模式
             msg warn "正在申请 SSL 证书（standalone 模式）..."
-            
+
             # 确保 80 端口空闲
             systemctl stop nginx &>/dev/null
             sleep 1
-            
+
             # 检查 80 端口是否被占用
             if ss -tlnp | grep -q ':80 '; then
                 msg err "80 端口被占用，无法申请证书"
                 ss -tlnp | grep ':80'
                 msg warn "请关闭占用 80 端口的服务后重试"
+                return 1
+            fi
+
+            # 防火墙预检：确保 80 端口对外可访问
+            msg warn "检查防火墙配置..."
+            firewall_issue=
+            
+            # 检查 firewalld
+            if command -v firewall-cmd &>/dev/null && firewall-cmd --state &>/dev/null; then
+                if ! firewall-cmd --query-service=http &>/dev/null && ! firewall-cmd --query-port=80/tcp &>/dev/null; then
+                    msg err "firewalld 未开放 80 端口"
+                    msg warn "请执行以下命令开放端口："
+                    msg "  firewall-cmd --permanent --add-service=http"
+                    msg "  firewall-cmd --permanent --add-service=https"
+                    msg "  firewall-cmd --reload"
+                    firewall_issue=1
+                fi
+            fi
+            
+            # 检查 ufw
+            if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
+                if ! ufw status | grep -qE "80/tcp|http"; then
+                    msg err "ufw 防火墙未开放 80 端口"
+                    msg warn "请执行以下命令开放端口："
+                    msg "  ufw allow 80/tcp"
+                    msg "  ufw allow 443/tcp"
+                    firewall_issue=1
+                fi
+            fi
+            
+            # 检查 iptables（如果没有 firewalld/ufw）
+            if [[ ! $firewall_issue ]] && ! command -v firewall-cmd &>/dev/null && ! command -v ufw &>/dev/null; then
+                if iptables -L -n 2>/dev/null | grep -q "REJECT\|DROP"; then
+                    if ! iptables -L -n | grep -q "dpt:80.*ACCEPT"; then
+                        msg warn "iptables 可能有阻止 80 端口的规则，请检查"
+                    fi
+                fi
+            fi
+            
+            if [[ $firewall_issue ]]; then
+                msg err "防火墙配置不正确，证书申请将失败"
+                msg warn "请先修复防火墙配置，然后重新运行安装"
                 return 1
             fi
 
