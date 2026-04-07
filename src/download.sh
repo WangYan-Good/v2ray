@@ -77,7 +77,7 @@ get_latest_version() {
         return
         ;;
     esac
-    latest_ver=$(_wget -qO- $url | grep tag_name | grep -E -o 'v([0-9.]+)')
+    latest_ver=$(_wget -qO- $url | grep tag_name | grep -E -o 'v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9_.-]+)?')
     [[ ! $latest_ver ]] && {
         error_out "DOWNLOAD" "获取 ${name} 最新版本失败，请检查网络连接" "1. 检查网络: ping github.com  2. 配置代理: export https_proxy=http://127.0.0.1:7890  3. 重试命令"
         exit $ERR_DOWNLOAD
