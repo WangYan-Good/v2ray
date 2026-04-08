@@ -2,7 +2,7 @@
 
 > 任务: 统一错误处理机制，所有函数使用 `return <error_code>` 而非 `exit`，顶层统一捕获
 > 创建时间: 2026-04-07
-> 状态: 🟡 待执行
+> 状态: � 已完成
 > 负责人: -
 
 ---
@@ -322,7 +322,7 @@ echo "退出码: $?"
 
 ```bash
 # Step 1: 使用非 ROOT 用户运行脚本
-ssh wangyan@192.168.1.110 "bash /etc/xray/sh/src/init.sh 2>&1" || true
+ssh 测试客户端 "bash /etc/xray/sh/src/init.sh 2>&1" || true
 
 # 或使用 sudo -u 模拟
 sudo -u www-data bash -c 'source /etc/xray/sh/src/init.sh' 2>&1 || true
@@ -1335,7 +1335,7 @@ echo "✅ 后续命令正常执行 (脚本未因 exit 1 终止整个 shell)"
 
 ## 真实环境验证详情
 
-### 服务端 (root@bak.proxy.yourdie.com)
+### 服务端 (测试服务器)
 
 #### TC-11: 服务启动失败验证
 
@@ -1384,7 +1384,7 @@ nginx: configuration file /etc/nginx/nginx.conf test failed
   5. bashrc 配置中的别名
   6. systemd 服务文件
 
-### 客户端 (wangyan@192.168.1.110)
+### 客户端 (测试客户端)
 
 #### TC-06: 非 ROOT 权限验证
 
@@ -1466,7 +1466,7 @@ ERR_UNKNOWN=99      # 未知错误
 
 ---
 
-*测试执行: 2026-04-07 | 服务端: root@bak.proxy.yourdie.com | 客户端: wangyan@192.168.1.110*
+*测试执行:2026-04-07 | 服务端: 测试服务器 | 客户端: 测试客户端*
 *通过率: 26/26 = 100% (0 跳过)*
 *T8 任务状态: ✅ 全部子任务已完成 (8.6~8.11)*
 

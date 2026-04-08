@@ -42,9 +42,10 @@
 | 协议 | 传输方式 | TLS | 动态端口 | 说明 |
 |------|----------|-----|----------|------|
 | VMess | TCP/mKCP/QUIC | ❌ | ✅ | 基础协议 |
-| VMess | WS/H2/gRPC | ✅ | ❌ | 推荐组合 |
-| VLESS | WS/H2/gRPC | ✅ | ❌ | 新一代协议 |
-| Trojan | WS/H2/gRPC | ✅ | ❌ | 伪装性强 |
+| VMess | WS/XHTTP/gRPC | ✅ | ❌ | 推荐组合 |
+| VLESS | WS/XHTTP/gRPC | ✅ | ❌ | 新一代协议 |
+| VLESS | XTLS-uTLS-REALITY | ✅ | ❌ | 高级伪装协议 |
+| Trojan | WS/XHTTP/gRPC | ✅ | ❌ | 伪装性强 |
 | Shadowsocks | TCP | ❌ | ❌ | 简单快速 |
 | Socks | TCP | ❌ | ❌ | 代理协议 |
 
@@ -723,6 +724,17 @@ xray add vless-grpc-tls grpc.example.com
 # Trojan-WS-TLS
 xray add trojan-ws-tls trojan.example.com
 
+# VLESS-XHTTP-TLS (多路复用)
+xray add vless-xhttp-tls xhttp.example.com
+
+# Trojan-XHTTP-TLS (多路复用)
+xray add trojan-xhttp-tls xhttp.example.com
+
+# VLESS-REALITY (高级伪装)
+xray add reality
+# 或指定参数
+xray add reality 12345 uuid servername.example.com
+
 # VMess-TCP (无 TLS)
 xray add vmess-tcp
 
@@ -1203,6 +1215,86 @@ server {
 }
 ```
 
+#### VLESS-XHTTP-TLS
+
+```json
+{
+  "inbounds": [
+    {
+      "tag": "VLESS-XHTTP-example.com.json",
+      "port": 50064,
+      "listen": "127.0.0.1",
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "uuid-here"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "tls",
+        "xhttpSettings": {
+          "path": "/path",
+          "host": "example.com",
+          "mode": "auto"
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
+      }
+    }
+  ]
+}
+```
+
+#### VLESS-XTLS-uTLS-REALITY
+
+```json
+{
+  "inbounds": [
+    {
+      "tag": "VLESS-XTLS-uTLS-REALITY-12345.json",
+      "port": 12345,
+      "listen": "0.0.0.0",
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "uuid-here"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "xtls",
+        "xtlsSettings": {
+          "serverName": "servername.example.com",
+          "certificates": []
+        },
+        "realitySettings": {
+          "show": false,
+          "dest": "servername.example.com:443",
+          "xver": 0,
+          "serverNames": ["servername.example.com"],
+          "privateKey": "private-key-here",
+          "publicKey": "public-key-here",
+          "shortIds": [""]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
+      }
+    }
+  ]
+}
+```
+
 ### Caddy 配置示例
 
 ```caddy
@@ -1490,7 +1582,7 @@ dig your-domain.com
 | VLESS | gRPC + TLS | ✅ 完美支持 | ⭐⭐⭐⭐ |
 | Trojan | WebSocket + TLS | ✅ 完美支持 | ⭐⭐⭐⭐ |
 | Trojan | gRPC + TLS | ✅ 完美支持 | ⭐⭐⭐⭐ |
-| VMess | H2 + TLS | ✅ 支持 | ⭐⭐⭐ |
+| VMess | XHTTP + TLS | ✅ 支持 | ⭐⭐⭐ |
 | VMess | TCP (无 TLS) | ❌ 不支持 | - |
 | VMess | mKCP / QUIC | ❌ 不支持 (UDP) | - |
 
