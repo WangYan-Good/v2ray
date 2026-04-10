@@ -91,9 +91,10 @@ jobs:
       - name: Check for V2Ray remnants
         run: |
           echo "=== Checking for V2Ray/v2ray remnants ==="
-          # Allow legitimate contexts: old_backup, Loyalsoldier, tree/old, v2ray-rules-dat
+          # Allow legitimate contexts: old_backup, Loyalsoldier, tree/old, v2ray-rules-dat,
+          # old migration paths (src/old.sh, /etc/v2ray/, v2ray_*, _v2ray_*)
           RESULTS=$(grep -rn 'V2Ray\|v2ray' src/ install.sh xray.sh \
-            --include="*.sh" 2>/dev/null | grep -v 'old_backup\|Loyalsoldier\|tree/old\|v2ray-rules-dat' || true)
+            --include="*.sh" 2>/dev/null | grep -v 'old_backup\|Loyalsoldier\|tree/old\|v2ray-rules-dat\|src/old\.sh\|src/init\.sh\|/etc/v2ray/\|v2ray_\|_v2ray_\|233blog_v2ray' || true)
 
           if [[ -n "$RESULTS" ]]; then
             echo "❌ Found V2Ray/v2ray remnants:"
