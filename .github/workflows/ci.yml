@@ -1,0 +1,140 @@
+name: CI Check
+
+on:
+  push:
+    branches: [develop, main, master]
+  pull_request:
+    branches: [develop]
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck
+        run: |
+          echo "=== Checking install.sh ==="
+          shellcheck --severity=info install.sh
+
+          echo "=== Checking xray.sh ==="
+          shellcheck --severity=info xray.sh
+
+          echo "=== Checking src/*.sh ==="
+          for f in src/*.sh; do
+            echo "Checking $f..."
+            shellcheck --severity=info "$f"
+          done
+
+          echo "✅ All ShellCheck checks passed"
+
+  bash-syntax:
+    name: Bash Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check bash syntax
+        run: |
+          echo "=== Checking install.sh ==="
+          bash -n install.sh
+
+          echo "=== Checking xray.sh ==="
+          bash -n xray.sh
+
+          echo "=== Checking src/*.sh ==="
+          for f in src/*.sh; do
+            echo "Checking $f..."
+            bash -n "$f"
+          done
+
+          echo "✅ All bash syntax checks passed"
+
+  json-validation:
+    name: JSON Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Validate JSON files
+        run: |
+          echo "=== Validating JSON files ==="
+          find . -name "*.json" -not -path "./.git/*" | while read -r f; do
+            echo "Validating $f..."
+            jq . "$f" > /dev/null 2>&1 || {
+              echo "❌ Invalid JSON: $f"
+              jq . "$f"
+              exit 1
+            }
+          done
+          echo "✅ All JSON files valid"
+
+  naming-consistency:
+    name: Naming Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for V2Ray remnants
+        run: |
+          echo "=== Checking for V2Ray/v2ray remnants ==="
+          # Allow legitimate contexts: old_backup, Loyalsoldier, tree/old, v2ray-rules-dat
+          RESULTS=$(grep -rn 'V2Ray\|v2ray' src/ install.sh xray.sh \
+            --include="*.sh" 2>/dev/null | grep -v 'old_backup\|Loyalsoldier\|tree/old\|v2ray-rules-dat' || true)
+
+          if [[ -n "$RESULTS" ]]; then
+            echo "❌ Found V2Ray/v2ray remnants:"
+            echo "$RESULTS"
+            exit 1
+          fi
+
+          echo "✅ No V2Ray/v2ray remnants found (except legitimate contexts)"
+
+  protocol-completeness:
+    name: Protocol Completeness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check protocol list
+        run: |
+          echo "=== Checking protocol completeness ==="
+          MISSING=0
+
+          for proto in \
+            "VLESS-XTLS-uTLS-REALITY" \
+            "VLESS-XHTTP-TLS" \
+            "Trojan-XHTTP-TLS" \
+            "VMess-WS-TLS" \
+            "VLESS-WS-TLS" \
+            "Trojan-WS-TLS" \
+            "Shadowsocks" \
+            "VMess-TCP"; do
+            if grep -q "$proto" src/core.sh; then
+              echo "✅ $proto found"
+            else
+              echo "❌ $proto MISSING"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+
+          if [[ $MISSING -gt 0 ]]; then
+            echo "❌ $MISSING protocols missing from protocol_list"
+            exit 1
+          fi
+
+          echo "✅ All required protocols present"
