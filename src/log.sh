@@ -1,3 +1,5 @@
+#!/bin/bash
+
 is_log_level_list=(
     debug
     info

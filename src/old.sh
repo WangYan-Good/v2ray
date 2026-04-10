@@ -1,3 +1,5 @@
+#!/bin/bash
+
 is_old_list=(
 	TCP
 	TCP_HTTP

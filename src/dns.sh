@@ -1,3 +1,5 @@
+#!/bin/bash
+
 is_dns_list=(
     1.1.1.1
     8.8.8.8
