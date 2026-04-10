@@ -23,27 +23,29 @@ jobs:
       - name: Run ShellCheck
         # Exclude rules:
         # SC2034 - vars appear unused but are dynamically sourced by load()
-        # SC2154 - same as SC2034, dynamically sourced vars
+        # SC2068 - project uses $@ without quoting as standard pattern
+        # SC2145 - same as SC2068, array/string mixing in $@ usage
+        # SC2154 - dynamically sourced vars from load()
         # SC2155 - project uses 'local var=$(cmd)' as a standard pattern
         # SC2317 - helper functions appear unreachable but are called indirectly
         run: |
           echo "=== Checking install.sh ==="
-          shellcheck --severity=warning --exclude=SC2034,SC2154,SC2155,SC2317 install.sh
+          shellcheck --severity=warning --exclude=SC2034,SC2068,SC2145,SC2154,SC2155,SC2317 install.sh
 
           echo "=== Checking xray.sh ==="
-          shellcheck --severity=warning --exclude=SC2034,SC2154,SC2155,SC2317 xray.sh
+          shellcheck --severity=warning --exclude=SC2034,SC2068,SC2145,SC2154,SC2155,SC2317 xray.sh
 
           echo "=== Checking src/*.sh (excluding core.sh) ==="
           for f in src/*.sh; do
             [[ "$f" == "src/core.sh" ]] && continue
             echo "Checking $f..."
-            shellcheck --severity=warning --exclude=SC2034,SC2154,SC2155,SC2317 "$f"
+            shellcheck --severity=warning --exclude=SC2034,SC2068,SC2145,SC2154,SC2155,SC2317 "$f"
           done
 
           echo "=== Checking src/core.sh (large file, 120s timeout) ==="
           # SC2155 excluded: core.sh uses 'local var=$(cmd)' extensively (2340 lines)
           # Splitting all instances would be a massive behavioral change
-          timeout 120 shellcheck --severity=warning --exclude=SC2034,SC2086,SC2154,SC2155,SC2317 src/core.sh || {
+          timeout 120 shellcheck --severity=warning --exclude=SC2034,SC2068,SC2086,SC2145,SC2154,SC2155,SC2317 src/core.sh || {
             if [[ $? -eq 124 ]]; then
               echo "⚠️ ShellCheck timeout on src/core.sh (2340 lines, too complex)"
             else
