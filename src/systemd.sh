@@ -1,3 +1,53 @@
+##
+## 安装前系统级配置: 文件描述符限制
+## 确保系统能支持大量并发连接
+##
+setup_system_limits() {
+    local limits_conf="/etc/security/limits.conf"
+
+    ##
+    ## 1. 设置系统级文件描述符上限 (/etc/security/limits.conf)
+    ##
+    if ! grep -q 'xray.*nofile' "$limits_conf" 2>/dev/null; then
+        cat >>"$limits_conf" <<'EOF'
+
+# Xray 文件描述符限制
+root soft nofile 1048576
+root hard nofile 1048576
+* soft nofile 1048576
+* hard nofile 1048576
+EOF
+    fi
+
+    ##
+    ## 2. 设置系统全局文件描述符上限 (fs.file-max)
+    ##
+    local current_max
+    current_max=$(sysctl -n fs.file-max 2>/dev/null || echo "0")
+    if [[ "$current_max" != "0" ]] && [[ "$current_max" -lt 1048576 ]]; then
+        if [[ ! -f /etc/sysctl.d/99-xray.conf ]] || ! grep -q 'fs.file-max' /etc/sysctl.d/99-xray.conf 2>/dev/null; then
+            # 追加到 Xray sysctl 配置或创建新文件
+            if [[ -f /etc/sysctl.d/99-xray.conf ]]; then
+                echo "fs.file-max = 1048576" >>/etc/sysctl.d/99-xray.conf
+            else
+                echo "fs.file-max = 1048576" >/etc/sysctl.d/99-xray.conf
+            fi
+        fi
+    fi
+
+    ##
+    ## 3. 设置 systemd 全局默认限制
+    ##
+    local systemd_conf="/etc/systemd/system.conf"
+    if [[ -f "$systemd_conf" ]] && ! grep -q 'DefaultLimitNOFILE=' "$systemd_conf" 2>/dev/null; then
+        sed -i 's/^#*DefaultLimitNOFILE=.*/DefaultLimitNOFILE=1048576/' "$systemd_conf"
+        # 如果原本没有该配置（sed 未匹配到），则添加
+        if ! grep -q 'DefaultLimitNOFILE=1048576' "$systemd_conf" 2>/dev/null; then
+            echo "DefaultLimitNOFILE=1048576" >>"$systemd_conf"
+        fi
+    fi
+}
+
 install_service() {
     case $1 in
     xray)

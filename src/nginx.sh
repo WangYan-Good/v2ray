@@ -51,7 +51,7 @@ error_log /var/log/nginx/error.log;
 pid /run/nginx.pid;
 
 events {
-    worker_connections 1024;
+    worker_connections 4096;
     multi_accept on;
 }
 
