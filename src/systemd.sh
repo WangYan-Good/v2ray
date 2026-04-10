@@ -124,6 +124,6 @@ WantedBy=multi-user.target"
     esac
 
     # enable, reload
-    systemctl enable $1
+    systemctl enable "$1"
     systemctl daemon-reload
 }
