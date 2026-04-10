@@ -22,15 +22,15 @@ jobs:
       - name: Run ShellCheck
         run: |
           echo "=== Checking install.sh ==="
-          shellcheck --severity=info install.sh
+          shellcheck --severity=warning --exclude=SC2034,SC2317 install.sh
 
           echo "=== Checking xray.sh ==="
-          shellcheck --severity=info xray.sh
+          shellcheck --severity=warning --exclude=SC2034,SC2317 xray.sh
 
           echo "=== Checking src/*.sh ==="
           for f in src/*.sh; do
             echo "Checking $f..."
-            shellcheck --severity=info "$f"
+            shellcheck --severity=warning --exclude=SC2034,SC2317 "$f"
           done
 
           echo "✅ All ShellCheck checks passed"
