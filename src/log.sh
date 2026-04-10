@@ -6,6 +6,36 @@ is_log_level_list=(
     none
     del
 )
+
+##
+## 安装 logrotate 配置
+## 自动轮转 access.log 和 error.log，防止磁盘写满
+##
+setup_logrotate() {
+    local logrotate_conf="/etc/logrotate.d/$is_core"
+
+    if [[ -f "$logrotate_conf" ]]; then
+        return 0  # 已配置，跳过
+    fi
+
+    cat >"$logrotate_conf" <<EOF
+# Xray 日志轮转配置
+# 由 Xray 脚本自动生成
+$is_log_dir/access.log $is_log_dir/error.log {
+    daily               # 每天轮转
+    rotate 30           # 保留 30 天
+    missingok           # 日志文件不存在时不报错
+    notifempty          # 空文件不轮转
+    compress            # 压缩旧日志
+    delaycompress       # 延迟压缩 (下次轮转再压缩)
+    dateext             # 使用日期作为文件名后缀
+    copytruncate        # 复制并截断 (无需重启服务)
+    maxsize 100M        # 文件超过 100MB 也触发轮转
+    create 0644 root root
+}
+EOF
+}
+
 log_set() {
     if [[ $2 ]]; then
         for v in ${is_log_level_list[@]}; do

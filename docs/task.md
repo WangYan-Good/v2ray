@@ -1,7 +1,7 @@
 # V2Ray → Xray 升级任务追踪
 
-> 最后更新: 2026-04-08
-> 状态: 🟢 Phase 1-2 已完成, T11 已完成 — XHTTP H2 兼容性修复已集成
+> 最后更新: 2026-04-10
+> 状态: 🟢 Phase 1-2 已完成, T11 已完成, 性能优化已完成 — XHTTP H2 兼容性修复已集成
 
 ---
 
@@ -14,6 +14,39 @@
 | Phase 3: 生产就绪 | 4 | 0 | 0 | 4 | 0 | 0% |
 | Phase 4: 后续优化 | 24 | 1 | 0 | 23 | 0 | 4% |
 | **总计** | **38** | **8** | **0** | **29** | **1** | **21%** |
+
+---
+
+## 服务器性能优化记录
+
+> 测试服务端 (bak.proxy.yourdie.com) 优化记录，不涉及项目代码修改
+
+### 2026-04-10 第一轮优化
+
+| 序号 | 优化项 | 操作 | 状态 |
+|------|--------|------|------|
+| 1 | xrdp 卸载 | 停止/禁用/卸载 xrdp + tigervnc + dbus-x11 + imlib2，防火墙移除 3389 | ✅ 已完成 |
+| 2 | 僵尸进程清理 | kill 3 个卡死的 `xray gen` 进程 (PID 90342, 169939, 193313) | ✅ 已完成 |
+| 3 | BBR + TCP 优化 | 创建 `/etc/sysctl.d/99-xray.conf`，启用 BBR + 15 个 TCP 参数 | ✅ 已完成 |
+| 4 | 文件描述符 | limits.conf + systemd DefaultLimitNOFILE=1048576 | ✅ 已完成 |
+| 5 | 日志轮转 | `/etc/logrotate.d/xray`，daily, rotate 30, compress | ✅ 已完成 |
+| 6 | 关闭 CUPS | 停止/禁用 cups.service + cups.path + cups.socket | ✅ 已完成 |
+| 7 | 禁用 kdump | systemctl disable kdump | ✅ 已完成 |
+| 8 | 卸载桌面组件 | 移除 gdm, gnome-session, bluez, avahi, ModemManager, upower, smartmontools 等 80+ 包 | ✅ 已完成 |
+| 9 | crashkernel | grubby --args="crashkernel=0" (重启后生效, 释放 192MB) | ✅ 已配置 |
+| 10 | 移除 rhgb | grubby --remove-args="rhgb quiet" (重启后生效) | ✅ 已配置 |
+| 11 | Swap 优化 | vfs_cache_pressure=50, dirty_ratio=20, dirty_background_ratio=5, min_free_kbytes=65536 | ✅ 已完成 |
+| 12 | 禁用不必要服务 | accounts-daemon, atd, libstoragemgmt, mcelog, mdmonitor, tuned, udisks2, sssd, iscsi 等 16 个 | ✅ 已完成 |
+| 13 | Nginx 优化 | worker_connections 1024 → 4096 | ✅ 已完成 |
+
+**优化效果:**
+- 系统负载: 3.93 → **0.09** (↓ 98%)
+- BBR: cubic → **bbr**
+- 文件描述符: 1024 → **1048576**
+- Swap: 28MB → **26MB** (持续下降中)
+- 内存可用: 1.8GB → **1.7GB** (桌面组件卸载后释放 ~200MB)
+
+---
 
 ---
 

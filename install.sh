@@ -12,13 +12,13 @@ blue='\e[94m'
 magenta='\e[95m'
 cyan='\e[96m'
 none='\e[0m'
-_red() { echo -e ${red}$@${none}; }
-_blue() { echo -e ${blue}$@${none}; }
-_cyan() { echo -e ${cyan}$@${none}; }
-_green() { echo -e ${green}$@${none}; }
-_yellow() { echo -e ${yellow}$@${none}; }
-_magenta() { echo -e ${magenta}$@${none}; }
-_red_bg() { echo -e "\e[41m$@${none}"; }
+_red() { echo -e "${red}$*${none}"; }
+_blue() { echo -e "${blue}$*${none}"; }
+_cyan() { echo -e "${cyan}$*${none}"; }
+_green() { echo -e "${green}$*${none}"; }
+_yellow() { echo -e "${yellow}$*${none}"; }
+_magenta() { echo -e "${magenta}$*${none}"; }
+_red_bg() { echo -e "\e[41m$*${none}"; }
 
 is_err=$(_red_bg 错误!)
 is_warn=$(_red_bg 警告!)
@@ -36,11 +36,11 @@ ERR_CONFIG=7
 ERR_SERVICE=8
 
 err() {
-    echo -e "\n$is_err $@\n" && exit 1
+    echo -e "\n$is_err $*\n" && exit 1
 }
 
 warn() {
-    echo -e "\n$is_warn $@\n"
+    echo -e "\n$is_warn $*\n"
 }
 
 ##
@@ -55,7 +55,7 @@ error_out() {
 }
 
 warn_out() {
-    echo -e "\n${yellow}[WARN] 警告! $@${none}\n"
+    echo -e "\n${yellow}[WARN] 警告! $*${none}\n"
 }
 
 ## >>> start: TODO 修复BUG #1:安全：强制 ROOT 权限
@@ -132,6 +132,14 @@ tmp_var_lists=(
     is_pkg_ok
 )
 
+tmpcore=
+tmpsh=
+tmpjq=
+is_core_ok=
+is_sh_ok=
+is_jq_ok=
+is_pkg_ok=
+
 # tmp dir
 tmpdir=$(mktemp -u)
 [[ ! $tmpdir ]] && {
@@ -139,13 +147,14 @@ tmpdir=$(mktemp -u)
 }
 
 # set up var
-for i in ${tmp_var_lists[*]}; do
-    export $i=$tmpdir/$i
+for i in "${tmp_var_lists[@]}"; do
+    export "$i"="$tmpdir/$i"
 done
 
 # load bash script.
 load() {
-    . $is_sh_dir/src/$1
+    # shellcheck disable=SC1090
+    . "$is_sh_dir/src/$1"
 }
 
 # wget: 默认验证 SSL 证书，TLS 1.2+
@@ -188,23 +197,26 @@ show_help() {
 # install dependent pkg
 install_pkg() {
     cmd_not_found=
-    for i in $*; do
-        [[ ! $(type -P $i) ]] && cmd_not_found="$cmd_not_found,$i"
+    for i in "$@"; do
+        [[ ! $(type -P "$i") ]] && cmd_not_found="$cmd_not_found,$i"
     done
     if [[ $cmd_not_found ]]; then
-        pkg=$(echo $cmd_not_found | sed 's/,/ /g')
-        msg warn "安装依赖包 >${pkg}"
-        $cmd install -y $pkg &>/dev/null
-        if [[ $? != 0 ]]; then
+        cmd_not_found=${cmd_not_found#,}
+        pkg=${cmd_not_found//,/ }
+        IFS=' ' read -r -a pkg_array <<< "$pkg"
+        set -- "${pkg_array[@]}"
+        msg warn "安装依赖包 >$*"
+        if ! $cmd install -y "$@" &>/dev/null; then
             [[ $cmd =~ yum ]] && yum install epel-release -y &>/dev/null
             $cmd update -y &>/dev/null
-            $cmd install -y $pkg &>/dev/null
-            [[ $? == 0 ]] && >$is_pkg_ok
+            if $cmd install -y "$@" &>/dev/null; then
+                : >"$is_pkg_ok"
+            fi
         else
-            >$is_pkg_ok
+            : >"$is_pkg_ok"
         fi
     else
-        >$is_pkg_ok
+        : >"$is_pkg_ok"
     fi
 }
 
@@ -239,7 +251,7 @@ download() {
     esac
 
     msg warn "下载 ${name} > ${link}"
-    if _wget -t 3 -q -c $link -O $tmpfile; then
+    if _wget -t 3 -q -c "$link" -O "$tmpfile"; then
         ## SHA256 校验 (仅 Xray-core)
         if [[ $1 == "core" ]]; then
             dgst_link="${link}.dgst"
@@ -262,7 +274,7 @@ download() {
             fi
             rm -f "$dgst_tmp"
         fi
-        mv -f $tmpfile $is_ok
+        mv -f "$tmpfile" "$is_ok"
     fi
 }
 
@@ -275,22 +287,22 @@ get_ip() {
 # check background tasks status
 check_status() {
     # dependent pkg install fail
-    [[ ! -f $is_pkg_ok ]] && {
+    [[ ! -f "$is_pkg_ok" ]] && {
         error_out "DEPENDENCY" "安装依赖包失败" "请尝试手动安装: $cmd update -y; $cmd install -y $is_pkg"
         is_fail=1
     }
 
     # download file status
     if [[ $is_wget ]]; then
-        [[ ! -f $is_core_ok ]] && {
+        [[ ! -f "$is_core_ok" ]] && {
             error_out "DOWNLOAD" "下载 ${is_core_name} 失败" "检查网络或配置代理后重试"
             is_fail=1
         }
-        [[ ! -f $is_sh_ok ]] && {
+        [[ ! -f "$is_sh_ok" ]] && {
             error_out "DOWNLOAD" "下载 ${is_core_name} 脚本失败" "检查网络或配置代理后重试"
             is_fail=1
         }
-        [[ ! -f $is_jq_ok ]] && {
+        [[ ! -f "$is_jq_ok" ]] && {
             error_out "DOWNLOAD" "下载 jq 失败" "检查网络或配置代理后重试"
             is_fail=1
         }
@@ -329,7 +341,7 @@ pass_args() {
             shift 2
             ;;
         -l | --local-install)
-            [[ ! -f ${PWD}/src/core.sh || ! -f ${PWD}/$is_core.sh ]] && {
+            [[ ! -f "${PWD}/src/core.sh" || ! -f "${PWD}/$is_core.sh" ]] && {
                 err "当前目录 (${PWD}) 非完整的脚本目录."
             }
             local_install=1
@@ -371,11 +383,11 @@ pass_args() {
             ;;
         --uninstall)
             # 执行卸载
-            if [[ -f $is_sh_bin ]]; then
-                $is_sh_bin uninstall
+            if [[ -f "$is_sh_bin" ]]; then
+                "$is_sh_bin" uninstall
             else
                 # 直接删除文件
-                rm -rf $is_core_dir $is_log_dir $is_sh_bin
+                rm -rf "$is_core_dir" "$is_log_dir" "$is_sh_bin"
                 sed -i "/$is_core/d" /root/.bashrc
                 # 如果选择了卸载 caddy/nginx
                 if [[ -f /usr/local/bin/caddy ]]; then
@@ -393,7 +405,7 @@ pass_args() {
             exit
             ;;
         *)
-            echo -e "\n${is_err} ($@) 为未知参数...\n"
+            echo -e "\n${is_err} $*\n"
             show_help
             ;;
         esac
@@ -405,19 +417,19 @@ pass_args() {
 
 # exit and remove tmpdir
 exit_and_del_tmpdir() {
-    rm -rf $tmpdir
+    rm -rf "$tmpdir"
 
     # 失败时回滚已安装的文件
     if [[ ! $1 ]]; then
         # 检查是否已安装到系统（通过检查关键文件是否存在）
-        if [[ -d $is_sh_dir || -d $is_core_dir/bin || -f $is_sh_bin ]]; then
+        if [[ -d "$is_sh_dir" || -d "$is_core_dir/bin" || -f "$is_sh_bin" ]]; then
             msg warn "检测到部分安装文件，正在清理..."
 
             # 清理 Xray 文件
-            [[ -d $is_sh_dir ]] && rm -rf $is_sh_dir && msg ok "  - 已清理脚本目录"
-            [[ -d $is_core_dir ]] && rm -rf $is_core_dir && msg ok "  - 已清理核心目录"
-            [[ -f $is_sh_bin ]] && rm -f $is_sh_bin && msg ok "  - 已清理命令链接"
-            [[ -d $is_log_dir ]] && rm -rf $is_log_dir && msg ok "  - 已清理日志目录"
+            [[ -d "$is_sh_dir" ]] && rm -rf "$is_sh_dir" && msg ok "  - 已清理脚本目录"
+            [[ -d "$is_core_dir" ]] && rm -rf "$is_core_dir" && msg ok "  - 已清理核心目录"
+            [[ -f "$is_sh_bin" ]] && rm -f "$is_sh_bin" && msg ok "  - 已清理命令链接"
+            [[ -d "$is_log_dir" ]] && rm -rf "$is_log_dir" && msg ok "  - 已清理日志目录"
 
             # 清理 bashrc 配置
             if grep -q "$is_core" /root/.bashrc 2>/dev/null; then
@@ -426,8 +438,8 @@ exit_and_del_tmpdir() {
             fi
 
             # 清理 systemd 配置
-            if [[ -f /etc/systemd/system/$is_core.service ]]; then
-                rm -f /etc/systemd/system/$is_core.service
+            if [[ -f "/etc/systemd/system/$is_core.service" ]]; then
+                rm -f "/etc/systemd/system/$is_core.service"
                 systemctl daemon-reload
                 msg ok "  - 已清理 systemd 配置"
             fi
@@ -448,7 +460,7 @@ main() {
     ##
     ## check if scripts exists locally.
     ##
-    if [[ -f ${PWD}/src/core.sh && -f ${PWD}/$is_core.sh ]]; then
+    if [[ -f "${PWD}/src/core.sh" && -f "${PWD}/$is_core.sh" ]]; then
         msg warn "检测到本地脚本，使用本地安装模式"
         local_install=1
     fi
@@ -457,7 +469,7 @@ main() {
     ## check old version
     ## 检查旧版本（提供交互式选项）
     ##
-    [[ -f $is_sh_bin && -d $is_core_dir/bin && -d $is_sh_dir && -d $is_conf_dir ]] && {
+    [[ -f "$is_sh_bin" && -d "$is_core_dir/bin" && -d "$is_sh_dir" && -d "$is_conf_dir" ]] && {
         echo
         echo -e "${yellow}检测到脚本已安装!${none}"
         echo "当前安装信息:"
@@ -474,7 +486,7 @@ main() {
         
         while :; do
             echo -ne "请输入选择 [1-3] (默认:3): "
-            read reinstall_choice
+            read -r reinstall_choice
             [[ ! $reinstall_choice ]] && reinstall_choice=3
             case $reinstall_choice in
             1)
@@ -510,7 +522,7 @@ main() {
     ## $# 表示传递给脚本的参数个数
     ## -gt 表示 greater than，即大于
     ##
-    [[ $# -gt 0 ]] && pass_args $@
+    [[ $# -gt 0 ]] && pass_args "$@"
 
     ##
     ## show welcome msg
@@ -529,56 +541,59 @@ main() {
     ##
     ## create tmpdir
     ##
-    mkdir -p $tmpdir
+    mkdir -p "$tmpdir"
     
     ##
     ## if is_core_file, copy file
     ##
     [[ $is_core_file ]] && {
-        cp -f $is_core_file $is_core_ok
+        cp -f "$is_core_file" "$is_core_ok"
         msg warn "${yellow}${is_core_name} 文件使用 > $is_core_file${none}"
     }
     ##
     ## local dir install sh script
     ##
     [[ $local_install ]] && {
-        >$is_sh_ok
+        : >"$is_sh_ok"
         msg warn "${yellow}本地获取安装脚本 > $PWD ${none}"
     }
 
-    timedatectl set-ntp true &>/dev/null
-    [[ $? != 0 ]] && {
+    if ! timedatectl set-ntp true &>/dev/null; then
         msg warn "${yellow}\e[4m提醒!!! 无法设置自动同步时间, 可能会影响使用 VMess 协议.${none}"
-    }
+    fi
 
     # [步骤 1/10] 准备安装环境
     msg warn "[步骤 1/10] 准备安装环境..."
-    mkdir -p $tmpdir
+    mkdir -p "$tmpdir"
     [[ $is_core_file ]] && {
-        cp -f $is_core_file $is_core_ok
+        cp -f "$is_core_file" "$is_core_ok"
         msg ok "  - 使用自定义核心文件"
     }
     [[ $local_install ]] && {
-        >$is_sh_ok
+        : >"$is_sh_ok"
         msg ok "  - 本地获取安装脚本"
     }
     msg ok "  - 安装环境准备完成"
     
     # [步骤 2/10] 同步系统时间
     msg warn "[步骤 2/10] 同步系统时间..."
-    timedatectl set-ntp true &>/dev/null
-    [[ $? != 0 ]] && msg warn "  - 提醒：无法设置自动同步时间" || msg ok "  - 系统时间已同步"
+    if timedatectl set-ntp true &>/dev/null; then
+        msg ok "  - 系统时间已同步"
+    else
+        msg warn "  - 提醒：无法设置自动同步时间"
+    fi
     
 
     # [步骤 3/10] 安装依赖包
     msg warn "[步骤 3/10] 安装依赖包..."
-    install_pkg $is_pkg &
+    read -r -a _pkg_list <<< "$is_pkg"
+    install_pkg "${_pkg_list[@]}" &
     msg ok "  - 依赖包安装进行中 (后台)"
 
     # [步骤 4/10] 检查 jq
     msg warn "[步骤 4/10] 检查 jq..."
     if [[ $(type -P jq) ]]; then
-        >$is_jq_ok
+        : >"$is_jq_ok"
         msg ok "  - jq 已安装"
     else
         jq_not_found=1
@@ -619,13 +634,12 @@ main() {
     # [步骤 8/10] 测试核心文件
     msg warn "[步骤 8/10] 测试核心文件..."
     if [[ $is_core_file ]]; then
-        unzip -qo $is_core_ok -d $tmpdir/testzip &>/dev/null
-        [[ $? != 0 ]] && {
+        if ! unzip -qo "$is_core_ok" -d "$tmpdir/testzip" &>/dev/null; then
             error_out "CONFIG" "核心文件解压失败" "检查核心文件是否损坏: $is_core_file"
             exit_and_del_tmpdir
-        }
+        fi
         for i in ${is_core} geoip.dat geosite.dat; do
-            [[ ! -f $tmpdir/testzip/$i ]] && is_file_err=1 && break
+            [[ ! -f "$tmpdir/testzip/$i" ]] && is_file_err=1 && break
         done
         [[ $is_file_err ]] && {
             error_out "CONFIG" "核心文件不完整" "请重新下载核心文件或检查文件来源"
@@ -653,23 +667,22 @@ main() {
 
     # copy sh file
     if [[ $local_install ]]; then
-        cp -rf $PWD/* $is_sh_dir
-        msg ok "  - 已复制本地脚本"
-    else
-        unzip -qo $is_sh_ok -d $is_sh_dir
-        msg ok "  - 已解压脚本文件"
+            cp -rf "$PWD"/* "$is_sh_dir"
+            msg ok "  - 已复制本地脚本"
+        else
+            unzip -qo "$is_sh_ok" -d "$is_sh_dir"
     fi
 
     # create core bin dir
-    mkdir -p $is_core_dir/bin
+    mkdir -p "$is_core_dir/bin"
     msg ok "  - 已创建核心目录"
     
     # copy core file
     if [[ $is_core_file ]]; then
-        cp -rf $tmpdir/testzip/* $is_core_dir/bin
+        cp -rf "$tmpdir/testzip"/* "$is_core_dir/bin"
         msg ok "  - 已复制核心文件"
     else
-        unzip -qo $is_core_ok -d $is_core_dir/bin
+        unzip -qo "$is_core_ok" -d "$is_core_dir/bin"
         msg ok "  - 已解压核心文件"
     fi
 
@@ -678,18 +691,18 @@ main() {
     msg ok "  - 已添加别名"
 
     # core command
-    ln -sf $is_sh_dir/$is_core.sh $is_sh_bin
+    ln -sf "$is_sh_dir/$is_core.sh" "$is_sh_bin"
     msg ok "  - 已创建命令链接"
 
     # jq
-    [[ $jq_not_found ]] && mv -f $is_jq_ok /usr/bin/jq && msg ok "  - 已安装 jq"
+    [[ $jq_not_found ]] && mv -f "$is_jq_ok" /usr/bin/jq && msg ok "  - 已安装 jq"
 
     # chmod
-    chmod +x $is_core_bin $is_sh_bin /usr/bin/jq
+    chmod +x "$is_core_bin" "$is_sh_bin" /usr/bin/jq
     msg ok "  - 已设置执行权限：$is_core_bin, $is_sh_bin, /usr/bin/jq (+x)"
 
     # create log dir
-    mkdir -p $is_log_dir
+    mkdir -p "$is_log_dir"
     msg ok "  - 已创建日志目录：$is_log_dir (access.log, error.log)"
 
     # show a tips msg
@@ -699,6 +712,16 @@ main() {
     load systemd.sh
     is_new_install=1
     install_service $is_core &>/dev/null
+
+    # setup system-wide limits (file descriptors, fs.file-max)
+    msg ok "  - 正在配置系统级限制..."
+    setup_system_limits &>/dev/null
+    msg ok "  - 系统级限制已配置 (LimitNOFILE=1048576)"
+
+    # setup log rotation
+    load log.sh
+    setup_logrotate &>/dev/null
+    msg ok "  - 日志轮转已配置 (/etc/logrotate.d/$is_core)"
 
     # create condf dir
     mkdir -p $is_conf_dir
@@ -724,7 +747,7 @@ main() {
             
             while :; do
                 echo -ne "请输入选择 [1-4] (默认:2): "
-                read tls_choice
+                read -r tls_choice
                 [[ ! $tls_choice ]] && tls_choice=2
                 case $tls_choice in
                 1)
@@ -761,7 +784,7 @@ main() {
             
             while :; do
                 echo -ne "请输入选择 [1-2] (默认:1): "
-                read tls_choice
+                read -r tls_choice
                 [[ ! $tls_choice ]] && tls_choice=1
                 case $tls_choice in
                 1)
@@ -787,7 +810,7 @@ main() {
             
             while :; do
                 echo -ne "请输入选择 [1-2] (默认:1): "
-                read tls_choice
+                read -r tls_choice
                 [[ ! $tls_choice ]] && tls_choice=1
                 case $tls_choice in
                 1)
@@ -813,7 +836,7 @@ main() {
             
             while :; do
                 echo -ne "请输入选择 [1-2] (默认:2): "
-                read tls_choice
+                read -r tls_choice
                 [[ ! $tls_choice ]] && tls_choice=2
                 case $tls_choice in
                 1)
@@ -886,6 +909,7 @@ main() {
     ## 显示所有协议选项（与 xray add 命令完全一致）
     ##
     echo "请选择协议类型:"
+    # shellcheck disable=SC2154
     for i in "${!protocol_list[@]}"; do
         num=$((i + 1))
         echo "$num) ${protocol_list[$i]}"
@@ -898,7 +922,7 @@ main() {
     ##
     while :; do
         echo -ne "请输入选择 [1-$((${#protocol_list[@]} + 1))] (默认:1): "
-        read protocol_choice
+        read -r protocol_choice
         [[ ! $protocol_choice ]] && protocol_choice=1
         
         if [[ $protocol_choice -le ${#protocol_list[@]} ]]; then
@@ -930,7 +954,7 @@ main() {
         ## 域名验证循环
         ##
         while :; do
-            read -p "> " domain_input
+            read -r -p "> " domain_input
 
             ##
             ## 此协议需要域名，不能为空
@@ -977,7 +1001,7 @@ main() {
                 echo "请选择:"
                 echo "1) 继续配置（可能失败）"
                 echo "2) 退出，配置 DNS 后重试"
-                read -p "请选择 [1-2] (默认:1): " dns_choice
+                read -r -p "请选择 [1-2] (默认:1): " dns_choice
                 [[ ! $dns_choice ]] && dns_choice=1
                 if [[ "$dns_choice" == "2" ]]; then
                     msg warn "安装已结束，配置 DNS 后请重新运行安装脚本"
@@ -996,7 +1020,7 @@ main() {
         echo "请选择配置方式:"
         echo "1) 自动配置（随机生成端口、密码等参数）"
         echo "2) 跳过，稍后手动配置"
-        read -p "请选择 [1-2] (默认:1): " config_choice
+        read -r -p "请选择 [1-2] (默认:1): " config_choice
         [[ ! $config_choice ]] && config_choice=1
 
         if [[ $config_choice == "1" ]]; then
@@ -1013,7 +1037,7 @@ main() {
         ##
         ## 添加 域名+协议 配置
         ##
-        add $protocol_type $domain_input
+        add "$protocol_type" "$domain_input"
         echo
 
         ##
@@ -1032,7 +1056,7 @@ main() {
         ##
         ## 使用 auto 参数自动配置
         ##
-        add $protocol_type auto
+        add "$protocol_type" auto
         echo
 
         ##
@@ -1069,4 +1093,4 @@ main() {
 ##
 ## start, input all parameters
 ##
-main $@
+main "$@"
