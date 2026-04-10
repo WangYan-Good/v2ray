@@ -20,6 +20,11 @@ jobs:
           sudo apt-get install -y shellcheck
 
       - name: Run ShellCheck
+        # Exclude rules:
+        # SC2034 - vars appear unused but are dynamically sourced by load()
+        # SC2148 - src/*.sh are modules sourced by load(), never executed directly
+        # SC2154 - same as SC2034, dynamically sourced vars
+        # SC2317 - helper functions appear unreachable but are called indirectly
         run: |
           echo "=== Checking install.sh ==="
           shellcheck --severity=warning --exclude=SC2034,SC2154,SC2317 install.sh
