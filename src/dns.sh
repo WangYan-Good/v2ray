@@ -38,7 +38,7 @@ dns_set() {
             is_dns_use=none
             ;;
         *)
-            err "无法识别 DNS 参数: $@"
+            err "无法识别 DNS 参数: $*"
             ;;
         esac
     else
