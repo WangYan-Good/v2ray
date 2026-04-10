@@ -24,19 +24,20 @@ jobs:
         # Exclude rules:
         # SC2034 - vars appear unused but are dynamically sourced by load()
         # SC2154 - same as SC2034, dynamically sourced vars
+        # SC2155 - project uses 'local var=$(cmd)' as a standard pattern
         # SC2317 - helper functions appear unreachable but are called indirectly
         run: |
           echo "=== Checking install.sh ==="
-          shellcheck --severity=warning --exclude=SC2034,SC2154,SC2317 install.sh
+          shellcheck --severity=warning --exclude=SC2034,SC2154,SC2155,SC2317 install.sh
 
           echo "=== Checking xray.sh ==="
-          shellcheck --severity=warning --exclude=SC2034,SC2154,SC2317 xray.sh
+          shellcheck --severity=warning --exclude=SC2034,SC2154,SC2155,SC2317 xray.sh
 
           echo "=== Checking src/*.sh (excluding core.sh) ==="
           for f in src/*.sh; do
             [[ "$f" == "src/core.sh" ]] && continue
             echo "Checking $f..."
-            shellcheck --severity=warning --exclude=SC2034,SC2154,SC2317 "$f"
+            shellcheck --severity=warning --exclude=SC2034,SC2154,SC2155,SC2317 "$f"
           done
 
           echo "=== Checking src/core.sh (large file, 120s timeout) ==="
