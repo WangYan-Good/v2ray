@@ -118,8 +118,10 @@ _try_enable_bbr() {
 ## 检查 BBR 状态
 ##
 _check_bbr() {
-    local congestion=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null)
-    local qdisc=$(sysctl -n net.core.default_qdisc 2>/dev/null)
+    local congestion
+    congestion=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null)
+    local qdisc
+    qdisc=$(sysctl -n net.core.default_qdisc 2>/dev/null)
 
     echo ""
     echo "=== BBR 状态 ==="
