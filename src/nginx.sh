@@ -3,6 +3,99 @@
 # Nginx + Certbot 自动 TLS 配置模块
 # 支持多站点共存，共享 80/443 端口
 
+##
+## 生成 Nginx location 块（用于追加到 .add 文件）
+## 支持: ws, xhttp, h2, grpc
+##
+nginx_add_location() {
+    local net_type="$1"
+    local loc_path="$2"
+    local loc_port="$3"
+    local add_file="${is_nginx_site_file}.add"
+
+    ##
+    ## 检查路径是否已存在于 .conf 或 .add 中
+    ##
+    local existing=""
+    for f in ${is_nginx_site_file} ${add_file}; do
+        if [[ -f "$f" ]]; then
+            # Normalize path: strip trailing slash for comparison
+            existing=$(grep -oE "location\s+[^{]+" "$f" 2>/dev/null | awk '{print $2}' | sed 's|/$||' || true)
+            local norm_path=$(echo "$loc_path" | sed 's|/$||')
+            if echo "$existing" | grep -qxF "$norm_path"; then
+                msg warn "路径 ${loc_path} 已存在于 Nginx 配置中，跳过追加"
+                return 0
+            fi
+        fi
+    done
+
+    ##
+    ## 追加 location 块到 .add 文件
+    ##
+    local loc_block=""
+    case $net_type in
+    *ws* | *websocket*)
+        loc_block="
+    # Xray WebSocket: ${host}${loc_path}
+    location ${loc_path} {
+        proxy_pass http://127.0.0.1:${loc_port};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400;
+        proxy_buffering off;
+    }"
+        ;;
+    *grpc* | *grpc*)
+        loc_block="
+    # Xray gRPC: ${host}${loc_path}
+    location ${loc_path}/ {
+        grpc_pass grpc://127.0.0.1:${loc_port};
+        grpc_set_header Host \$host;
+        grpc_set_header X-Real-IP \$remote_addr;
+        grpc_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        grpc_read_timeout 300s;
+    }"
+        ;;
+    *h2* | *xhttp* | *http*)
+        loc_block="
+    # Xray HTTP/2: ${host}${loc_path}
+    location ${loc_path} {
+        proxy_pass http://127.0.0.1:${loc_port};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400;
+        proxy_buffering off;
+    }"
+        ;;
+    esac
+
+    if [[ -n "$loc_block" ]]; then
+        echo "$loc_block" >>"$add_file"
+        msg ok "已追加 location ${loc_path} 到 ${add_file}"
+    fi
+}
+
+##
+## 检查是否应该追加到 .add（同域名多协议共存）
+## 返回 0 = 追加到 .add，返回 1 = 创建完整 .conf
+##
+nginx_should_append() {
+    # .conf 不存在时，必须创建完整 server 块
+    [[ ! -f ${is_nginx_site_file} ]] && return 1
+    # .conf 存在时，追加到 .add
+    return 0
+}
+
 nginx_config() {
     ##
     ## /etc/nginx/xray/{host}.conf
@@ -156,37 +249,17 @@ EOF
         ;;
     
     *ws*)
-        # 检测配置冲突
-        [[ -f ${is_nginx_site_file} ]] && {
-            msg warn "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
-            msg warn "请选择:"
-            msg "1) 覆盖现有配置 (备份为 .bak)"
-            msg "2) 跳过，保留现有配置"
-            msg "3) 修改配置 (手动编辑)"
-            while :; do
-                echo -ne "请输入选择 [1-3] (默认:1): "
-                read nginx_conf_choice
-                [[ ! $nginx_conf_choice ]] && nginx_conf_choice=1
-                case $nginx_conf_choice in
-                1)
-                    cp -f ${is_nginx_site_file} ${is_nginx_site_file}.bak
-                    msg ok "已备份现有配置：${is_nginx_site_file}.bak"
-                    break
-                    ;;
-                2)
-                    msg warn "跳过配置，保留现有配置"
-                    return 0
-                    ;;
-                3)
-                    msg warn "请手动编辑：${is_nginx_site_file}"
-                    return 0
-                    ;;
-                *)
-                    msg "输入无效，请输入 1-3"
-                    ;;
-                esac
-            done
-        }
+        # 同域名多协议共存：追加到 .add 而不是覆盖 .conf
+        if nginx_should_append; then
+            msg warn "同域名已有 Nginx 配置，追加 location 到 .add 文件"
+            # 确保证书软链接存在
+            if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
+                nginx_certbot issue ${host}
+            fi
+            nginx_add_location "ws" "${path}" "${port}"
+            nginx_reload
+            return 0
+        fi
         # WebSocket 配置 (VMess/VLESS/Trojan)
         cat >${is_nginx_site_file} <<<"
 # ${host} - Xray WebSocket
@@ -273,7 +346,18 @@ server {
         ;;
 
     *h2* | *xhttp* | *http*)
-        # 检测配置冲突
+        # 同域名多协议共存：追加到 .add 而不是覆盖 .conf
+        if nginx_should_append; then
+            msg warn "同域名已有 Nginx 配置，追加 location 到 .add 文件"
+            # 确保证书软链接存在
+            if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
+                nginx_certbot issue ${host}
+            fi
+            nginx_add_location "xhttp" "${path}" "${port}"
+            nginx_reload
+            return 0
+        fi
+        # 检测配置冲突（首次创建时）
         [[ -f ${is_nginx_site_file} ]] && {
             msg warn "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
             msg warn "请选择:"
@@ -377,7 +461,21 @@ server {
         ;;
 
     *grpc*)
-        # 检测配置冲突
+        # 同域名多协议共存：追加到 .add 而不是覆盖 .conf
+        if nginx_should_append; then
+            msg warn "同域名已有 Nginx 配置，追加 location 到 .add 文件"
+            # 确保证书软链接存在
+            if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
+                nginx_certbot issue ${host}
+            fi
+            # gRPC location 格式不同（需要末尾有 /）
+            local grpc_path="${path}"
+            [[ "$grpc_path" != */ ]] && grpc_path="${grpc_path}/"
+            nginx_add_location "grpc" "$grpc_path" "${port}"
+            nginx_reload
+            return 0
+        fi
+        # 检测配置冲突（首次创建时）
         [[ -f ${is_nginx_site_file} ]] && {
             msg warn "检测到已存在的 Nginx 配置：${is_nginx_site_file}"
             msg warn "请选择:"
@@ -496,10 +594,69 @@ server {
         ;;
     
     del)
-        # 删除配置
-        rm -rf ${is_nginx_site_file} ${is_nginx_site_file}.add
-        # 清理证书（可选，注释掉以保留证书）
-        # rm -rf $is_nginx_dir/ssl/${host}
+        # 同域名多协议共存：只从 .add 中删除 location 块
+        local add_file="${is_nginx_site_file}.add"
+        local del_location_path="${path}"
+
+        # 使用 core.sh 在删除 JSON 前提取的 path
+        if [[ -n "$is_del_json_path" ]]; then
+            del_location_path="$is_del_json_path"
+        fi
+
+        if [[ -f "$add_file" ]]; then
+            # .add 存在，只删除对应的 location 块（包括前导注释）
+            # 使用 awk 删除从 # Xray 注释到闭合 } 的整个块
+            local norm_path=$(echo "$del_location_path" | sed 's|/$||')
+            awk -v p="$norm_path" '
+                BEGIN { skip=0; prev_comment="" }
+                # 检测 Xray 注释行（# Xray WebSocket/gRPC/HTTP/2: ...）
+                /^[[:space:]]*#[[:space:]]*Xray/ {
+                    prev_comment=$0
+                    next
+                }
+                # 匹配 location 行
+                /^[[:space:]]*location/ {
+                    # 提取路径
+                    line=$0
+                    gsub(/^[[:space:]]*location[[:space:]]+/, "", line)
+                    gsub(/[[:space:]]*\{.*/, "", line)
+                    gsub(/\/$/, "", line)
+                    # 比较（去掉前导/后）
+                    if (line == p || line == "/" p || "/" line == p) {
+                        skip=1
+                        prev_comment=""
+                        next
+                    }
+                    # 不是要删除的 location，打印之前的注释和当前行
+                    if (prev_comment != "") print prev_comment
+                    print
+                    prev_comment=""
+                    next
+                }
+                skip && /^[[:space:]]*\}/ { skip=0; next }
+                !skip {
+                    if (prev_comment != "") { print prev_comment; prev_comment="" }
+                    print
+                }
+            ' "$add_file" > "${add_file}.tmp"
+            mv -f "${add_file}.tmp" "$add_file"
+
+            # 如果 .add 只剩下注释，可以删除
+            local loc_count
+            loc_count=$(grep -c 'location' "$add_file" 2>/dev/null)
+            loc_count=${loc_count:-0}
+            if [[ "$loc_count" -eq 0 ]]; then
+                # 保留空 .add 文件（Nginx include 需要它存在）
+                echo "# 伪装网站配置" > "$add_file"
+            fi
+
+            msg ok "已从 ${add_file} 中删除 location ${del_location_path}"
+        else
+            # 没有 .add 文件，说明是单协议场景，直接删除 .conf
+            rm -f ${is_nginx_site_file}
+            msg ok "已删除 Nginx 配置：${is_nginx_site_file}"
+        fi
+        # 不清理证书（其他协议可能还在用）
         ;;
     esac
     
