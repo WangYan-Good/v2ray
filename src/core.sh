@@ -478,23 +478,30 @@ create() {
                 create nginx $net
 
                 ##
-                ## 配置一致性校验：检查 Nginx location 路径是否与 Xray path 匹配
+                ## 配置一致性校验：检查新协议的 location 是否已正确添加到 .add 文件
                 ##
                 is_nginx_site_file=$is_nginx_conf/${host}.conf
-                if [[ -f $is_nginx_site_file ]]; then
+                is_nginx_add_file=${is_nginx_site_file}.add
+                if [[ -f $is_nginx_add_file ]]; then
                     ##
-                    ## 从 Nginx 配置中提取 location 路径
-                    ##
-                    is_nginx_location_path=$(grep -E '^\s+location\s+/' "$is_nginx_site_file" | head -1 | awk '{print $2}' | sed 's/{$//')
-
-                    ##
+                    ## 同域名多协议追加模式：只需确认 .add 中包含新 path 的 location
                     ## 从 Xray JSON 中提取 path
                     ##
-                    is_xray_path=$(jq -r '.inbounds[0].streamSettings.httpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // empty' "$is_json_file" 2>/dev/null)
-
+                    is_xray_path=$(jq -r '.inbounds[0].streamSettings.xhttpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // .inbounds[0].streamSettings.httpSettings.path // .inbounds[0].settings.path // empty' "$is_json_file" 2>/dev/null)
+                    if [[ -n "$is_xray_path" ]]; then
+                        if ! grep -q "location.*${is_xray_path}" "$is_nginx_add_file" 2>/dev/null; then
+                            # path 不在 .add 中，可能出问题了
+                            error_out "CONFIG" "Nginx .add 文件中未找到对应的 location 路径！" "1. 检查 .add 文件: cat $is_nginx_add_file  2. 重新添加配置: xray del $is_config_file && xray add $protocol_type $host"
+                            return 1
+                        fi
+                    fi
+                    # location 已正确追加，无需额外处理
+                elif [[ -f $is_nginx_site_file ]]; then
                     ##
-                    ## 排除空值或 root (/) 的情况，进行精确匹配
+                    ## 首次创建（.conf 模式）：检查 location 是否匹配
                     ##
+                    is_nginx_location_path=$(grep -E '^\s+location\s+/' "$is_nginx_site_file" | head -1 | awk '{print $2}' | sed 's/{$//')
+                    is_xray_path=$(jq -r '.inbounds[0].streamSettings.xhttpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // .inbounds[0].streamSettings.httpSettings.path // .inbounds[0].settings.path // empty' "$is_json_file" 2>/dev/null)
                     if [[ -n "$is_nginx_location_path" && -n "$is_xray_path" && "$is_nginx_location_path" != "$is_xray_path" ]]; then
                         error_out "CONFIG" "配置冲突：Xray 路径 ($is_xray_path) 与 Nginx location ($is_nginx_location_path) 不匹配！" "1. 重新生成并覆盖 Nginx 配置  2. 查看 Nginx 配置: cat $is_nginx_site_file"
                         msg warn "如果继续使用当前配置，客户端将无法连接。"
@@ -942,6 +949,8 @@ del() {
             msg "\n是否删除配置文件?: $is_config_file"
             pause
         fi
+        # 在删除 JSON 文件之前，提取 path 供 nginx_config del 使用
+        is_del_json_path=$(jq -r '.inbounds[0].streamSettings.xhttpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // .inbounds[0].streamSettings.httpSettings.path // .inbounds[0].settings.path // empty' "$is_conf_dir/$is_config_file" 2>/dev/null)
         api del $is_conf_dir/"$is_config_file" $is_dynamic_port_file &>/dev/null
         rm -rf $is_conf_dir/"$is_config_file" $is_dynamic_port_file
         [[ $is_api_fail && ! $is_new_json ]] && manage restart &
