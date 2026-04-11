@@ -50,7 +50,7 @@ nginx_add_location() {
         proxy_buffering off;
     }"
         ;;
-    *grpc* | *grpc*)
+    *grpc*)
         loc_block="
     # Xray gRPC: ${host}${loc_path}
     location ${loc_path}/ {
