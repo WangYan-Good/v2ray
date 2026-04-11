@@ -2059,7 +2059,10 @@ update() {
         ;;
     esac
     [[ $2 ]] && is_new_ver=v${2#v}
-    [[ $is_run_ver == $is_new_ver ]] && {
+    # 版本号比较: 提取主版本号进行比较 (忽略 -release/-beta 等后缀)
+    is_run_ver_main=$(echo "$is_run_ver" | sed 's/-.*//')
+    is_new_ver_main=$(echo "$is_new_ver" | sed 's/-.*//')
+    [[ "$is_run_ver_main" == "$is_new_ver_main" ]] && {
         msg "\n自定义版本和当前 $is_show_name 版本一样, 无需更新.\n"
         exit
     }
@@ -2068,7 +2071,10 @@ update() {
         msg "\n使用自定义版本更新 $is_show_name: $(_green $is_new_ver)\n"
     else
         get_latest_version $is_update_name
-        [[ $is_run_ver == $latest_ver ]] && {
+        # 版本号比较: 提取主版本号进行比较 (忽略 -release/-beta 等后缀)
+        is_run_ver_main=$(echo "$is_run_ver" | sed 's/-.*//')
+        is_latest_ver_main=$(echo "$latest_ver" | sed 's/-.*//')
+        [[ "$is_run_ver_main" == "$is_latest_ver_main" ]] && {
             msg "\n$is_show_name 当前已经是最新版本了.\n"
             exit
         }
