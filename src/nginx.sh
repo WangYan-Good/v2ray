@@ -379,7 +379,7 @@ server {
             local _add_ret=$?
             [[ $_add_ret -eq 2 ]] && return 0
             if [[ $_add_ret -eq 3 ]]; then
-                error_out "NGINX" "路径 ${path} 已被其他协议占用，无法添加" "请使用不同的路径: xray add h2 ${host} auto /your-unique-path"
+                error_out "NGINX" "路径 ${path} 已被其他协议占用，无法添加" "请使用不同的路径: xray add xhttp ${host} auto /your-unique-path"
                 return 1
             fi
             if ! nginx_test; then
@@ -508,7 +508,7 @@ server {
             local _add_ret=$?
             [[ $_add_ret -eq 2 ]] && return 0
             if [[ $_add_ret -eq 3 ]]; then
-                error_out "NGINX" "路径 ${grpc_path} 已被其他协议占用，无法添加" "请使用不同的 serviceName: xray add tgrpc ${host} auto /your-unique-path"
+                error_out "NGINX" "路径 ${grpc_path} 已被其他协议占用，无法添加" "请使用不同的 serviceName: xray add grpc ${host} auto /your-unique-path"
                 return 1
             fi
             if ! nginx_test; then
