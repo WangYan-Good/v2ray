@@ -24,7 +24,7 @@ nginx_add_location() {
             local norm_path=$(echo "$loc_path" | sed 's|/$||')
             if echo "$existing" | grep -qxF "$norm_path"; then
                 msg warn "路径 ${loc_path} 已存在于 Nginx 配置中，跳过追加"
-                return 0
+                return 2
             fi
         fi
     done
@@ -257,6 +257,8 @@ EOF
                 nginx_certbot issue ${host}
             fi
             nginx_add_location "ws" "${path}" "${port}"
+            local _add_ret=$?
+            [[ $_add_ret -eq 2 ]] && return 0
             if ! nginx_test; then
                 error_out "NGINX" "Nginx 配置测试失败，追加 location 后配置有误" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
                 return 1
@@ -358,6 +360,8 @@ server {
                 nginx_certbot issue ${host}
             fi
             nginx_add_location "xhttp" "${path}" "${port}"
+            local _add_ret=$?
+            [[ $_add_ret -eq 2 ]] && return 0
             if ! nginx_test; then
                 error_out "NGINX" "Nginx 配置测试失败，追加 location 后配置有误" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
                 return 1
@@ -481,6 +485,8 @@ server {
             [[ "$grpc_path" != /* ]] && grpc_path="/$grpc_path"
             [[ "$grpc_path" != */ ]] && grpc_path="${grpc_path}/"
             nginx_add_location "grpc" "$grpc_path" "${port}"
+            local _add_ret=$?
+            [[ $_add_ret -eq 2 ]] && return 0
             if ! nginx_test; then
                 error_out "NGINX" "Nginx 配置测试失败，追加 location 后配置有误" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
                 return 1
