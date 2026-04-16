@@ -37,13 +37,13 @@ caddy_add_location() {
 
     ##
     ## 追加 reverse_proxy 块到 .add 文件
-    ## gRPC 路径确保有前导 /（去除重复后重新添加）
+    ## gRPC 路径确保有前导 /
     ##
     local loc_block=""
     case $net_type in
     *grpc*)
-        local grpc_path="${loc_path#/}"
-        loc_block="reverse_proxy /${grpc_path}/* h2c://127.0.0.1:${loc_port}"
+        [[ "${loc_path}" != /* ]] && loc_path="/${loc_path}"
+        loc_block="reverse_proxy ${loc_path}/* h2c://127.0.0.1:${loc_port}"
         ;;
     *h2*)
         loc_block="reverse_proxy ${loc_path} h2c://127.0.0.1:${loc_port}"

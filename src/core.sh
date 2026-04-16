@@ -426,10 +426,10 @@ create() {
                         ##
                         ## 检查路径是否已在 .conf 或 .add 中（字段级精确匹配，避免子串误判）
                         ##
-                        local _xp="${is_xray_path#/}"
+                        local path_without_slash="${is_xray_path#/}"
                         is_path_in_caddy=0
                         for _cf in "$is_caddy_site_file" "$is_caddy_add_file"; do
-                            if [[ -f "$_cf" ]] && [[ $(awk -v p="$_xp" '
+                            if [[ -f "$_cf" ]] && [[ $(awk -v p="$path_without_slash" '
                                 /reverse_proxy/ {
                                     rp=$2; gsub(/\/\*$/, "", rp); gsub(/\/$/, "", rp); gsub(/^\//, "", rp)
                                     if (rp == p) { print "1"; exit }
@@ -464,10 +464,10 @@ create() {
                         ##
                         ## 检查路径是否已在 .conf 或 .add 中（字段级精确匹配，避免子串误判）
                         ##
-                        local _xp="${is_xray_path#/}"
+                        local path_without_slash="${is_xray_path#/}"
                         is_path_in_nginx=0
                         for _nf in "$is_nginx_site_file" "$is_nginx_add_file"; do
-                            if [[ -f "$_nf" ]] && [[ $(awk -v p="$_xp" '
+                            if [[ -f "$_nf" ]] && [[ $(awk -v p="$path_without_slash" '
                                 /location/ {
                                     loc=$2; gsub(/\/+$/, "", loc); gsub(/^\/+/, "", loc)
                                     if (loc == p) { print "1"; exit }
