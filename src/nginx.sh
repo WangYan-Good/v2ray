@@ -64,8 +64,8 @@ nginx_add_location() {
         ;;
     *grpc*)
         loc_block="
-    # Xray gRPC: ${host}${loc_path}
-    location ${loc_path}/ {
+    # Xray gRPC: ${host}${loc_path%/}/
+    location ${loc_path%/}/ {
         grpc_pass grpc://127.0.0.1:${loc_port};
         grpc_set_header Host \$host;
         grpc_set_header X-Real-IP \$remote_addr;
