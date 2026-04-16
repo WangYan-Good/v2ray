@@ -1356,7 +1356,7 @@ add() {
     create server $is_new_protocol
 
     # show config info.
-    info
+    info $is_config_name
 }
 
 ##
@@ -1476,8 +1476,9 @@ get() {
             done
 
             # 合并变量
-            [[ -z $host ]] && host="${grpc_host:-${ws_host:-${h2_host:-}}}"
-            [[ -z $path ]] && path="${h2_path:-${ws_path:-${grpc_serviceName:-}}}"
+            # 先清除派生变量，防止上次操作的残留值污染当前配置的显示
+            host="${grpc_host:-${ws_host:-${h2_host:-}}}"
+            path="${h2_path:-${ws_path:-${grpc_serviceName:-}}}"
             [[ -z $is_https_port ]] && is_https_port=443
             header_type="${tcp_type:-}${kcp_type:-}${quic_type:-}"
             # 判断是否为 reality 协议
