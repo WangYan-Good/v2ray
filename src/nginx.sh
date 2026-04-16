@@ -23,8 +23,20 @@ nginx_add_location() {
             existing=$(grep -oE "location\s+[^{]+" "$f" 2>/dev/null | awk '{print $2}' | sed 's|/$||' || true)
             local norm_path=$(echo "$loc_path" | sed 's|/$||')
             if echo "$existing" | grep -qxF "$norm_path"; then
-                msg warn "路径 ${loc_path} 已存在于 Nginx 配置中，跳过追加"
-                return 2
+                # Path exists — check whether it routes to the same upstream port.
+                # Same port means this is a same-protocol re-add (idempotent, skip silently).
+                # Different port means another protocol already owns this path — that is a conflict.
+                local existing_port
+                existing_port=$(awk -v path="$norm_path" '
+                    /location/ { loc=$2; gsub(/\/+$/, "", loc); in_block=(loc == path ? 1 : 0) }
+                    in_block && /pass/ { gsub(/.*:/, ""); gsub(/;.*/, ""); print; exit }
+                ' "$f" 2>/dev/null)
+                if [[ "$existing_port" == "$loc_port" ]]; then
+                    msg warn "路径 ${loc_path} 已存在于 Nginx 配置中，跳过追加"
+                    return 2
+                else
+                    return 3
+                fi
             fi
         fi
     done
@@ -259,6 +271,10 @@ EOF
             nginx_add_location "ws" "${path}" "${port}"
             local _add_ret=$?
             [[ $_add_ret -eq 2 ]] && return 0
+            if [[ $_add_ret -eq 3 ]]; then
+                error_out "NGINX" "路径 ${path} 已被其他协议占用，无法添加" "请使用不同的路径: xray add ws ${host} auto /your-unique-path"
+                return 1
+            fi
             if ! nginx_test; then
                 error_out "NGINX" "Nginx 配置测试失败，追加 location 后配置有误" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
                 return 1
@@ -362,6 +378,10 @@ server {
             nginx_add_location "xhttp" "${path}" "${port}"
             local _add_ret=$?
             [[ $_add_ret -eq 2 ]] && return 0
+            if [[ $_add_ret -eq 3 ]]; then
+                error_out "NGINX" "路径 ${path} 已被其他协议占用，无法添加" "请使用不同的路径: xray add h2 ${host} auto /your-unique-path"
+                return 1
+            fi
             if ! nginx_test; then
                 error_out "NGINX" "Nginx 配置测试失败，追加 location 后配置有误" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
                 return 1
@@ -487,6 +507,10 @@ server {
             nginx_add_location "grpc" "$grpc_path" "${port}"
             local _add_ret=$?
             [[ $_add_ret -eq 2 ]] && return 0
+            if [[ $_add_ret -eq 3 ]]; then
+                error_out "NGINX" "路径 ${grpc_path} 已被其他协议占用，无法添加" "请使用不同的 serviceName: xray add tgrpc ${host} auto /your-unique-path"
+                return 1
+            fi
             if ! nginx_test; then
                 error_out "NGINX" "Nginx 配置测试失败，追加 location 后配置有误" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
                 return 1
