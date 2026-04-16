@@ -257,6 +257,10 @@ EOF
                 nginx_certbot issue ${host}
             fi
             nginx_add_location "ws" "${path}" "${port}"
+            if ! nginx_test; then
+                error_out "NGINX" "Nginx 配置测试失败，追加 location 后配置有误" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
+                return 1
+            fi
             nginx_reload
             return 0
         fi
@@ -354,6 +358,10 @@ server {
                 nginx_certbot issue ${host}
             fi
             nginx_add_location "xhttp" "${path}" "${port}"
+            if ! nginx_test; then
+                error_out "NGINX" "Nginx 配置测试失败，追加 location 后配置有误" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
+                return 1
+            fi
             nginx_reload
             return 0
         fi
@@ -473,6 +481,10 @@ server {
             [[ "$grpc_path" != /* ]] && grpc_path="/$grpc_path"
             [[ "$grpc_path" != */ ]] && grpc_path="${grpc_path}/"
             nginx_add_location "grpc" "$grpc_path" "${port}"
+            if ! nginx_test; then
+                error_out "NGINX" "Nginx 配置测试失败，追加 location 后配置有误" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
+                return 1
+            fi
             nginx_reload
             return 0
         fi
