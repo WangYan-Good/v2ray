@@ -986,6 +986,9 @@ uninstall() {
     if [[ $is_caddy ]]; then
         is_tmp_list=("卸载 $is_core_name" "卸载 ${is_core_name} & Caddy")
         ask list is_do_uninstall
+    elif [[ $is_nginx ]]; then
+        is_tmp_list=("卸载 $is_core_name" "卸载 ${is_core_name} & Nginx")
+        ask list is_do_uninstall
     else
         ask string y "是否卸载 ${is_core_name}? [y]:"
     fi
@@ -994,10 +997,26 @@ uninstall() {
     rm -rf $is_core_dir $is_log_dir $is_sh_bin /lib/systemd/system/$is_core.service
     sed -i "/$is_core/d" /root/.bashrc
     # uninstall caddy; 2 is ask result
-    if [[ $REPLY == '2' ]]; then
+    if [[ $REPLY == '2' && $is_caddy ]]; then
         manage stop caddy &>/dev/null
         manage disable caddy &>/dev/null
         rm -rf $is_caddy_dir $is_caddy_bin /lib/systemd/system/caddy.service
+    elif [[ $is_caddy ]]; then
+        # remove xray-specific caddy configs only, keep caddy itself
+        rm -rf $is_caddy_conf
+    fi
+    # uninstall nginx; 2 is ask result
+    if [[ $REPLY == '2' && $is_nginx ]]; then
+        systemctl stop nginx &>/dev/null
+        systemctl disable nginx &>/dev/null
+        $cmd remove nginx -y &>/dev/null
+        rm -rf $is_nginx_conf
+    elif [[ $is_nginx ]]; then
+        # remove xray-specific nginx configs and reload nginx
+        load nginx.sh
+        rm -rf $is_nginx_conf
+        sed -i "\|include $is_nginx_conf|d" $is_nginx_file
+        nginx_reload
     fi
     [[ $is_install_sh ]] && return # reinstall
     _green "\n卸载完成!"
