@@ -1618,8 +1618,8 @@ get() {
             ;;
         *grpc* | *gun)
             net=grpc
-            # gRPC 默认 serviceName 为 "grpc"，而不是 UUID
-            [[ ! $path ]] && path="grpc"
+            # gRPC 默认 serviceName 使用 UUID，避免多协议共存时路径冲突
+            [[ ! $path ]] && path="$uuid"
             # 移除路径中的斜杠 (gRPC serviceName 不支持斜杠)
             [[ $path == */* ]] && path=$(sed 's#/##g' <<<$path)
             is_stream='streamSettings:{network:"grpc",grpc_host:'\"$host\"',security:'\"$is_tls\"',grpcSettings:{serviceName:'\"$path\"'}}'
