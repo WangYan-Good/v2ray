@@ -500,10 +500,9 @@ server {
             if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
                 nginx_certbot issue ${host}
             fi
-            # gRPC location 格式不同（需要前导斜杠和末尾 /）
+            # gRPC location 格式不同（需要前导斜杠，末尾 / 由 nginx_add_location 添加）
             local grpc_path="${path}"
             [[ "$grpc_path" != /* ]] && grpc_path="/$grpc_path"
-            [[ "$grpc_path" != */ ]] && grpc_path="${grpc_path}/"
             nginx_add_location "grpc" "$grpc_path" "${port}"
             local _add_ret=$?
             [[ $_add_ret -eq 2 ]] && return 0
