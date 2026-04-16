@@ -1004,6 +1004,8 @@ uninstall() {
     elif [[ $is_caddy ]]; then
         # remove xray-specific caddy configs only, keep caddy itself
         rm -rf $is_caddy_conf
+        sed -i "\|import $is_caddy_conf|d" $is_caddy_file
+        manage restart caddy &>/dev/null
     fi
     # uninstall nginx; 2 is ask result
     if [[ $REPLY == '2' && $is_nginx ]]; then
