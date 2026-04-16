@@ -468,8 +468,9 @@ server {
             if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
                 nginx_certbot issue ${host}
             fi
-            # gRPC location 格式不同（需要末尾有 /）
+            # gRPC location 格式不同（需要前导斜杠和末尾 /）
             local grpc_path="${path}"
+            [[ "$grpc_path" != /* ]] && grpc_path="/$grpc_path"
             [[ "$grpc_path" != */ ]] && grpc_path="${grpc_path}/"
             nginx_add_location "grpc" "$grpc_path" "${port}"
             nginx_reload
