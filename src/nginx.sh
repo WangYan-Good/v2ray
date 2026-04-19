@@ -23,8 +23,20 @@ nginx_add_location() {
             existing=$(grep -oE "location\s+[^{]+" "$f" 2>/dev/null | awk '{print $2}' | sed 's|/$||' || true)
             local norm_path=$(echo "$loc_path" | sed 's|/$||')
             if echo "$existing" | grep -qxF "$norm_path"; then
-                msg warn "路径 ${loc_path} 已存在于 Nginx 配置中，跳过追加"
-                return 0
+                # Path exists — check whether it routes to the same upstream port.
+                # Same port means this is a same-protocol re-add (idempotent, skip silently).
+                # Different port means another protocol already owns this path — that is a conflict.
+                local existing_port
+                existing_port=$(awk -v path="$norm_path" '
+                    /location/ { loc=$2; gsub(/\/+$/, "", loc); in_block=(loc == path ? 1 : 0) }
+                    in_block && /pass/ { gsub(/.*:/, ""); gsub(/;.*/, ""); print; exit }
+                ' "$f" 2>/dev/null)
+                if [[ "$existing_port" == "$loc_port" ]]; then
+                    msg warn "路径 ${loc_path} 已存在于 Nginx 配置中，跳过追加"
+                    return 2
+                else
+                    return 3
+                fi
             fi
         fi
     done
@@ -52,8 +64,8 @@ nginx_add_location() {
         ;;
     *grpc*)
         loc_block="
-    # Xray gRPC: ${host}${loc_path}
-    location ${loc_path}/ {
+    # Xray gRPC: ${host}${loc_path%/}/
+    location ${loc_path%/}/ {
         grpc_pass grpc://127.0.0.1:${loc_port};
         grpc_set_header Host \$host;
         grpc_set_header X-Real-IP \$remote_addr;
@@ -254,9 +266,22 @@ EOF
             msg warn "同域名已有 Nginx 配置，追加 location 到 .add 文件"
             # 确保证书软链接存在
             if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
-                nginx_certbot issue ${host}
+                if ! nginx_certbot issue ${host}; then
+                    error_out "CERT" "证书申请/校验失败，无法追加 WS 配置" "1. 手动申请证书: certbot certonly --webroot -w /var/www/certbot -d ${host}  2. 查看日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
+                    return 1
+                fi
             fi
             nginx_add_location "ws" "${path}" "${port}"
+            local _add_ret=$?
+            [[ $_add_ret -eq 2 ]] && return 0
+            if [[ $_add_ret -eq 3 ]]; then
+                error_out "NGINX" "路径 ${path} 已被其他协议占用，无法添加" "请使用不同的路径: xray add ws ${host} auto /your-unique-path"
+                return 1
+            fi
+            if ! nginx_test; then
+                error_out "NGINX" "Nginx 配置测试失败，追加 location 后配置有误" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
+                return 1
+            fi
             nginx_reload
             return 0
         fi
@@ -351,9 +376,22 @@ server {
             msg warn "同域名已有 Nginx 配置，追加 location 到 .add 文件"
             # 确保证书软链接存在
             if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
-                nginx_certbot issue ${host}
+                if ! nginx_certbot issue ${host}; then
+                    error_out "CERT" "证书申请/校验失败，无法追加 XHTTP/H2 配置" "1. 手动申请证书: certbot certonly --webroot -w /var/www/certbot -d ${host}  2. 查看日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
+                    return 1
+                fi
             fi
             nginx_add_location "xhttp" "${path}" "${port}"
+            local _add_ret=$?
+            [[ $_add_ret -eq 2 ]] && return 0
+            if [[ $_add_ret -eq 3 ]]; then
+                error_out "NGINX" "路径 ${path} 已被其他协议占用，无法添加" "请使用不同的路径: xray add xhttp ${host} auto /your-unique-path"
+                return 1
+            fi
+            if ! nginx_test; then
+                error_out "NGINX" "Nginx 配置测试失败，追加 location 后配置有误" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
+                return 1
+            fi
             nginx_reload
             return 0
         fi
@@ -466,12 +504,25 @@ server {
             msg warn "同域名已有 Nginx 配置，追加 location 到 .add 文件"
             # 确保证书软链接存在
             if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
-                nginx_certbot issue ${host}
+                if ! nginx_certbot issue ${host}; then
+                    error_out "CERT" "证书申请/校验失败，无法追加 gRPC 配置" "1. 手动申请证书: certbot certonly --webroot -w /var/www/certbot -d ${host}  2. 查看日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
+                    return 1
+                fi
             fi
-            # gRPC location 格式不同（需要末尾有 /）
+            # gRPC location 格式不同（需要前导斜杠，末尾 / 由 nginx_add_location 添加）
             local grpc_path="${path}"
-            [[ "$grpc_path" != */ ]] && grpc_path="${grpc_path}/"
+            [[ "$grpc_path" != /* ]] && grpc_path="/$grpc_path"
             nginx_add_location "grpc" "$grpc_path" "${port}"
+            local _add_ret=$?
+            [[ $_add_ret -eq 2 ]] && return 0
+            if [[ $_add_ret -eq 3 ]]; then
+                error_out "NGINX" "路径 ${grpc_path} 已被其他协议占用，无法添加" "请使用不同的 serviceName: xray add grpc ${host} auto /your-unique-path"
+                return 1
+            fi
+            if ! nginx_test; then
+                error_out "NGINX" "Nginx 配置测试失败，追加 location 后配置有误" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
+                return 1
+            fi
             nginx_reload
             return 0
         fi

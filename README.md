@@ -144,18 +144,18 @@ core.sh (核心逻辑)
 **在线一键安装（推荐）**
 
 ```bash
-# v1.1.1 一键安装（使用 curl）
-bash <(curl -Ls https://raw.githubusercontent.com/WangYan-Good/xray/v1.1.1/install.sh)
+# v1.1.2 一键安装（使用 curl）
+bash <(curl -Ls https://raw.githubusercontent.com/WangYan-Good/xray/v1.1.2/install.sh)
 
 # 备用地址（使用 jsDelivr CDN 加速）
-bash <(curl -Ls https://cdn.jsdelivr.net/gh/WangYan-Good/xray@v1.1.1/install.sh)
+bash <(curl -Ls https://cdn.jsdelivr.net/gh/WangYan-Good/xray@v1.1.2/install.sh)
 
 # 或使用 wget
-bash <(wget -qO- https://raw.githubusercontent.com/WangYan-Good/xray/v1.1.1/install.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/WangYan-Good/xray/v1.1.2/install.sh)
 
 # 指定 TLS 方案
-bash <(curl -Ls https://raw.githubusercontent.com/WangYan-Good/xray/v1.1.1/install.sh) --tls nginx
-bash <(curl -Ls https://raw.githubusercontent.com/WangYan-Good/xray/v1.1.1/install.sh) --tls caddy
+bash <(curl -Ls https://raw.githubusercontent.com/WangYan-Good/xray/v1.1.2/install.sh) --tls nginx
+bash <(curl -Ls https://raw.githubusercontent.com/WangYan-Good/xray/v1.1.2/install.sh) --tls caddy
 ```
 
 **手动下载安装**

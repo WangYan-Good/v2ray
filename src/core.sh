@@ -412,65 +412,37 @@ create() {
 
                 ##
                 ## 配置一致性校验：检查 Caddy reverse_proxy 路径是否与 Xray path 匹配
+                ## 多协议追加模式下，新路径写入 .add 而非 .conf，需同时检查两个文件
                 ##
                 is_caddy_site_file=$is_caddy_conf/${host}.conf
+                is_caddy_add_file="${is_caddy_site_file}.add"
                 if [[ -f $is_caddy_site_file ]]; then
                     ##
-                    ## 从 Caddyfile 中提取 reverse_proxy 的路径 (例如 /uuid)
+                    ## 从 Xray JSON 中提取 path（兼容 ws/h2/grpc/xhttp）
                     ##
-                    is_caddy_path=$(grep -E '^\s*reverse_proxy\s+' "$is_caddy_site_file" | head -1 | awk '{print $2}')
+                    is_xray_path=$(jq -r '.inbounds[0].streamSettings.wsSettings.path // .inbounds[0].streamSettings.xhttpSettings.path // .inbounds[0].streamSettings.httpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // empty' "$is_json_file" 2>/dev/null)
 
-                    ##
-                    ## 从 Xray JSON 中提取 path
-                    ##
-                    is_xray_path=$(jq -r '.inbounds[0].streamSettings.httpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // empty' "$is_json_file" 2>/dev/null)
-
-                    ##
-                    ## 排除空值或 root (/) 的情况，进行精确匹配
-                    ##
-                    if [[ -n "$is_caddy_path" && -n "$is_xray_path" && "$is_caddy_path" != "$is_xray_path" ]]; then
-                        error_out "CONFIG" "配置冲突：Xray 路径 ($is_xray_path) 与 Caddy reverse_proxy ($is_caddy_path) 不匹配！" "1. 重新生成并覆盖 Caddy 配置  2. 查看 Caddy 配置: cat $is_caddy_site_file"
-                        msg warn "如果继续使用当前配置，客户端将无法连接。"
-                        echo
-                        echo "请选择:"
-                        echo "1) 重新生成并覆盖 Caddy 配置 (推荐)"
-                        echo "2) 放弃本次 Xray 配置更改 (保留旧配置)"
-                        echo "3) 继续（连接将失败，需手动修复）"
-                        while :; do
-                            read -p "请选择 [1-3] (默认:1): " is_caddy_conflict_choice
-                            [[ ! $is_caddy_conflict_choice ]] && is_caddy_conflict_choice=1
-                            case $is_caddy_conflict_choice in
-                            1)
-                                msg warn "重新生成 Caddy 配置..."
-                                ##
-                                ## 先备份并删除现有配置，避免 create caddy 再次弹出"是否覆盖"的选择
-                                ##
-                                [[ -f ${is_caddy_site_file} ]] && {
-                                    cp -f ${is_caddy_site_file} ${is_caddy_site_file}.bak
-                                    msg warn "已备份现有 Caddy 配置：${is_caddy_site_file}.bak"
-                                    rm -f ${is_caddy_site_file}
-                                }
-                                create caddy $net
+                    if [[ -n "$is_xray_path" ]]; then
+                        ##
+                        ## 检查路径是否已在 .conf 或 .add 中（字段级精确匹配，避免子串误判）
+                        ##
+                        local path_without_slash="${is_xray_path#/}"
+                        is_path_in_caddy=0
+                        for _cf in "$is_caddy_site_file" "$is_caddy_add_file"; do
+                            if [[ -f "$_cf" ]] && [[ $(awk -v p="$path_without_slash" '
+                                /reverse_proxy/ {
+                                    rp=$2; gsub(/\/\*$/, "", rp); gsub(/\/$/, "", rp); gsub(/^\//, "", rp)
+                                    if (rp == p) { print "1"; exit }
+                                }' "$_cf" 2>/dev/null) == "1" ]]; then
+                                is_path_in_caddy=1
                                 break
-                                ;;
-                            2)
-                                rm -f "$is_json_file"
-                                [[ -f ${is_caddy_site_file}.bak ]] && {
-                                    cp -f ${is_caddy_site_file}.bak ${is_caddy_site_file}
-                                    msg warn "已放弃新 Xray 配置，恢复旧 Caddy 配置"
-                                } || msg warn "已放弃新 Xray 配置"
-                                manage restart caddy &
-                                return
-                                ;;
-                            3)
-                                msg warn "已继续，但请注意 Xray 与 Caddy 配置不一致"
-                                break
-                                ;;
-                            *)
-                                msg "输入无效，请输入 1-3"
-                                ;;
-                            esac
+                            fi
                         done
+
+                        if [[ $is_path_in_caddy -eq 0 ]]; then
+                            error_out "CONFIG" "Caddy 配置中未找到对应的 reverse_proxy 路径 ($is_xray_path)！" "1. 检查 .add 文件: cat $is_caddy_add_file  2. 重新添加配置: xray del $is_config_file && xray add $is_new_protocol $host"
+                            return 1
+                        fi
                     fi
                 fi
             elif [[ $is_nginx ]]; then
@@ -478,73 +450,37 @@ create() {
                 create nginx $net
 
                 ##
-                ## 配置一致性校验：检查新协议的 location 是否已正确添加到 .add 文件
+                ## 配置一致性校验：检查新协议的路径是否已正确写入 .conf 或 .add
+                ## 多协议追加模式下路径写入 .add，首次创建时路径在 .conf
                 ##
                 is_nginx_site_file=$is_nginx_conf/${host}.conf
                 is_nginx_add_file=${is_nginx_site_file}.add
-                if [[ -f $is_nginx_add_file ]]; then
+                if [[ -f $is_nginx_site_file ]]; then
                     ##
-                    ## 同域名多协议追加模式：只需确认 .add 中包含新 path 的 location
-                    ## 从 Xray JSON 中提取 path
+                    ## 从 Xray JSON 中提取 path（兼容 ws/h2/grpc/xhttp）
                     ##
-                    is_xray_path=$(jq -r '.inbounds[0].streamSettings.xhttpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // .inbounds[0].streamSettings.httpSettings.path // .inbounds[0].settings.path // empty' "$is_json_file" 2>/dev/null)
+                    is_xray_path=$(jq -r '.inbounds[0].streamSettings.wsSettings.path // .inbounds[0].streamSettings.xhttpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // .inbounds[0].streamSettings.httpSettings.path // .inbounds[0].settings.path // empty' "$is_json_file" 2>/dev/null)
                     if [[ -n "$is_xray_path" ]]; then
-                        if ! grep -q "location.*${is_xray_path}" "$is_nginx_add_file" 2>/dev/null; then
-                            # path 不在 .add 中，可能出问题了
-                            error_out "CONFIG" "Nginx .add 文件中未找到对应的 location 路径！" "1. 检查 .add 文件: cat $is_nginx_add_file  2. 重新添加配置: xray del $is_config_file && xray add $protocol_type $host"
+                        ##
+                        ## 检查路径是否已在 .conf 或 .add 中（字段级精确匹配，避免子串误判）
+                        ##
+                        local path_without_slash="${is_xray_path#/}"
+                        is_path_in_nginx=0
+                        for _nf in "$is_nginx_site_file" "$is_nginx_add_file"; do
+                            if [[ -f "$_nf" ]] && [[ $(awk -v p="$path_without_slash" '
+                                /location/ {
+                                    loc=$2; gsub(/\/+$/, "", loc); gsub(/^\/+/, "", loc)
+                                    if (loc == p) { print "1"; exit }
+                                }' "$_nf" 2>/dev/null) == "1" ]]; then
+                                is_path_in_nginx=1
+                                break
+                            fi
+                        done
+
+                        if [[ $is_path_in_nginx -eq 0 ]]; then
+                            error_out "CONFIG" "Nginx 配置中未找到对应的 location 路径 ($is_xray_path)！" "1. 检查配置文件: cat $is_nginx_site_file  2. 重新添加配置: xray del $is_config_file && xray add $is_new_protocol $host"
                             return 1
                         fi
-                    fi
-                    # location 已正确追加，无需额外处理
-                elif [[ -f $is_nginx_site_file ]]; then
-                    ##
-                    ## 首次创建（.conf 模式）：检查 location 是否匹配
-                    ##
-                    is_nginx_location_path=$(grep -E '^\s+location\s+/' "$is_nginx_site_file" | head -1 | awk '{print $2}' | sed 's/{$//')
-                    is_xray_path=$(jq -r '.inbounds[0].streamSettings.xhttpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // .inbounds[0].streamSettings.httpSettings.path // .inbounds[0].settings.path // empty' "$is_json_file" 2>/dev/null)
-                    if [[ -n "$is_nginx_location_path" && -n "$is_xray_path" && "$is_nginx_location_path" != "$is_xray_path" ]]; then
-                        error_out "CONFIG" "配置冲突：Xray 路径 ($is_xray_path) 与 Nginx location ($is_nginx_location_path) 不匹配！" "1. 重新生成并覆盖 Nginx 配置  2. 查看 Nginx 配置: cat $is_nginx_site_file"
-                        msg warn "如果继续使用当前配置，客户端将无法连接。"
-                        echo
-                        echo "请选择:"
-                        echo "1) 重新生成并覆盖 Nginx 配置 (推荐)"
-                        echo "2) 放弃本次 Xray 配置更改 (保留旧配置)"
-                        echo "3) 继续（连接将失败，需手动修复）"
-                        while :; do
-                            read -p "请选择 [1-3] (默认:1): " is_conflict_choice
-                            [[ ! $is_conflict_choice ]] && is_conflict_choice=1
-                            case $is_conflict_choice in
-                            1)
-                                msg warn "重新生成 Nginx 配置..."
-                                ##
-                                ## 先备份并删除现有配置，避免 create nginx 再次弹出"是否覆盖"的选择
-                                ##
-                                [[ -f ${is_nginx_site_file} ]] && {
-                                    cp -f ${is_nginx_site_file} ${is_nginx_site_file}.bak
-                                    msg warn "已备份现有 Nginx 配置：${is_nginx_site_file}.bak"
-                                    rm -f ${is_nginx_site_file}
-                                }
-                                create nginx $net
-                                break
-                                ;;
-                            2)
-                                rm -f "$is_json_file"
-                                [[ -f ${is_nginx_site_file}.bak ]] && {
-                                    cp -f ${is_nginx_site_file}.bak ${is_nginx_site_file}
-                                    msg warn "已放弃新 Xray 配置，恢复旧 Nginx 配置"
-                                } || msg warn "已放弃新 Xray 配置"
-                                nginx_reload
-                                return
-                                ;;
-                            3)
-                                msg warn "已继续，但请注意 Xray 与 Nginx 配置不一致"
-                                break
-                                ;;
-                            *)
-                                msg "输入无效，请输入 1-3"
-                                ;;
-                            esac
-                        done
                     fi
                 fi
             fi
@@ -602,7 +538,9 @@ create() {
         ## create nginx new
         ##
         if ! nginx_config $2; then
-            error_out "CERT" "Nginx 配置生成失败，证书申请未成功" "1. 稍后手动申请证书: certbot certonly --webroot -w /var/www/certbot -d $2  2. 查看 Certbot 日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
+            local cert_domain="$host"
+            [[ -z "$cert_domain" ]] && cert_domain="$2"
+            error_out "CERT" "Nginx 配置生成失败，证书申请未成功" "1. 稍后手动申请证书: certbot certonly --webroot -w /var/www/certbot -d $cert_domain  2. 查看 Certbot 日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
             msg warn "Xray 配置已生成，但 TLS 尚未启用"
             msg warn "你可以稍后手动申请证书并重载 Nginx"
             is_api_fail=1
@@ -962,10 +900,16 @@ del() {
                 [[ ! $old_host ]] && return # no host exist or not set new host;
                 is_del_host=$old_host
             }
-            [[ $is_del_host && $host != $old_host && ! $is_no_auto_tls ]] && {
+            if [[ $is_del_host && $host != $old_host && ! $is_no_auto_tls ]]; then
                 rm -rf $is_caddy_conf/$is_del_host.conf $is_caddy_conf/$is_del_host.conf.add
                 [[ ! $is_new_json ]] && manage restart caddy &
-            }
+            elif [[ $is_del_host && ! $is_no_auto_tls ]]; then
+                # 同域名多协议共存：从 .add 中删除对应的 reverse_proxy 行
+                load caddy.sh
+                is_caddy_site_file=$is_caddy_conf/$is_del_host.conf
+                caddy_config del
+                [[ ! $is_new_json ]] && manage restart caddy &
+            fi
         }
         [[ $is_nginx ]] && {
             load nginx.sh
@@ -1435,7 +1379,7 @@ add() {
     create server $is_new_protocol
 
     # show config info.
-    info
+    info $is_config_name
 }
 
 ##
@@ -1555,8 +1499,9 @@ get() {
             done
 
             # 合并变量
-            [[ -z $host ]] && host="${grpc_host:-${ws_host:-${h2_host:-}}}"
-            [[ -z $path ]] && path="${h2_path:-${ws_path:-${grpc_serviceName:-}}}"
+            # 先清除派生变量，防止上次操作的残留值污染当前配置的显示
+            host="${grpc_host:-${ws_host:-${h2_host:-}}}"
+            path="${h2_path:-${ws_path:-${grpc_serviceName:-}}}"
             [[ -z $is_https_port ]] && is_https_port=443
             header_type="${tcp_type:-}${kcp_type:-}${quic_type:-}"
             # 判断是否为 reality 协议
@@ -1697,8 +1642,8 @@ get() {
             ;;
         *grpc* | *gun)
             net=grpc
-            # gRPC 默认 serviceName 为 "grpc"，而不是 UUID
-            [[ ! $path ]] && path="grpc"
+            # gRPC 默认 serviceName 使用 UUID，避免多协议共存时路径冲突
+            [[ ! $path ]] && path="$uuid"
             # 移除路径中的斜杠 (gRPC serviceName 不支持斜杠)
             [[ $path == */* ]] && path=$(sed 's#/##g' <<<$path)
             is_stream='streamSettings:{network:"grpc",grpc_host:'\"$host\"',security:'\"$is_tls\"',grpcSettings:{serviceName:'\"$path\"'}}'
@@ -1901,11 +1846,14 @@ info() {
     ## is_color=$(shuf -i 41-45 -n1)
     ##
     is_color=44
+    # 统一订阅节点标签：协议-传输-目标(host 优先，否则 IP)
+    is_node_target="${host:-$is_addr}"
+    is_node_tag="${is_protocol}-${net}-${is_node_target}"
     case $net in
     tcp | kcp | quic)
         is_can_change=(0 1 5 7)
         is_info_show=(0 1 2 3 4 5)
-        is_vmess_url=$(jq -c '{v:2,ps:'\"${net}-$is_addr\"',add:'\"$is_addr\"',port:'\"$port\"',id:'\"$uuid\"',aid:"0",net:'\"$net\"',type:'\"$header_type\"',path:'\"$kcp_seed\"'}' <<<{})
+        is_vmess_url=$(jq -c '{v:2,ps:'\"$is_node_tag\"',add:'\"$is_addr\"',port:'\"$port\"',id:'\"$uuid\"',aid:"0",net:'\"$net\"',type:'\"$header_type\"',path:'\"$kcp_seed\"'}' <<<{})
         is_url=vmess://$(echo -n $is_vmess_url | base64 -w 0)
         is_tmp_port=$port
         [[ $is_dynamic_port ]] && {
@@ -1921,13 +1869,15 @@ info() {
     ss)
         is_can_change=(0 1 4 6)
         is_info_show=(0 1 2 10 11)
-        is_url="ss://$(echo -n ${ss_method}:${ss_password} | base64 -w 0)@${is_addr}:${port}#$net-${is_addr}"
+        is_url="ss://$(echo -n ${ss_method}:${ss_password} | base64 -w 0)@${is_addr}:${port}#$is_node_tag"
         is_info_str=($is_protocol $is_addr $port $ss_password $ss_method)
         ;;
     ws | h2 | grpc | xhttp)
         is_color=45
         is_can_change=(0 1 2 3 5)
         is_info_show=(0 1 2 3 4 6 7 8)
+        # 对于 TLS 域名协议，标签目标强制使用域名
+        is_node_tag="${is_protocol}-${net}-${host}"
         is_url_path=path
         is_display_path=$path
         [[ $net == 'grpc' ]] && {
@@ -1935,7 +1885,7 @@ info() {
             is_url_path=serviceName
         }
         [[ $is_protocol == 'vmess' ]] && {
-            is_vmess_url=$(jq -c '{v:2,ps:'\"$net-$host\"',add:'\"$is_addr\"',port:'\"$is_https_port\"',id:'\"$uuid\"',aid:"0",net:'\"$net\"',host:'\"$host\"',path:'\"$path\"',tls:'\"tls\"'}' <<<{})
+            is_vmess_url=$(jq -c '{v:2,ps:'\"$is_node_tag\"',add:'\"$is_addr\"',port:'\"$is_https_port\"',id:'\"$uuid\"',aid:"0",net:'\"$net\"',host:'\"$host\"',path:'\"$path\"',tls:'\"tls\"'}' <<<{})
             is_url=vmess://$(echo -n $is_vmess_url | base64 -w 0)
         } || {
             [[ $is_trojan ]] && {
@@ -1943,7 +1893,7 @@ info() {
                 is_can_change=(0 1 2 3 4)
                 is_info_show=(0 1 2 10 4 6 7 8)
             }
-            is_url="$is_protocol://$uuid@$host:$is_https_port?encryption=none&security=tls&type=$net&host=$host&${is_url_path}=$(sed 's#/#%2F#g' <<<$is_display_path)#$net-$host"
+            is_url="$is_protocol://$uuid@$host:$is_https_port?encryption=none&security=tls&type=$net&host=$host&${is_url_path}=$(sed 's#/#%2F#g' <<<$is_display_path)#$is_node_tag"
         }
         [[ $is_caddy || $is_nginx ]] && is_can_change+=(13)
         is_info_str=($is_protocol $is_addr $is_https_port $uuid $net $host $is_display_path 'tls')
@@ -1953,7 +1903,7 @@ info() {
         is_can_change=(0 1 5 10 11)
         is_info_show=(0 1 2 3 15 8 16 17 18)
         is_info_str=($is_protocol $is_addr $port $uuid xtls-rprx-vision reality $is_servername "ios" $is_public_key)
-        is_url="$is_protocol://$uuid@$is_addr:$port?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp&sni=$is_servername&pbk=$is_public_key&fp=ios#$net-$is_addr"
+        is_url="$is_protocol://$uuid@$is_addr:$port?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp&sni=$is_servername&pbk=$is_public_key&fp=ios#$is_node_tag"
         ;;
     door)
         is_can_change=(0 1 8 9)
@@ -1964,7 +1914,7 @@ info() {
         is_can_change=(0 1 15 4)
         is_info_show=(0 1 2 19 10)
         is_info_str=($is_protocol $is_addr $port $is_socks_user $is_socks_pass)
-        is_url="socks://$(echo -n ${is_socks_user}:${is_socks_pass} | base64 -w 0)@${is_addr}:${port}#$net-${is_addr}"
+        is_url="socks://$(echo -n ${is_socks_user}:${is_socks_pass} | base64 -w 0)@${is_addr}:${port}#$is_node_tag"
         ;;
     http)
         is_can_change=(0 1)
