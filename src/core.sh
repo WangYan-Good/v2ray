@@ -538,7 +538,9 @@ create() {
         ## create nginx new
         ##
         if ! nginx_config $2; then
-            error_out "CERT" "Nginx 配置生成失败，证书申请未成功" "1. 稍后手动申请证书: certbot certonly --webroot -w /var/www/certbot -d $2  2. 查看 Certbot 日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
+            local cert_domain="$host"
+            [[ -z "$cert_domain" ]] && cert_domain="$2"
+            error_out "CERT" "Nginx 配置生成失败，证书申请未成功" "1. 稍后手动申请证书: certbot certonly --webroot -w /var/www/certbot -d $cert_domain  2. 查看 Certbot 日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
             msg warn "Xray 配置已生成，但 TLS 尚未启用"
             msg warn "你可以稍后手动申请证书并重载 Nginx"
             is_api_fail=1

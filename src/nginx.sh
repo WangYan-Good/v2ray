@@ -266,7 +266,10 @@ EOF
             msg warn "同域名已有 Nginx 配置，追加 location 到 .add 文件"
             # 确保证书软链接存在
             if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
-                nginx_certbot issue ${host}
+                if ! nginx_certbot issue ${host}; then
+                    error_out "CERT" "证书申请/校验失败，无法追加 WS 配置" "1. 手动申请证书: certbot certonly --webroot -w /var/www/certbot -d ${host}  2. 查看日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
+                    return 1
+                fi
             fi
             nginx_add_location "ws" "${path}" "${port}"
             local _add_ret=$?
@@ -373,7 +376,10 @@ server {
             msg warn "同域名已有 Nginx 配置，追加 location 到 .add 文件"
             # 确保证书软链接存在
             if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
-                nginx_certbot issue ${host}
+                if ! nginx_certbot issue ${host}; then
+                    error_out "CERT" "证书申请/校验失败，无法追加 XHTTP/H2 配置" "1. 手动申请证书: certbot certonly --webroot -w /var/www/certbot -d ${host}  2. 查看日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
+                    return 1
+                fi
             fi
             nginx_add_location "xhttp" "${path}" "${port}"
             local _add_ret=$?
@@ -498,7 +504,10 @@ server {
             msg warn "同域名已有 Nginx 配置，追加 location 到 .add 文件"
             # 确保证书软链接存在
             if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
-                nginx_certbot issue ${host}
+                if ! nginx_certbot issue ${host}; then
+                    error_out "CERT" "证书申请/校验失败，无法追加 gRPC 配置" "1. 手动申请证书: certbot certonly --webroot -w /var/www/certbot -d ${host}  2. 查看日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
+                    return 1
+                fi
             fi
             # gRPC location 格式不同（需要前导斜杠，末尾 / 由 nginx_add_location 添加）
             local grpc_path="${path}"
