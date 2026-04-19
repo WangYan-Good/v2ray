@@ -108,6 +108,51 @@ nginx_should_append() {
     return 0
 }
 
+##
+## 确保站点配置包含 .add 导入（兼容旧版/手工修改的 .conf）
+##
+nginx_ensure_add_include() {
+    local site_file="$1"
+    [[ -z "$site_file" ]] && site_file="$is_nginx_site_file"
+    [[ ! -f "$site_file" ]] && return 1
+
+    # 已存在 include 时直接返回
+    if grep -qF "include ${site_file}.add;" "$site_file"; then
+        return 0
+    fi
+
+    # 在最后一个 server 块的闭合 } 前插入 include
+    local tmp_conf
+    tmp_conf=$(mktemp)
+    awk -v inc="    include ${site_file}.add;" '
+        {
+            lines[NR] = $0
+            if ($0 ~ /^[[:space:]]*server[[:space:]]*\{[[:space:]]*$/) in_server = 1
+            if (in_server && $0 ~ /^[[:space:]]*\}[[:space:]]*$/) {
+                last_server_close = NR
+                in_server = 0
+            }
+        }
+        END {
+            if (!last_server_close) {
+                for (i = 1; i <= NR; i++) print lines[i]
+                exit 1
+            }
+            for (i = 1; i <= NR; i++) {
+                if (i == last_server_close) print inc
+                print lines[i]
+            }
+        }
+    ' "$site_file" > "$tmp_conf" || {
+        rm -f "$tmp_conf"
+        return 1
+    }
+
+    mv -f "$tmp_conf" "$site_file"
+    msg warn "检测到 ${site_file} 缺少 .add 导入，已自动修复"
+    return 0
+}
+
 nginx_config() {
     ##
     ## /etc/nginx/xray/{host}.conf
@@ -275,6 +320,7 @@ EOF
         # 同域名多协议共存：追加到 .add 而不是覆盖 .conf
         if nginx_should_append; then
             msg warn "同域名已有 Nginx 配置，追加 location 到 .add 文件"
+            nginx_ensure_add_include "${is_nginx_site_file}"
             # 确保证书软链接存在
             if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
                 if ! nginx_certbot issue ${host}; then
@@ -385,6 +431,7 @@ server {
         # 同域名多协议共存：追加到 .add 而不是覆盖 .conf
         if nginx_should_append; then
             msg warn "同域名已有 Nginx 配置，追加 location 到 .add 文件"
+            nginx_ensure_add_include "${is_nginx_site_file}"
             # 确保证书软链接存在
             if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
                 if ! nginx_certbot issue ${host}; then
@@ -513,6 +560,7 @@ server {
         # 同域名多协议共存：追加到 .add 而不是覆盖 .conf
         if nginx_should_append; then
             msg warn "同域名已有 Nginx 配置，追加 location 到 .add 文件"
+            nginx_ensure_add_include "${is_nginx_site_file}"
             # 确保证书软链接存在
             if [[ ! -L $is_nginx_dir/ssl/${host} ]]; then
                 if ! nginx_certbot issue ${host}; then
