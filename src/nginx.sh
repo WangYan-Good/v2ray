@@ -257,6 +257,17 @@ EOF
                     msg warn "添加：include $is_nginx_conf/*.conf;"
                 fi
             fi
+
+            ##
+            ## 迁移清理：移除旧版 v2ray 配置导入，避免与 xray 配置重复加载
+            ##
+            local legacy_nginx_conf="$is_nginx_dir/v2ray"
+            if grep -q "include $legacy_nginx_conf/\*.conf" "$is_nginx_file"; then
+                cp -f "$is_nginx_file" "${is_nginx_file}.bak.$(date +%Y%m%d%H%M%S)"
+                sed -i "\|include $legacy_nginx_conf/\\*.conf;|d" "$is_nginx_file"
+                msg warn "检测到旧版 v2ray Nginx 导入，已从 nginx.conf 移除: include $legacy_nginx_conf/*.conf;"
+                msg warn "旧配置文件保留在 $legacy_nginx_conf/，如无需兼容可手动清理"
+            fi
         fi
         ;;
     
