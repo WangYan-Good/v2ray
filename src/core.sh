@@ -273,7 +273,7 @@ ask() {
     esac
     msg $is_opt_msg
     [[ ! $is_opt_input_msg ]] && is_opt_input_msg="请选择 [\e[91m1-${#is_tmp_list[@]}\e[0m]:"
-    [[ $is_tmp_list ]] && show_list "${is_tmp_list[@]}"
+    [[ ${#is_tmp_list[@]} -gt 0 ]] && show_list "${is_tmp_list[@]}"
     while :; do
         echo -ne $is_opt_input_msg
         read REPLY
@@ -282,7 +282,7 @@ ask() {
         [[ "$REPLY" == "${is_str}2${is_get}3${is_opt}3" && $is_ask_set == 'is_main_pick' ]] && {
             msg "\n${is_get}2${is_str}3${is_msg}3b${is_tmp}o${is_opt}y\n" && exit
         }
-        if [[ ! $is_tmp_list ]]; then
+        if [[ ${#is_tmp_list[@]} -eq 0 ]]; then
             [[ $(grep port <<<$is_ask_set) ]] && {
                 [[ ! $(is_test port "$REPLY") ]] && {
                     msg "$is_err 请输入正确的端口, 可选(1-65535)"
@@ -1415,9 +1415,9 @@ get() {
         ##
         ## 修复后（增强通用性，兼容 H2/WS/gRPC/TCP 所有协议）
         ##
-        readarray -t is_all_json <<<"$(ls -1 $is_conf_dir | grep -E '\.json$' | grep -i "$is_file_str" | sed '/dynamic-port-.*-link/d' | head -233)"
+        readarray -t is_all_json < <(ls -1 "$is_conf_dir" | grep -E '\.json$' | grep -i "$is_file_str" | sed '/dynamic-port-.*-link/d' | head -233)
         [[ ${#is_all_json[@]} -eq 0 ]] && {
-            is_all_json=($(ls -1 $is_conf_dir | grep -E '\.json$' | head -10))
+            readarray -t is_all_json < <(ls -1 "$is_conf_dir" | grep -E '\.json$' | head -10)
             [[ ${#is_all_json[@]} -eq 0 ]] && err "无法找到相关的配置文件: $2"
         }
         [[ ${#is_all_json[@]} -eq 1 ]] && is_config_file=$is_all_json && is_auto_get_config=1
