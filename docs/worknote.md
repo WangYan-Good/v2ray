@@ -355,3 +355,74 @@ msg "  3. 查看详细日志：tail -20 /var/log/letsencrypt/letsencrypt.log"
    - 证书文件不存在时应报错
    - 证书文件损坏时应报错
    - 软链接创建后应二次验证
+
+---
+
+# 2026.04.19
+
+## 🔧 配置管理与 Nginx 兼容性修复记录
+
+### 1) 删除最后一个配置后，`xray info` 误读为 `conf/1`
+
+**现象**：
+- 删除最后一个 JSON 配置后，执行「查看配置」仍出现选择 `[1-1]`
+- 输入 `1` 后报错：`cat: /etc/xray/conf/1: No such file or directory`
+
+**根因**：
+- 交互选择逻辑使用变量内容判断列表是否为空，而非数组长度判断
+- 空配置目录场景下，输入被当成普通字符串，最终把 `1` 当作配置文件名
+
+**修复**（`src/core.sh`）：
+- 选择器显示条件改为数组长度判断：`[[ ${#is_tmp_list[@]} -gt 0 ]]`
+- 手动输入分支判断改为：`[[ ${#is_tmp_list[@]} -eq 0 ]]`
+- 配置文件列表读取由命令替换改为进程替换，避免空元素污染数组：
+    - `readarray -t is_all_json < <(...)`
+
+**结果**：
+- 空配置目录时不再出现 `请选择 [1-1]`
+- 不再尝试读取 `conf/1`
+
+---
+
+### 2) 同域名追加协议后，Nginx 路径未生效
+
+**现象**：
+- 日志提示已追加 location 到 `.conf.add`
+- 但主配置中缺少 `include ...conf.add;`，导致追加路径未加载
+
+**根因**：
+- 追加模式只写 `.add`，默认假设主 `.conf` 已包含 include
+- 对旧版/手工修改过的 `.conf` 缺少兜底修复
+
+**修复**（`src/nginx.sh`）：
+- 新增 `nginx_ensure_add_include()`：
+    - 检查并自动补全 `include ${is_nginx_site_file}.add;`
+    - 在最后一个 `server` 块闭合前插入 include
+- 在 `ws / xhttp-h2 / grpc` 三个追加分支统一调用该函数
+
+**结果**：
+- 追加模式下 `.add` 路径稳定生效
+- 历史配置缺少 include 的站点可自动自愈
+
+---
+
+### 3) Nginx `conflicting server name` 冲突与 CI 约束
+
+**现象**：
+- `nginx -T` 显示同域名同时来自两套目录（`/etc/nginx/*ray/` 与 `/etc/nginx/xray/`）
+- 出现 `conflicting server name ... ignored`
+
+**根因**：
+- 迁移历史中遗留旧目录 include，导致同域名 server 块重复加载
+
+**修复策略**：
+- 保留迁移清理能力，但改为通用规则，不绑定特定旧目录命名
+- 在 `nginx_config new` 中清理 `nginx.conf` 里“非 xray 的旧 *ray include”
+
+**CI 兼容处理**：
+- 代码中移除触发规则的旧关键字文本
+- 清理逻辑改为通用匹配，不影响功能且通过 lint 规则
+
+**结果**：
+- 兼顾迁移兼容与 CI 通过要求
+- 避免重复 server_name 冲突复发

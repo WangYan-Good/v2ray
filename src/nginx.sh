@@ -304,14 +304,28 @@ EOF
             fi
 
             ##
-            ## 迁移清理：移除旧版 v2ray 配置导入，避免与 xray 配置重复加载
+            ## 迁移清理：移除非 xray 的旧 *ray 导入，避免与当前配置重复加载
             ##
-            local legacy_nginx_conf="$is_nginx_dir/v2ray"
-            if grep -q "include $legacy_nginx_conf/\*.conf" "$is_nginx_file"; then
+            local legacy_tmp
+            legacy_tmp=$(mktemp)
+            awk -v xray_inc="include $is_nginx_conf/*.conf;" '
+                {
+                    line=$0
+                    if (line ~ /^[[:space:]]*include[[:space:]]+\/etc\/nginx\/[[:alnum:]_-]*ray\/\*\.conf;[[:space:]]*$/ && index(line, xray_inc) == 0) {
+                        removed++
+                        next
+                    }
+                    print line
+                }
+            ' "$is_nginx_file" > "$legacy_tmp"
+
+            if ! cmp -s "$legacy_tmp" "$is_nginx_file"; then
                 cp -f "$is_nginx_file" "${is_nginx_file}.bak.$(date +%Y%m%d%H%M%S)"
-                sed -i "\|include $legacy_nginx_conf/\\*.conf;|d" "$is_nginx_file"
-                msg warn "检测到旧版 v2ray Nginx 导入，已从 nginx.conf 移除: include $legacy_nginx_conf/*.conf;"
-                msg warn "旧配置文件保留在 $legacy_nginx_conf/，如无需兼容可手动清理"
+                mv -f "$legacy_tmp" "$is_nginx_file"
+                msg warn "检测到旧版 *ray Nginx 导入，已从 nginx.conf 移除非 xray include"
+                msg warn "如需保留旧目录，请手动检查 /etc/nginx/*ray/ 配置"
+            else
+                rm -f "$legacy_tmp"
             fi
         fi
         ;;
