@@ -71,14 +71,14 @@ mihomo_node_opts() {
         ;;
     xhttp)
         xhttp_mode=$(jq -r '.inbounds[0].streamSettings.xhttpSettings.mode // "auto"' <<<$is_json_str 2>/dev/null)
+        [[ -z $xhttp_mode || $xhttp_mode == null ]] && xhttp_mode=auto
         echo "    network: xhttp"
+        echo "    alpn:"
+        echo "      - h2"
         echo "    xhttp-opts:"
         echo "      path: $q_path"
+        [[ -n $host ]] && echo "      host: $q_host"
         echo "      mode: $(mihomo_json_str "$xhttp_mode")"
-        [[ -n $host ]] && {
-            echo "      headers:"
-            echo "        Host: $q_host"
-        }
         ;;
     esac
 }
@@ -87,9 +87,70 @@ mihomo_node_opts() {
 ## 根据协议类型（vmess/vless/trojan/shadowsocks）生成完整的 mihomo 节点配置
 ## 支持 TLS、Reality、xHTTP 等传输方式
 ##
+mihomo_support_reason() {
+    if [[ -n $is_dynamic_port ]]; then
+        echo "dynamic-port is not supported by mihomo subscription"
+        return
+    fi
+
+    case $is_protocol in
+    vmess)
+        case $net in
+        tcp | "")
+            [[ -n $header_type && $header_type != none ]] && echo "vmess tcp header type '$header_type' is not supported"
+            ;;
+        ws | grpc)
+            ;;
+        xhttp)
+            echo "mihomo xhttp transport is VLESS only"
+            ;;
+        kcp | quic)
+            echo "mihomo does not support $net transport"
+            ;;
+        *)
+            echo "unsupported vmess transport: ${net:-tcp}"
+            ;;
+        esac
+        ;;
+    vless)
+        case $net in
+        tcp | ws | grpc | xhttp | reality | "")
+            ;;
+        kcp | quic)
+            echo "mihomo does not support $net transport"
+            ;;
+        *)
+            echo "unsupported vless transport: ${net:-tcp}"
+            ;;
+        esac
+        ;;
+    trojan)
+        case $net in
+        tcp | ws | grpc | "")
+            ;;
+        xhttp)
+            echo "mihomo trojan transport supports ws/grpc/tcp only"
+            ;;
+        *)
+            echo "unsupported trojan transport: ${net:-tcp}"
+            ;;
+        esac
+        ;;
+    shadowsocks | socks)
+        ;;
+    *)
+        echo "unsupported protocol: $is_protocol"
+        ;;
+    esac
+}
+
+mihomo_is_supported() {
+    [[ -z $(mihomo_support_reason) ]]
+}
+
 mihomo_node() {
     local name server node_port q_name q_server
-    local q_uuid q_password q_method q_sni q_pbk
+    local q_uuid q_password q_method q_sni q_pbk q_user
 
     name="${is_config_name%.json}"
     server="${host:-$is_addr}"
@@ -102,6 +163,12 @@ mihomo_node() {
     q_method=$(mihomo_json_str "$ss_method")
     q_sni=$(mihomo_json_str "${is_servername:-$host}")
     q_pbk=$(mihomo_json_str "$is_public_key")
+    q_user=$(mihomo_json_str "$is_socks_user")
+
+    if ! mihomo_is_supported; then
+        echo "  # skip $q_name: $(mihomo_support_reason)"
+        return
+    fi
 
     case $is_protocol in
     vmess)
@@ -162,6 +229,15 @@ mihomo_node() {
         echo "    password: $(mihomo_json_str "$ss_password")"
         echo "    udp: true"
         ;;
+    socks)
+        echo "  - name: $q_name"
+        echo "    type: socks5"
+        echo "    server: $q_server"
+        echo "    port: $node_port"
+        [[ -n $is_socks_user ]] && echo "    username: $q_user"
+        [[ -n $is_socks_pass ]] && echo "    password: $(mihomo_json_str "$is_socks_pass")"
+        echo "    udp: true"
+        ;;
     *)
         echo "  # skip unsupported protocol: $q_name ($is_protocol)"
         ;;
@@ -199,14 +275,12 @@ mihomo_sub() {
 
     for file in "${files[@]}"; do
         [[ -z $file ]] && continue
-        unset is_config_file is_json_str is_protocol port uuid client_password trojan_password ss_method ss_password net is_security host path is_addr is_reality is_trojan is_servername is_public_key
+        unset is_config_file is_json_str is_protocol port uuid client_password trojan_password ss_method ss_password net is_security host path is_addr is_reality is_trojan is_servername is_public_key is_dynamic_port header_type is_socks_user is_socks_pass
         is_config_file="$file"
         info "$file" >/dev/null
-        case $is_protocol in
-        vmess | vless | trojan | shadowsocks)
+        if mihomo_is_supported; then
             node_names+=("${is_config_name%.json}")
-            ;;
-        esac
+        fi
         mihomo_node
     done
 
