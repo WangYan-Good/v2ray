@@ -4,7 +4,7 @@
 | Field | Value |
 |-------|-------|
 | **Product Name** | Xray Management Script |
-| **Version** | v1.1.2 |
+| **Version** | v1.2.0 |
 | **Author** | WangYan-Good |
 | **Repository** | https://github.com/WangYan-Good/xray |
 | **Last Updated** | 2026-05-05 |
