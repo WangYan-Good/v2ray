@@ -182,6 +182,9 @@ is_sh_dir=$is_core_dir/sh               # is_sh_dir    = /etc/xray/sh
 is_sh_repo=$author/$is_core             # is_sh_repo   = WangYan-Good/xray
 is_pkg="wget unzip jq qrencode"
 is_config_json=$is_core_dir/config.json # is_config_json = /etc/xray/config.json
+is_sub_dir=$is_core_dir/sub             # is_sub_dir = /etc/xray/sub
+is_mihomo_sub_file=$is_sub_dir/mihomo.yaml
+is_sub_token_file=$is_sub_dir/token
 is_caddy_bin=/usr/local/bin/caddy
 is_caddy_dir=/etc/caddy
 is_caddy_repo=caddyserver/caddy

@@ -487,6 +487,8 @@ create() {
         }
         # restart core
         [[ $is_api_fail ]] && manage restart &
+        load mihomo.sh
+        mihomo_refresh_file &>/dev/null || true
         ;;
     client)
         is_tls=tls
@@ -916,6 +918,8 @@ del() {
             nginx_config del
             nginx_reload
         }
+        load mihomo.sh
+        mihomo_refresh_file &>/dev/null || true
     fi
     if [[ ! $(ls $is_conf_dir | grep .json) && ! $is_change ]]; then
         warn "当前配置目录为空! 因为你刚刚删除了最后一个配置文件."
@@ -2186,6 +2190,8 @@ main() {
                 msg "fix: $v"
                 change $v full
             done
+            load mihomo.sh
+            mihomo_refresh_file &>/dev/null || true
             _green "\nfix 完成.\n"
             ;;
         *)
@@ -2237,6 +2243,18 @@ main() {
         else
             err "无法执行此操作"
         fi
+        ;;
+    mihomo | clash)
+        load mihomo.sh
+        mihomo_sub $2
+        ;;
+    refresh-sub | sub-refresh)
+        load mihomo.sh
+        mihomo_refresh_sub $2
+        ;;
+    sub-url)
+        load mihomo.sh
+        mihomo_sub_url $2
         ;;
     i | info)
         info $2

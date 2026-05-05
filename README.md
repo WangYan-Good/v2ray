@@ -766,6 +766,15 @@ xray qr VMess-WS-example.com.json
 
 # 查看 URL 链接
 xray url VMess-WS-example.com.json
+
+# 输出 Mihomo/Clash YAML
+xray mihomo
+
+# 生成静态订阅文件并配置 HTTP 订阅入口
+xray refresh-sub example.com
+
+# 查看 Mihomo HTTP 订阅地址
+xray sub-url example.com
 ```
 
 #### 更改配置
