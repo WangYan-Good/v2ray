@@ -249,10 +249,10 @@ mihomo_node() {
 ## 支持单个目标文件或扫描所有配置文件
 ##
 mihomo_sub() {
-    local target="$1"
+    local target="${1:-}"
     local old_dont_show="$is_dont_show_info"
     local old_dont_exit="$is_dont_auto_exit"
-    local files file node_names=()
+    local files file path node_names=()
 
     echo "mixed-port: 7890"
     echo "allow-lan: false"
@@ -266,7 +266,13 @@ mihomo_sub() {
         get file "$target"
         files=("$is_config_file")
     else
-        readarray -t files < <(ls -1 "$is_conf_dir" 2>/dev/null | grep -E '\.json$' | sed '/dynamic-port-.*-link/d')
+        files=()
+        for path in "$is_conf_dir"/*.json; do
+            [[ -e $path ]] || continue
+            file=${path##*/}
+            [[ $file == dynamic-port-*-link.json ]] && continue
+            files+=("$file")
+        done
     fi
 
     if [[ ${#files[@]} -eq 0 ]]; then
@@ -373,7 +379,7 @@ mihomo_refresh_sub() {
     local sub_host="${1:-$(mihomo_first_host)}"
     local token
     [[ ! -d $is_sub_dir ]] && mkdir -p "$is_sub_dir"
-    mihomo_sub >"$is_mihomo_sub_file"
+    mihomo_sub "" >"$is_mihomo_sub_file"
     chmod 644 "$is_mihomo_sub_file" 2>/dev/null
     token=$(mihomo_token)
 
@@ -395,7 +401,7 @@ mihomo_refresh_sub() {
 ##
 mihomo_refresh_file() {
     [[ ! -d $is_sub_dir ]] && mkdir -p "$is_sub_dir"
-    mihomo_sub >"$is_mihomo_sub_file"
+    mihomo_sub "" >"$is_mihomo_sub_file"
     chmod 644 "$is_mihomo_sub_file" 2>/dev/null
     mihomo_token >/dev/null
 }

@@ -857,21 +857,24 @@ README 仍使用 V2Ray 标题和描述，未反映 Xray 特性。
 | 字段 | 内容 |
 |------|------|
 | **优先级** | 🟡 P1 |
-| **状态** | ⬜ 未开始 |
+| **状态** | ✅ 已完成 |
 | **负责人** | - |
 | **预计工作量** | 4h |
 
 **具体任务**:
-- [ ] 19.1 创建 .github/workflows/ci.yml
-- [ ] 19.2 自动化测试运行
-- [ ] 19.3 代码检查 (shellcheck)
+- [x] 19.1 创建 .github/workflows/ci.yml
+- [x] 19.2 自动化测试运行
+- [x] 19.3 代码检查 (shellcheck)
 
 **验收标准**:
 - ✅ PR 时自动运行测试
+- ✅ `tests/run.sh` 可在本地和 CI 中运行所有 `testcase-*.sh`
+- ✅ CI 覆盖 Bash 语法、ShellCheck、JSON、命名一致性、协议完整性、发布打包契约、关键部署回归契约
 
 **实现方案**:
 1. 使用 GitHub Actions。
-2. 运行 testcase-*.sh (需脚本化)。
+2. 运行 `tests/testcase-*.sh`，由 `tests/run.sh` 统一调度。
+3. 保留独立 ShellCheck job，并在 `automated-tests` job 中运行脚本化回归用例。
 
 ---
 
