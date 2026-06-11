@@ -25,38 +25,8 @@ jobs:
           sudo apt-get install -y shellcheck
 
       - name: Run ShellCheck
-        # Exclude rules:
-        # SC1078 - here-doc warnings in nginx config generation (standard style)
-        # SC1090 - dynamic source/load() pattern, ShellCheck can't resolve
-        # SC2034 - vars appear unused but are dynamically sourced by load()
-        # SC2046 - unquoted command substitution in heredocs/cat is standard style
-        # SC2062 - unquoted grep patterns are standard project style
-        # SC2068 - project uses $@ without quoting as standard pattern
-        # SC2140 - unquoted text in echo/cat (standard project style)
-        # SC2145 - same as SC2068, array/string mixing in $@ usage
-        # SC2154 - dynamically sourced vars from load()
-        # SC2155 - project uses 'local var=$(cmd)' as a standard pattern
-        # SC2207 - array assignment from command output (standard style)
-        # SC2317 - helper functions appear unreachable but are called indirectly
-        run: |
-          echo "=== Checking install.sh ==="
-          shellcheck --severity=warning --exclude=SC1078,SC1090,SC2034,SC2046,SC2062,SC2068,SC2140,SC2145,SC2154,SC2155,SC2207,SC2317 install.sh
-
-          echo "=== Checking xray.sh ==="
-          shellcheck --severity=warning --exclude=SC1078,SC1090,SC2034,SC2046,SC2062,SC2068,SC2140,SC2145,SC2154,SC2155,SC2207,SC2317 xray.sh
-
-          echo "=== Checking src/*.sh (excluding core.sh) ==="
-          for f in src/*.sh; do
-            [[ "$f" == "src/core.sh" ]] && continue
-            echo "Checking $f..."
-            shellcheck --severity=warning --exclude=SC1078,SC1090,SC2034,SC2046,SC2062,SC2068,SC2140,SC2145,SC2154,SC2155,SC2207,SC2317 "$f"
-          done
-
-          echo "=== Checking src/core.sh (skipped: 2340 lines, too slow for ShellCheck) ==="
-          echo "⚠️ src/core.sh skipped (too large for CI ShellCheck)"
-          echo "   Run locally if needed: shellcheck src/core.sh"
-
-          echo "✅ All ShellCheck checks passed"
+        # ShellCheck rules and core.sh chunking are maintained in tests/shellcheck.sh.
+        run: bash tests/shellcheck.sh
 
   bash-syntax:
     name: Bash Syntax
