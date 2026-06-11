@@ -357,11 +357,12 @@ Other:
 
 | Job | Trigger | Checks |
 |-----|---------|--------|
-| **ShellCheck** | push to develop/main/master, PR to develop | Static analysis on all `.sh` files (excluding core.sh), with documented rule exclusions |
-| **Bash Syntax** | push to develop/main/master, PR to develop | `bash -n` syntax validation on all `.sh` files |
-| **JSON Validation** | push to develop/main/master, PR to develop | All `.json` files must parse successfully via `jq` |
-| **Naming Consistency** | push to develop/main/master, PR to develop | No V2Ray/v2ray remnants in source (except allowed contexts) |
-| **Protocol Completeness** | push to develop/main/master, PR to develop | All 8 required protocols present in `protocol_list` |
+| **ShellCheck** | push to develop/main/master, PR to develop/main/master | Static analysis on all `.sh` files (excluding core.sh), with documented rule exclusions |
+| **Bash Syntax** | push to develop/main/master, PR to develop/main/master | `bash -n` syntax validation on all `.sh` files |
+| **Automated Testcases** | push to develop/main/master, PR to develop/main/master, manual dispatch | Runs `tests/run.sh`, covering scripted `testcase-*.sh` workflow, release packaging contracts, protocol contracts, and deployment regression guards |
+| **JSON Validation** | push to develop/main/master, PR to develop/main/master | All `.json` files must parse successfully via `jq` |
+| **Naming Consistency** | push to develop/main/master, PR to develop/main/master | No V2Ray/v2ray remnants in source (except allowed contexts) |
+| **Protocol Completeness** | push to develop/main/master, PR to develop/main/master | All 8 required protocols present in `protocol_list` |
 
 ---
 

@@ -87,10 +87,12 @@ case $(uname -m) in
 amd64 | x86_64)
     is_jq_arch=amd64
     is_core_arch="64"
+    caddy_arch="amd64"
     ;;
 *aarch64* | *armv8*)
     is_jq_arch=arm64
     is_core_arch="arm64-v8a"
+    caddy_arch="arm64"
     ;;
 *)
     error_out "ARCH" "不支持的系统架构: $(uname -m)，脚本仅支持 x86_64 或 ARM64" "请使用 64 位系统运行脚本"
@@ -114,12 +116,16 @@ is_pkg="wget unzip"
 is_config_json=$is_core_dir/config.json # is_config_json = /etc/xray/config.json
 
 # Nginx 变量
+is_nginx_bin=/usr/sbin/nginx              # is_nginx_bin  = /usr/sbin/nginx
 is_nginx_dir=/etc/nginx                 # is_nginx_dir  = /etc/nginx
 is_nginx_file=$is_nginx_dir/nginx.conf  # is_nginx_file = /etc/nginx/nginx.conf
 is_nginx_conf=$is_nginx_dir/$is_core    # is_nginx_conf = /etc/nginx/xray
+is_nginx_repo=nginx/nginx
 
 # Caddy 变量
+is_caddy_bin=/usr/local/bin/caddy
 is_caddy_dir=/etc/caddy
+is_caddy_repo=caddyserver/caddy
 is_caddy_file=$is_caddy_dir/Caddyfile
 is_caddy_conf=$is_caddy_dir/$author
 tmp_var_lists=(
@@ -159,7 +165,7 @@ load() {
 
 # wget: 默认验证 SSL 证书，TLS 1.2+
 _wget() {
-    [[ $proxy ]] && export https_proxy=$proxy
+    [[ $proxy ]] && export http_proxy=$proxy https_proxy=$proxy HTTP_PROXY=$proxy HTTPS_PROXY=$proxy
     wget --secure-protocol=TLSv1_2 "$@"
 }
 
@@ -352,6 +358,7 @@ pass_args() {
                 err "($1) 缺少必需参数, 正确使用示例: [$1 http://127.0.0.1:2333 or -p socks5://127.0.0.1:2333]"
             }
             proxy=$2
+            export http_proxy=$proxy https_proxy=$proxy HTTP_PROXY=$proxy HTTPS_PROXY=$proxy
             shift 2
             ;;
         -v | --core-version)
@@ -879,15 +886,23 @@ main() {
     ## 初始化 TLS 配置（Nginx 或 Caddy）
     ##
     if [[ $is_install_nginx ]]; then
-        msg warn "初始化 Nginx 配置..."
-        create nginx new
+        msg warn "安装并初始化 Nginx 配置..."
+        load nginx.sh
+        install_nginx_certbot || exit_and_del_tmpdir
+        load systemd.sh
+        install_service nginx &>/dev/null
+        create nginx new || exit_and_del_tmpdir
 
         ##
         ## 设置 is_nginx 标志，避免端口占用警告
         ##
         is_nginx=1
     elif [[ $is_install_caddy ]]; then
-        msg warn "初始化 Caddy 配置..."
+        msg warn "安装并初始化 Caddy 配置..."
+        load download.sh
+        download caddy || exit_and_del_tmpdir
+        load systemd.sh
+        install_service caddy &>/dev/null
         create caddy new
         
         ##

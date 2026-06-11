@@ -357,11 +357,12 @@ xray <命令> [参数...]
 
 | 任务 | 触发条件 | 检查项 |
 |------|----------|--------|
-| **ShellCheck** | push 至 develop/main/master，PR 至 develop | 对所有 `.sh` 文件进行静态分析（排除 core.sh），排除规则已记录 |
-| **Bash 语法校验** | push 至 develop/main/master，PR 至 develop | 对所有 `.sh` 文件执行 `bash -n` 语法验证 |
-| **JSON 格式校验** | push 至 develop/main/master，PR 至 develop | 所有 `.json` 文件必须能被 `jq` 正常解析 |
-| **命名一致性** | push 至 develop/main/master，PR 至 develop | 源代码中无 V2Ray/v2ray 残留（除允许的上下文外） |
-| **协议完整性** | push 至 develop/main/master，PR 至 develop | `protocol_list` 中必须包含全部 8 个必需协议 |
+| **ShellCheck** | push 至 develop/main/master，PR 至 develop/main/master | 对所有 `.sh` 文件进行静态分析（排除 core.sh），排除规则已记录 |
+| **Bash 语法校验** | push 至 develop/main/master，PR 至 develop/main/master | 对所有 `.sh` 文件执行 `bash -n` 语法验证 |
+| **自动化测试用例** | push 至 develop/main/master，PR 至 develop/main/master，手动触发 | 执行 `tests/run.sh`，覆盖脚本化 `testcase-*.sh` 流程、发布打包契约、协议契约和关键部署回归保护 |
+| **JSON 格式校验** | push 至 develop/main/master，PR 至 develop/main/master | 所有 `.json` 文件必须能被 `jq` 正常解析 |
+| **命名一致性** | push 至 develop/main/master，PR 至 develop/main/master | 源代码中无 V2Ray/v2ray 残留（除允许的上下文外） |
+| **协议完整性** | push 至 develop/main/master，PR 至 develop/main/master | `protocol_list` 中必须包含全部 8 个必需协议 |
 
 ---
 

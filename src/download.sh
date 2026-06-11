@@ -97,7 +97,9 @@ download() {
     core)
         name=$is_core_name
         tmpfile=$tmpdir/$is_core.zip
-        link="https://github.com/${is_core_repo}/releases/download/${latest_ver}/${is_core}-linux-${is_core_arch}.zip"
+        core_file_name="${is_core}-linux-${is_core_arch}.zip"
+        [[ "$is_core_repo" == *"XTLS/Xray-core"* ]] && core_file_name="Xray-linux-${is_core_arch}.zip"
+        link="https://github.com/${is_core_repo}/releases/download/${latest_ver}/${core_file_name}"
         download_file
 
         ## SHA256 校验 (Xray-core)

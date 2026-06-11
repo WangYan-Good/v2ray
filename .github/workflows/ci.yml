@@ -4,7 +4,11 @@ on:
   push:
     branches: [develop, main, master]
   pull_request:
-    branches: [develop]
+    branches: [develop, main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   shellcheck:
@@ -76,6 +80,17 @@ jobs:
           done
 
           echo "✅ All bash syntax checks passed"
+
+  automated-tests:
+    name: Automated Testcases
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run scripted testcases
+        run: bash tests/run.sh
 
   json-validation:
     name: JSON Validation
