@@ -391,7 +391,7 @@ create() {
             is_dynamic_port_link_file=$is_json_file-link.json
             cat <<<$is_new_dynamic_port_json >$is_dynamic_port_link_file
         }
-        if [[ $is_new_install ]]; then
+        if [[ $is_new_install || ! -f $is_config_json ]]; then
             
             ##
             ## config.json
@@ -551,7 +551,7 @@ create() {
         ##
         ## 重新加载 nginx 以让配置生效
         ##
-        nginx_reload
+        nginx_reload || return 1
         ;;
     config.json)
         get_port

@@ -204,17 +204,19 @@ is_https_port=443
 ## core ver
 ##
 is_core_ver=$($is_core_bin version | head -n1 | cut -d " " -f1-2)
+is_core_major=${is_core_ver#* }
+is_core_major=${is_core_major%%.*}
 
-if [[ $(grep -o ^[0-9] <<<${is_core_ver#* }) -lt 5 ]]; then
+if [[ $is_core_major =~ ^[0-9]+$ && $is_core_major -lt 5 ]]; then
     # core version less than 5, e.g, v4.45.2
     is_core_ver_lt_5=1
-    if [[ $(grep 'run -config' /lib/systemd/system/$is_core.service) ]]; then
+    if [[ $EUID -eq 0 && -f /lib/systemd/system/$is_core.service && $(grep 'run -config' /lib/systemd/system/$is_core.service) ]]; then
         sed -i 's/run //' /lib/systemd/system/$is_core.service
         systemctl daemon-reload
     fi
 else
     is_with_run_arg=run
-    if [[ ! $(grep 'run -config' /lib/systemd/system/$is_core.service) ]]; then
+    if [[ $EUID -eq 0 && -f /lib/systemd/system/$is_core.service && ! $(grep 'run -config' /lib/systemd/system/$is_core.service) ]]; then
         sed -i 's/-config/run -config/' /lib/systemd/system/$is_core.service
         systemctl daemon-reload
     fi
