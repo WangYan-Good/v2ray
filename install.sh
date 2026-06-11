@@ -116,7 +116,7 @@ is_pkg="wget unzip"
 is_config_json=$is_core_dir/config.json # is_config_json = /etc/xray/config.json
 
 # Nginx 变量
-is_nginx_bin=/usr/sbin/nginx              # is_nginx_bin  = /usr/sbin/nginx
+is_nginx_bin=/usr/sbin/nginx            # is_nginx_bin  = /usr/sbin/nginx
 is_nginx_dir=/etc/nginx                 # is_nginx_dir  = /etc/nginx
 is_nginx_file=$is_nginx_dir/nginx.conf  # is_nginx_file = /etc/nginx/nginx.conf
 is_nginx_conf=$is_nginx_dir/$is_core    # is_nginx_conf = /etc/nginx/xray
@@ -189,7 +189,7 @@ msg() {
 # show help msg
 show_help() {
     echo -e "Usage: $0 [-f xxx | -l | -p xxx | -v xxx | --tls xxx | --uninstall | -h]"
-    echo -e "  -f, --core-file <path>          自定义 $is_core_name 文件路径, e.g., -f /root/${is_core}-linux-64.zip"
+    echo -e "  -f, --core-file <path>          自定义 $is_core_name 文件路径, e.g., -f /root/${is_core_name}-linux-64.zip"
     echo -e "  -l, --local-install             本地获取安装脚本, 使用当前目录"
     echo -e "  -p, --proxy <addr>              使用代理下载, e.g., -p http://127.0.0.1:2333"
     echo -e "  -v, --core-version <ver>        自定义 $is_core_name 版本, e.g., -v v5.4.1"
@@ -281,6 +281,9 @@ download() {
             rm -f "$dgst_tmp"
         fi
         mv -f "$tmpfile" "$is_ok"
+    else
+        error_out "DOWNLOAD" "下载 ${name} 失败" "检查网络或配置代理后重试: -p http://127.0.0.1:7890"
+        return $ERR_DOWNLOAD
     fi
 }
 
@@ -316,9 +319,15 @@ check_status() {
         [[ ! $is_fail ]] && {
             is_wget=1
             # 顺序下载替代并行 & (避免竞态条件 T7)
-            [[ ! $is_core_file ]] && download core
-            [[ ! $local_install ]] && download sh
-            [[ $jq_not_found ]] && download jq
+            if [[ ! $is_core_file ]]; then
+                download core || is_fail=1
+            fi
+            if [[ ! $local_install ]]; then
+                download sh || is_fail=1
+            fi
+            if [[ $jq_not_found ]]; then
+                download jq || is_fail=1
+            fi
             get_ip
             check_status
         }
@@ -595,6 +604,7 @@ main() {
     msg warn "[步骤 3/10] 安装依赖包..."
     read -r -a _pkg_list <<< "$is_pkg"
     install_pkg "${_pkg_list[@]}" &
+    install_pkg_pid=$!
     msg ok "  - 依赖包安装进行中 (后台)"
 
     # [步骤 4/10] 检查 jq
@@ -612,17 +622,17 @@ main() {
         # 顺序下载替代并行 & (避免竞态条件 T7)
         if [[ ! $is_core_file ]]; then
             msg warn "  - 开始下载 Xray 核心..."
-            download core
+            download core || exit_and_del_tmpdir
             msg ok "  - Xray 核心下载完成"
         fi
         if [[ ! $local_install ]]; then
             msg warn "  - 开始下载脚本..."
-            download sh
+            download sh || exit_and_del_tmpdir
             msg ok "  - 脚本下载完成"
         fi
         if [[ $jq_not_found ]]; then
             msg warn "  - 开始下载 jq..."
-            download jq
+            download jq || exit_and_del_tmpdir
             msg ok "  - jq 下载完成"
         fi
         get_ip
@@ -631,6 +641,9 @@ main() {
 
     # [步骤 6/10] 检查下载状态
     msg warn "[步骤 6/10] 检查下载状态..."
+    if [[ $install_pkg_pid ]]; then
+        wait "$install_pkg_pid" || true
+    fi
     msg ok "  - 所有文件下载完成"
 
     # [步骤 7/10] 检查下载状态
@@ -702,11 +715,17 @@ main() {
     msg ok "  - 已创建命令链接"
 
     # jq
-    [[ $jq_not_found ]] && mv -f "$is_jq_ok" /usr/bin/jq && msg ok "  - 已安装 jq"
+    jq_bin=$(type -P jq || true)
+    [[ $jq_not_found ]] && {
+        mv -f "$is_jq_ok" /usr/bin/jq
+        jq_bin=/usr/bin/jq
+        msg ok "  - 已安装 jq"
+    }
 
     # chmod
-    chmod +x "$is_core_bin" "$is_sh_bin" /usr/bin/jq
-    msg ok "  - 已设置执行权限：$is_core_bin, $is_sh_bin, /usr/bin/jq (+x)"
+    chmod +x "$is_core_bin" "$is_sh_bin"
+    [[ -n "$jq_bin" && -f "$jq_bin" ]] && chmod +x "$jq_bin"
+    msg ok "  - 已设置执行权限：$is_core_bin, $is_sh_bin${jq_bin:+, $jq_bin} (+x)"
 
     # create log dir
     mkdir -p "$is_log_dir"
@@ -1030,7 +1049,7 @@ main() {
             msg warn "请确保域名已正确解析到服务器 IP: $ip"
         fi
     else
-        msg "此协议不需要域名"
+        msg ok "此协议不需要域名"
         echo
         echo "请选择配置方式:"
         echo "1) 自动配置（随机生成端口、密码等参数）"

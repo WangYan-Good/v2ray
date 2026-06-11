@@ -277,7 +277,7 @@ xray version
 ./install.sh -l
 
 # 自定义核心文件
-./install.sh -f /root/xray-linux-64.zip
+./install.sh -f /root/Xray-linux-64.zip
 
 # 选择 TLS 方案
 ./install.sh --tls nginx   # Nginx + Certbot（多站点共存）

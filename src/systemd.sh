@@ -40,10 +40,10 @@ EOF
     ## 3. 设置 systemd 全局默认限制
     ##
     local systemd_conf="/etc/systemd/system.conf"
-    if [[ -f "$systemd_conf" ]] && ! grep -q 'DefaultLimitNOFILE=' "$systemd_conf" 2>/dev/null; then
-        sed -i 's/^#*DefaultLimitNOFILE=.*/DefaultLimitNOFILE=1048576/' "$systemd_conf"
-        # 如果原本没有该配置（sed 未匹配到），则添加
-        if ! grep -q 'DefaultLimitNOFILE=1048576' "$systemd_conf" 2>/dev/null; then
+    if [[ -f "$systemd_conf" ]]; then
+        if grep -q '^[[:space:]]*#*[[:space:]]*DefaultLimitNOFILE=' "$systemd_conf" 2>/dev/null; then
+            sed -i 's/^[[:space:]]*#*[[:space:]]*DefaultLimitNOFILE=.*/DefaultLimitNOFILE=1048576/' "$systemd_conf"
+        else
             echo "DefaultLimitNOFILE=1048576" >>"$systemd_conf"
         fi
     fi

@@ -39,22 +39,57 @@ get_xray_checksum() {
 
 ##
 ## 获取 Caddy 的 SHA256 校验和 (从 checksums.txt 文件)
-## checksums.txt 格式: 第一行=hash, 第二行=文件名 (两行一组)
+## 优先从 GitHub Release API 的 asset digest 字段读取，兜底解析 checksums.txt
 ## 用法: get_caddy_checksum <版本> <架构>
 ## 输出: SHA256 字符串 或 空
 ##
 get_caddy_checksum() {
     local ver="$1"
     local arch="$2"
+    local artifact="caddy_${ver#v}_linux_${arch}.tar.gz"
+    local api_url="https://api.github.com/repos/${is_caddy_repo}/releases/tags/${ver}"
     local base_url="https://github.com/${is_caddy_repo}/releases/download/${ver}"
     local checksum_url="${base_url}/caddy_${ver#v}_checksums.txt"
+    local tmp_release=$(mktemp)
     local tmp_checksum=$(mktemp)
+    local digest=""
 
-    if _wget -t 3 -q -c "$checksum_url" -O "$tmp_checksum" 2>/dev/null; then
-        # 两行一组: 第一行=hash, 第二行=文件名
-        grep -A1 "caddy_${ver#v}_linux_${arch}.tar.gz" "$tmp_checksum" 2>/dev/null | head -1
+    if _wget -t 3 -q -c "$api_url" -O "$tmp_release" 2>/dev/null; then
+        if command -v jq >/dev/null 2>&1; then
+            digest=$(jq -r --arg artifact "$artifact" '.assets[]? | select(.name == $artifact) | .digest // empty' "$tmp_release" 2>/dev/null | sed 's/^sha256://')
+        else
+            digest=$(awk -v artifact="$artifact" '
+                /"name":/ { found = index($0, "\"" artifact "\"") ? 1 : 0 }
+                found && /"digest":/ {
+                    line=$0
+                    sub(/^.*"digest":[[:space:]]*"/, "", line)
+                    sub(/".*$/, "", line)
+                    sub(/^sha256:/, "", line)
+                    print line
+                    exit
+                }
+            ' "$tmp_release" 2>/dev/null)
+        fi
     fi
-    rm -f "$tmp_checksum"
+
+    if [[ -z "$digest" ]] && _wget -t 3 -q -c "$checksum_url" -O "$tmp_checksum" 2>/dev/null; then
+        digest=$(awk -v artifact="$artifact" '
+            {
+                for (i = 1; i <= NF; i++) {
+                    if ($i ~ /^[A-Fa-f0-9]{64}$/) {
+                        hash = tolower($i)
+                    }
+                }
+                if (index($0, artifact) && hash) {
+                    print hash
+                    exit
+                }
+            }
+        ' "$tmp_checksum" 2>/dev/null)
+    fi
+
+    rm -f "$tmp_release" "$tmp_checksum"
+    [[ -n "$digest" ]] && printf '%s\n' "$digest"
 }
 
 get_latest_version() {

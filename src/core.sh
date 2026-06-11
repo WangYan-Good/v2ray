@@ -101,9 +101,9 @@ servername_list=(
     aws.amazon.com
 )
 
-is_random_ss_method=${ss_method_list[$(shuf -i 0-${#ss_method_list[@]} -n1) - 1]}
+is_random_ss_method=${ss_method_list[$(shuf -i 0-$((${#ss_method_list[@]} - 1)) -n1)]}
 is_random_header_type=${header_type_list[$(shuf -i 1-5 -n1)]} # random dont use none
-is_random_servername=${servername_list[$(shuf -i 0-${#servername_list[@]} -n1) - 1]}
+is_random_servername=${servername_list[$(shuf -i 0-$((${#servername_list[@]} - 1)) -n1)]}
 
 msg() {
     echo -e "$@"
