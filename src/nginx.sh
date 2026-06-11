@@ -1141,27 +1141,45 @@ nginx_certbot() {
 # 安装 Nginx + Certbot
 install_nginx_certbot() {
     _green "\n安装 Nginx + Certbot 实现自动配置 TLS.\n"
-    
-    # 检查是否已安装
-    if [[ -f $is_nginx_bin ]]; then
-        msg warn "Nginx 已安装，跳过安装"
+
+    local nginx_needs_install=
+    local certbot_needs_install=
+
+    if [[ ! -f $is_nginx_bin ]]; then
+        nginx_needs_install=1
+    elif [[ ! -f $is_nginx_file || ! -f $is_nginx_dir/mime.types ]]; then
+        msg warn "检测到 Nginx 配置不完整，正在恢复包默认配置"
+        nginx_needs_install=1
+    fi
+
+    if [[ ! $(type -P certbot) || ! $(type -P python3) ]]; then
+        certbot_needs_install=1
+    fi
+
+    if [[ ! $nginx_needs_install && ! $certbot_needs_install ]]; then
+        msg warn "Nginx 和 Certbot 已安装，跳过安装"
         is_nginx=1
-        return 0
-    fi
-    
-    msg warn "安装 Nginx 和 Certbot..."
-    
-    if [[ $cmd =~ apt-get ]]; then
-        # Ubuntu/Debian
-        $cmd update -y &>/dev/null
-        $cmd install nginx certbot python3-certbot-nginx -y &>/dev/null
     else
-        # CentOS
-        $cmd install epel-release -y &>/dev/null
-        $cmd update -y &>/dev/null
-        $cmd install nginx certbot python3-certbot-nginx -y &>/dev/null
+        msg warn "安装 Nginx 和 Certbot..."
+
+        if [[ $cmd =~ apt-get ]]; then
+            # Ubuntu/Debian
+            $cmd update -y &>/dev/null
+            if [[ $nginx_needs_install && -f $is_nginx_bin ]]; then
+                $cmd -o Dpkg::Options::=--force-confmiss install --reinstall nginx nginx-common -y &>/dev/null || $cmd install nginx nginx-common -y &>/dev/null
+            elif [[ $nginx_needs_install ]]; then
+                $cmd install nginx -y &>/dev/null
+            fi
+            [[ $certbot_needs_install ]] && $cmd install certbot python3-certbot-nginx -y &>/dev/null
+        else
+            # CentOS
+            $cmd install epel-release -y &>/dev/null
+            $cmd update -y &>/dev/null
+            [[ $nginx_needs_install ]] && $cmd install nginx -y &>/dev/null
+            [[ $certbot_needs_install ]] && $cmd install certbot python3-certbot-nginx -y &>/dev/null
+        fi
     fi
-    
+
     # 检查安装
     if [[ ! $(type -P nginx) ]]; then
         error_out "NGINX" "Nginx 安装失败" "1. 检查包管理器: $cmd update -y  2. 手动安装: $cmd install nginx"
@@ -1170,6 +1188,30 @@ install_nginx_certbot() {
 
     if [[ ! $(type -P certbot) ]]; then
         error_out "DEPENDENCY" "Certbot 安装失败" "1. 检查包管理器  2. 手动安装: $cmd install certbot python3-certbot-nginx"
+        return 1
+    fi
+
+    if [[ ! -f $is_nginx_dir/mime.types ]]; then
+        cat >$is_nginx_dir/mime.types <<'EOF'
+types {
+    text/html                             html htm shtml;
+    text/css                              css;
+    text/xml                              xml;
+    image/gif                             gif;
+    image/jpeg                            jpeg jpg;
+    application/javascript                js;
+    application/json                      json;
+    image/png                             png;
+    image/svg+xml                         svg svgz;
+    image/webp                            webp;
+    application/octet-stream              bin exe dll;
+}
+EOF
+        msg warn "Nginx mime.types 缺失，已生成最小兼容配置"
+    fi
+
+    if [[ ! -f $is_nginx_dir/mime.types ]]; then
+        error_out "NGINX" "Nginx 配置文件缺失: $is_nginx_dir/mime.types" "1. 重新安装 Nginx 包  2. 检查 $is_nginx_dir 目录是否被清理"
         return 1
     fi
     
@@ -1187,7 +1229,7 @@ install_nginx_certbot() {
     systemctl daemon-reload
     
     # 添加证书续期定时任务
-    if [[ ! $(crontab -l 2>/dev/null | grep -q 'certbot renew') ]]; then
+    if command -v crontab >/dev/null 2>&1 && ! crontab -l 2>/dev/null | grep -q 'certbot renew'; then
         (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'systemctl reload nginx'") | crontab -
         msg warn "已添加证书自动续期定时任务"
     fi

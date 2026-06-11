@@ -27,7 +27,7 @@ git push origin v1.0.3-release --tags
 
 ### 2. 查看发布进度
 
-访问：https://github.com/WangYan-Good/v2ray/actions
+访问：https://github.com/WangYan-Good/xray/actions
 
 ### 3. 发布完成后
 
