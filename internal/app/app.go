@@ -71,6 +71,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintln(stdout, shareURL)
 		return ExitOK
+	case "gen":
+		return runGen(commandArgs, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\n", command)
 		return ExitUsage
@@ -100,4 +102,70 @@ func matchNode(confDir string, args []string) (config.Node, error) {
 		name = args[0]
 	}
 	return config.MatchNode(confDir, name)
+}
+
+func runGen(args []string, stdout, stderr io.Writer) int {
+	format := "xray"
+	flags := flag.NewFlagSet("xray gen", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.StringVar(&format, "format", format, "generation format: xray, client, or mihomo")
+	if err := flags.Parse(args); err != nil {
+		fmt.Fprintln(stderr, err)
+		return ExitUsage
+	}
+
+	rest := flags.Args()
+	if format == "mihomo" && len(rest) == 0 {
+		out, err := protocol.MihomoDocument(protocol.DefaultProfiles())
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnsupported
+		}
+		fmt.Fprint(stdout, out)
+		return ExitOK
+	}
+	if len(rest) != 1 {
+		fmt.Fprintln(stderr, "profile name required")
+		return ExitUsage
+	}
+
+	profile, err := protocol.ProfileByName(rest[0])
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return ExitConfig
+	}
+
+	switch format {
+	case "xray":
+		out, err := protocol.XrayJSON(profile)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnsupported
+		}
+		fmt.Fprintln(stdout, string(out))
+		return ExitOK
+	case "client":
+		out, err := protocol.ClientJSON(profile)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnsupported
+		}
+		fmt.Fprintln(stdout, string(out))
+		return ExitOK
+	case "mihomo":
+		out, supported, reason, err := protocol.MihomoProxyYAML(profile)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnsupported
+		}
+		if !supported {
+			fmt.Fprintln(stderr, reason)
+			return ExitUnsupported
+		}
+		fmt.Fprint(stdout, out)
+		return ExitOK
+	default:
+		fmt.Fprintf(stderr, "unsupported gen format: %s\n", format)
+		return ExitUsage
+	}
 }

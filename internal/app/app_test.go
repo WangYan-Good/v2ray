@@ -72,3 +72,42 @@ func TestUnknownCommand(t *testing.T) {
 		t.Fatalf("stderr = %s", errOut)
 	}
 }
+
+func TestGenXrayReality(t *testing.T) {
+	code, out, errOut := run("gen", "--format", "xray", "vless-reality")
+	if code != ExitOK {
+		t.Fatalf("code = %d stderr = %s", code, errOut)
+	}
+	for _, want := range []string{
+		`"protocol": "vless"`,
+		`"security": "reality"`,
+		`"flow": "xtls-rprx-vision"`,
+		`"serverNames": [`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("gen xray output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestGenMihomoDefault(t *testing.T) {
+	code, out, errOut := run("gen", "--format", "mihomo")
+	if code != ExitOK {
+		t.Fatalf("code = %d stderr = %s", code, errOut)
+	}
+	for _, want := range []string{"reality-opts:", "xhttp-opts:", "type: ss", "type: socks5", "skip \"Trojan-XHTTP-TLS-example.com\""} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("gen mihomo output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestGenUnsupportedMihomoSingleNode(t *testing.T) {
+	code, out, errOut := run("gen", "--format", "mihomo", "trojan-xhttp-tls")
+	if code != ExitUnsupported {
+		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	if !strings.Contains(errOut, "mihomo trojan transport supports ws/grpc/tcp only") {
+		t.Fatalf("stderr = %s", errOut)
+	}
+}

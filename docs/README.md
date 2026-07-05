@@ -27,12 +27,14 @@ Chinese documents are the canonical active docs for this project. English mirror
 - System design: `03-architecture/system-design-zh.md`
 - Command matrix: `04-backend/command-matrix.md`
 - Go module design: `04-backend/go-module-design.md`
+- Protocol model design: `04-backend/protocol-model-design.md`
 - Protocol contracts: `07-data/protocol-contracts.md`
 - Release guide: `08-ops/release-guide.md`
 - Test strategy: `09-testing/test-strategy.md`
 - Go refactor plan: `10-project-management/go-refactor-plan.md`
 - Phase 0 baseline plan: `10-project-management/phase-0-baseline-plan.md`
 - Phase 1 Go CLI plan: `10-project-management/phase-1-go-cli-plan.md`
+- Phase 2 protocol generation plan: `10-project-management/phase-2-protocol-generation-plan.md`
 
 ## Maintenance Rules
 

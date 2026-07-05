@@ -106,10 +106,15 @@ internal/legacy/          Bash 兼容与迁移辅助
 - 优先覆盖当前已启用协议：REALITY、WS、gRPC、XHTTP、TCP、SS、Socks。
 - 生成 URL、客户端 JSON、Mihomo 节点。
 
+操作实施文档：`docs/10-project-management/phase-2-protocol-generation-plan.md`
+
 验收：
 
+- Go Profile 能覆盖 Phase 0 的 8 个协议 fixture。
 - Go 生成的 JSON 通过 `xray test` 或 fixture 校验。
 - 与 Bash 生成结果在关键字段上等价。
+- `gen` 预览命令只输出 stdout，不写系统文件。
+- Mihomo 生成包含支持节点和 Trojan XHTTP unsupported skip 注释。
 
 ### Phase 3: Nginx/Caddy 模板化
 
