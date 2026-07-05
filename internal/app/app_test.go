@@ -2,6 +2,8 @@ package app
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -63,12 +65,43 @@ func TestURLXHTTP(t *testing.T) {
 	}
 }
 
-func TestUnknownCommand(t *testing.T) {
-	code, _, errOut := run("add")
+func TestUnknownCommandIsNotDelegated(t *testing.T) {
+	code, _, errOut := run("definitely-missing")
 	if code != ExitUsage {
 		t.Fatalf("code = %d stderr = %s", code, errOut)
 	}
 	if !strings.Contains(errOut, "unknown command") {
+		t.Fatalf("stderr = %s", errOut)
+	}
+}
+
+func TestLegacyCommandDelegatesToBash(t *testing.T) {
+	dir := t.TempDir()
+	legacyPath := filepath.Join(dir, "xray.sh")
+	if err := os.WriteFile(legacyPath, []byte("#!/usr/bin/env bash\nprintf 'legacy args: %s\\n' \"$*\"\nexit 7\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XRAY_LEGACY_BIN", legacyPath)
+
+	code, out, errOut := run("add", "vws", "example.com")
+	if code != 7 {
+		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	if !strings.Contains(out, "legacy args: add vws example.com") {
+		t.Fatalf("stdout = %s", out)
+	}
+	if !strings.Contains(errOut, `delegating legacy command "add"`) {
+		t.Fatalf("stderr = %s", errOut)
+	}
+}
+
+func TestLegacyCommandMissingPath(t *testing.T) {
+	t.Setenv("XRAY_LEGACY_BIN", filepath.Join(t.TempDir(), "missing.sh"))
+	code, _, errOut := run("update")
+	if code != ExitConfig {
+		t.Fatalf("code = %d stderr = %s", code, errOut)
+	}
+	if !strings.Contains(errOut, "legacy command requires Bash entry") {
 		t.Fatalf("stderr = %s", errOut)
 	}
 }
@@ -187,5 +220,22 @@ func TestDownloadPlanUnsupportedArch(t *testing.T) {
 	}
 	if !strings.Contains(errOut, "unsupported architecture: riscv64") {
 		t.Fatalf("stderr = %s", errOut)
+	}
+}
+
+func TestSwitchPlan(t *testing.T) {
+	code, out, errOut := run("switch-plan")
+	if code != ExitOK {
+		t.Fatalf("code = %d stderr = %s", code, errOut)
+	}
+	for _, want := range []string{
+		"mode = go",
+		"entry = /usr/local/bin/xray",
+		"legacy = /etc/xray/sh/xray.sh",
+		"rollback = ln -sf /etc/xray/sh/xray.sh /usr/local/bin/xray",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("switch plan missing %q:\n%s", want, out)
+		}
 	}
 }

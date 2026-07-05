@@ -157,10 +157,15 @@ internal/legacy/          Bash 兼容与迁移辅助
 - 记录迁移警告和兼容路径。
 - 发布预览版本，允许用户回退到 Bash 版本。
 
+操作实施文档：`docs/10-project-management/phase-5-command-switch-plan.md`
+
 验收：
 
 - 主路径命令由 Go 执行。
-- 未迁移命令仍可用或明确提示。
+- 未迁移命令委托 `/etc/xray/sh/xray.sh`，并透传退出码。
+- legacy path 缺失时返回明确错误。
+- `switch-plan` 输出 Go 入口、legacy 路径和 rollback 步骤。
+- `install.sh` 官方在线安装路径默认安装 Go binary 到 `/usr/local/bin/xray`，并保留 Bash legacy 入口。
 
 ### Phase 6: 清理 Bash 旧实现
 

@@ -4,12 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"runtime"
 
 	"github.com/WangYan-Good/xray/internal/config"
 	"github.com/WangYan-Good/xray/internal/download"
 	frontendcaddy "github.com/WangYan-Good/xray/internal/frontend/caddy"
 	frontendnginx "github.com/WangYan-Good/xray/internal/frontend/nginx"
+	"github.com/WangYan-Good/xray/internal/legacy"
 	"github.com/WangYan-Good/xray/internal/protocol"
 	"github.com/WangYan-Good/xray/internal/ui"
 )
@@ -29,6 +31,14 @@ type options struct {
 }
 
 func Run(args []string, stdout, stderr io.Writer) int {
+	return RunWithIO(args, nil, stdout, stderr)
+}
+
+func RunWithIO(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return runApp(args, stdin, stdout, stderr, os.Getenv, legacy.OSRunner{})
+}
+
+func runApp(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv func(string) string, legacyRunner legacy.Runner) int {
 	opts, rest, err := parseArgs(args, stderr)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -79,7 +89,12 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runGen(commandArgs, stdout, stderr)
 	case "download-plan":
 		return runDownloadPlan(commandArgs, stdout, stderr)
+	case "switch-plan":
+		return runSwitchPlan(commandArgs, stdout, stderr)
 	default:
+		if legacy.IsLegacy(command) {
+			return legacy.Delegate(legacy.PathFromEnv(getenv), rest, stdin, stdout, stderr, legacyRunner)
+		}
 		fmt.Fprintf(stderr, "unknown command: %s\n", command)
 		return ExitUsage
 	}
@@ -234,5 +249,22 @@ func runDownloadPlan(args []string, stdout, stderr io.Writer) int {
 		return ExitConfig
 	}
 	fmt.Fprint(stdout, download.FormatPlan(plan))
+	return ExitOK
+}
+
+func runSwitchPlan(args []string, stdout, stderr io.Writer) int {
+	mode := "go"
+	flags := flag.NewFlagSet("xray switch-plan", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.StringVar(&mode, "mode", mode, "switch mode: go or rollback")
+	if err := flags.Parse(args); err != nil {
+		fmt.Fprintln(stderr, err)
+		return ExitUsage
+	}
+	if flags.NArg() != 0 {
+		fmt.Fprintln(stderr, "switch-plan does not accept positional arguments")
+		return ExitUsage
+	}
+	fmt.Fprint(stdout, legacy.FormatSwitchPlan(legacy.NewSwitchPlan(mode)))
 	return ExitOK
 }

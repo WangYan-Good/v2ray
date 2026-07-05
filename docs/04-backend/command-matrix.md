@@ -21,6 +21,8 @@
 | `url` | 无 | 只读 | 配置名 | 分享 URL | 无 | 可能触发公网 IP 探测 | P0 |
 | `qr` | 无 | 只读 | 配置名 | 二维码或二维码链接 | 无 | 可能调用 `qrencode` | P1 |
 | `gen` | 无 | 生成预览 | 协议和参数 | Xray inbound JSON | 无 | 无 | P0 |
+| `download-plan` | 无 | 生成预览 | 组件、版本、架构、代理 | 下载资产与安装步骤计划 | 无 | 无 | P3 |
+| `switch-plan` | 无 | 生成预览 | 可选模式 | Go/Bash 入口切换和回滚计划 | 无 | 无 | P3 |
 | `client` | `genc` | 生成预览 | 配置名 | 客户端 outbound/full JSON | 无 | 无 | P1 |
 | `add` | `a` | 写入 | 协议和参数 | 节点信息、URL | 写 `/etc/xray/conf`、可能写前端配置和订阅 | API 热加载、重启 Xray/Caddy/Nginx | P1 |
 | `change` | `c`, `config` | 写入 | 配置名、字段和值 | 更新后节点信息 | 重写节点 JSON、可能更新前端配置和订阅 | API 热加载、重启服务 | P2 |

@@ -5,7 +5,7 @@
 当推送匹配 `v*.*.*` 或 `v*-release` 格式的 tag 时，GitHub Actions 会自动：
 1. 打包 `code.zip`（包含 `xray.sh` 和 `src/` 目录）
 2. 创建 GitHub Release
-3. 上传 `code.zip` 和 `install.sh` 作为 release assets
+3. 上传 `code.zip`、`install.sh`、Go CLI tarball 和 `checksums.txt` 作为 release assets
 4. 自动生成更新日志
 
 ## 使用方法
@@ -34,6 +34,9 @@ git push origin v1.0.3-release --tags
 Release 会自动创建，包含：
 - ✅ `code.zip` - 脚本安装包
 - ✅ `install.sh` - 安装脚本
+- ✅ `xray-linux-amd64.tar.gz` - Go CLI amd64 预览入口
+- ✅ `xray-linux-arm64.tar.gz` - Go CLI arm64 预览入口
+- ✅ `checksums.txt` - Go CLI tarball SHA256
 - ✅ 自动生成的更新日志
 - ✅ 安装命令示例
 

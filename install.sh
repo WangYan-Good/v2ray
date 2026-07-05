@@ -88,11 +88,13 @@ amd64 | x86_64)
     is_jq_arch=amd64
     is_core_arch="64"
     caddy_arch="amd64"
+    is_go_arch="amd64"
     ;;
 *aarch64* | *armv8*)
     is_jq_arch=arm64
     is_core_arch="arm64-v8a"
     caddy_arch="arm64"
+    is_go_arch="arm64"
     ;;
 *)
     error_out "ARCH" "不支持的系统架构: $(uname -m)，脚本仅支持 x86_64 或 ARM64" "请使用 64 位系统运行脚本"
@@ -113,6 +115,7 @@ is_sh_bin=/usr/local/bin/$is_core       # is_sh_bin    = /usr/local/bin/xray
 is_sh_dir=$is_core_dir/sh               # is_sh_dir    = /etc/xray/sh
 is_sh_repo=$author/$is_core             # is_sh_repo   = WangYan-Good/xray
 is_pkg="wget unzip"
+is_pkg="$is_pkg tar"
 is_config_json=$is_core_dir/config.json # is_config_json = /etc/xray/config.json
 
 # Nginx 变量
@@ -132,18 +135,22 @@ tmp_var_lists=(
     tmpcore
     tmpsh
     tmpjq
+    tmpgo
     is_core_ok
     is_sh_ok
     is_jq_ok
+    is_go_ok
     is_pkg_ok
 )
 
 tmpcore=
 tmpsh=
 tmpjq=
+tmpgo=
 is_core_ok=
 is_sh_ok=
 is_jq_ok=
+is_go_ok=
 is_pkg_ok=
 
 # tmp dir
@@ -254,6 +261,13 @@ download() {
         tmpfile=$tmpjq
         is_ok=$is_jq_ok
         ;;
+    go)
+        go_asset="xray-linux-${is_go_arch}.tar.gz"
+        link=https://github.com/${is_sh_repo}/releases/latest/download/${go_asset}
+        name="$is_core_name Go CLI"
+        tmpfile=$tmpgo
+        is_ok=$is_go_ok
+        ;;
     esac
 
     msg warn "下载 ${name} > ${link}"
@@ -279,6 +293,39 @@ download() {
                 msg warn "无法获取 ${name} 校验文件，跳过验证"
             fi
             rm -f "$dgst_tmp"
+        fi
+        ## SHA256 校验 (Go CLI)
+        if [[ $1 == "go" ]]; then
+            checksum_link="https://github.com/${is_sh_repo}/releases/latest/download/checksums.txt"
+            checksum_tmp=$(mktemp)
+            if _wget -t 3 -q -c "$checksum_link" -O "$checksum_tmp" 2>/dev/null; then
+                expected_sha=$(awk -v artifact="$go_asset" '
+                    index($0, artifact) {
+                        for (i = 1; i <= NF; i++) {
+                            if ($i ~ /^[A-Fa-f0-9]{64}$/) {
+                                print tolower($i)
+                                exit
+                            }
+                        }
+                    }
+                ' "$checksum_tmp" 2>/dev/null)
+                if [[ -n "$expected_sha" ]]; then
+                    actual_sha=$(sha256sum "$tmpfile" | awk '{print $1}')
+                    if [[ "$actual_sha" == "$expected_sha" ]]; then
+                        msg ok "${name} 文件完整性验证通过"
+                    else
+                        rm -f "$checksum_tmp"
+                        err "${name} 文件校验和不匹配."
+                    fi
+                else
+                    rm -f "$checksum_tmp"
+                    err "无法在 checksums.txt 中找到 ${go_asset} 校验和."
+                fi
+            else
+                rm -f "$checksum_tmp"
+                err "无法获取 ${name} 校验文件."
+            fi
+            rm -f "$checksum_tmp"
         fi
         mv -f "$tmpfile" "$is_ok"
     else
@@ -315,6 +362,10 @@ check_status() {
             error_out "DOWNLOAD" "下载 jq 失败" "检查网络或配置代理后重试"
             is_fail=1
         }
+        [[ ! $local_install && ! -f "$is_go_ok" ]] && {
+            error_out "DOWNLOAD" "下载 ${is_core_name} Go CLI 失败" "检查网络或配置代理后重试；如需回退可使用本地安装模式保留 Bash 入口"
+            is_fail=1
+        }
     else
         [[ ! $is_fail ]] && {
             is_wget=1
@@ -324,6 +375,7 @@ check_status() {
             fi
             if [[ ! $local_install ]]; then
                 download sh || is_fail=1
+                download go || is_fail=1
             fi
             if [[ $jq_not_found ]]; then
                 download jq || is_fail=1
@@ -629,6 +681,9 @@ main() {
             msg warn "  - 开始下载脚本..."
             download sh || exit_and_del_tmpdir
             msg ok "  - 脚本下载完成"
+            msg warn "  - 开始下载 Go CLI..."
+            download go || exit_and_del_tmpdir
+            msg ok "  - Go CLI 下载完成"
         fi
         if [[ $jq_not_found ]]; then
             msg warn "  - 开始下载 jq..."
@@ -710,9 +765,20 @@ main() {
     echo "alias $is_core=$is_sh_bin" >>/root/.bashrc
     msg ok "  - 已添加别名"
 
-    # core command
-    ln -sf "$is_sh_dir/$is_core.sh" "$is_sh_bin"
-    msg ok "  - 已创建命令链接"
+    # command entry: Go CLI by default, Bash legacy as fallback
+    if [[ -f "$is_go_ok" ]]; then
+        mkdir -p "$tmpdir/go-cli"
+        if ! tar zxf "$is_go_ok" -C "$tmpdir/go-cli" &>/dev/null || [[ ! -f "$tmpdir/go-cli/$is_core" ]]; then
+            error_out "CONFIG" "Go CLI 解压失败" "检查 release asset: xray-linux-${is_go_arch}.tar.gz"
+            exit_and_del_tmpdir
+        fi
+        cp -f "$tmpdir/go-cli/$is_core" "$is_sh_bin"
+        msg ok "  - 已安装 Go CLI 入口：$is_sh_bin"
+        msg ok "  - 已保留 Bash 兼容入口：$is_sh_dir/$is_core.sh"
+    else
+        ln -sf "$is_sh_dir/$is_core.sh" "$is_sh_bin"
+        msg warn "  - 本地安装模式未提供 Go CLI，已回退为 Bash 命令链接"
+    fi
 
     # jq
     jq_bin=$(type -P jq || true)
