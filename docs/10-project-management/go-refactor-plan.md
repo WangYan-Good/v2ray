@@ -88,10 +88,16 @@ internal/legacy/          Bash 兼容与迁移辅助
 - 从 `/etc/xray/conf/*.json` 读取现有节点配置。
 - 输出保持和当前脚本大体兼容。
 
+操作实施文档：`docs/10-project-management/phase-1-go-cli-plan.md`
+
 验收：
 
 - Go CLI 能读取真实或 fixture 配置并生成节点信息。
 - 不写系统文件，不影响现有 Bash 安装。
+- `go test ./...` 通过。
+- `go run ./cmd/xray --conf-dir tests/fixtures/xray-conf info vless-reality` 能输出 REALITY 稳定字段。
+- `go run ./cmd/xray --conf-dir tests/fixtures/xray-conf url vless-xhttp` 能输出包含 `security=tls`、`type=xhttp`、`path` 的 VLESS URL。
+- 新增只读 Go CLI 契约测试接入 `tests/run.sh`。
 
 ### Phase 2: 协议模型与配置生成
 
@@ -193,6 +199,6 @@ internal/legacy/          Bash 兼容与迁移辅助
 
 - [x] 新增 `docs/09-testing/test-strategy.md`，定义 fixture 和容器测试策略。
 - [x] 新增 `docs/04-backend/command-matrix.md`，梳理 Phase 0 命令矩阵与兼容优先级。
-- [ ] 新增 `docs/04-backend/go-module-design.md`，细化 Go 包结构。
+- [x] 新增 `docs/04-backend/go-module-design.md`，细化 Go 包结构。
 - [x] 修复 Nginx + Certbot 自动续期问题，作为 Go 重构前的 Bash 主线稳定项。
 - [x] 为当前协议生成逻辑建立快照样例。
