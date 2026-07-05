@@ -884,49 +884,49 @@ del() {
     [[ $is_conf_dir_empty ]] && return # not found any json file.
     # get a config file
     [[ ! $is_config_file ]] && get info $1
-    if [[ $is_config_file ]]; then
-        if [[ $is_main_start && ! $is_no_del_msg ]]; then
-            msg "\n是否删除配置文件?: $is_config_file"
-            pause
-        fi
-        # 在删除 JSON 文件之前，提取 path 供 nginx_config del 使用
-        is_del_json_path=$(jq -r '.inbounds[0].streamSettings.xhttpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // .inbounds[0].streamSettings.httpSettings.path // .inbounds[0].settings.path // empty' "$is_conf_dir/$is_config_file" 2>/dev/null)
-        api del $is_conf_dir/"$is_config_file" $is_dynamic_port_file &>/dev/null
-        rm -rf $is_conf_dir/"$is_config_file" $is_dynamic_port_file
-        [[ $is_api_fail && ! $is_new_json ]] && manage restart &
-        [[ ! $is_no_del_msg ]] && _green "\n已删除: $is_config_file\n"
-
-        [[ $is_caddy ]] && {
-            is_del_host=$host
-            [[ $is_change ]] && {
-                [[ ! $old_host ]] && return # no host exist or not set new host;
-                is_del_host=$old_host
-            }
-            if [[ $is_del_host && $host != $old_host && ! $is_no_auto_tls ]]; then
-                rm -rf $is_caddy_conf/$is_del_host.conf $is_caddy_conf/$is_del_host.conf.add
-                [[ ! $is_new_json ]] && manage restart caddy &
-            elif [[ $is_del_host && ! $is_no_auto_tls ]]; then
-                # 同域名多协议共存：从 .add 中删除对应的 reverse_proxy 行
-                load caddy.sh
-                is_caddy_site_file=$is_caddy_conf/$is_del_host.conf
-                caddy_config del
-                [[ ! $is_new_json ]] && manage restart caddy &
-            fi
-        }
-        [[ $is_nginx ]] && {
-            load nginx.sh
-            nginx_config del
-            nginx_reload
-        }
-        load mihomo.sh
-        mihomo_refresh_file &>/dev/null || true
+    [[ ! $is_config_file ]] && return 1
+    if [[ $is_main_start && ! $is_no_del_msg ]]; then
+        msg "\n是否删除配置文件?: $is_config_file"
+        pause
     fi
+    # 在删除 JSON 文件之前，提取 path 供 nginx_config del 使用
+    is_del_json_path=$(jq -r '.inbounds[0].streamSettings.xhttpSettings.path // .inbounds[0].streamSettings.grpcSettings.serviceName // .inbounds[0].streamSettings.httpSettings.path // .inbounds[0].settings.path // empty' "$is_conf_dir/$is_config_file" 2>/dev/null)
+    api del $is_conf_dir/"$is_config_file" $is_dynamic_port_file &>/dev/null
+    rm -rf $is_conf_dir/"$is_config_file" $is_dynamic_port_file
+    [[ $is_api_fail && ! $is_new_json ]] && manage restart &
+    [[ ! $is_no_del_msg ]] && _green "\n已删除: $is_config_file\n"
+
+    [[ $is_caddy ]] && {
+        is_del_host=$host
+        [[ $is_change ]] && {
+            [[ ! $old_host ]] && return # no host exist or not set new host;
+            is_del_host=$old_host
+        }
+        if [[ $is_del_host && $host != $old_host && ! $is_no_auto_tls ]]; then
+            rm -rf $is_caddy_conf/$is_del_host.conf $is_caddy_conf/$is_del_host.conf.add
+            [[ ! $is_new_json ]] && manage restart caddy &
+        elif [[ $is_del_host && ! $is_no_auto_tls ]]; then
+            # 同域名多协议共存：从 .add 中删除对应的 reverse_proxy 行
+            load caddy.sh
+            is_caddy_site_file=$is_caddy_conf/$is_del_host.conf
+            caddy_config del
+            [[ ! $is_new_json ]] && manage restart caddy &
+        fi
+    }
+    [[ $is_nginx && $host ]] && {
+        load nginx.sh
+        nginx_config del
+        nginx_reload
+    }
+    load mihomo.sh
+    mihomo_refresh_file &>/dev/null || true
     if [[ ! $(ls $is_conf_dir | grep .json) && ! $is_change ]]; then
         warn "当前配置目录为空! 因为你刚刚删除了最后一个配置文件."
         is_conf_dir_empty=1
     fi
     unset is_dont_get_ip
     [[ $is_dont_auto_exit ]] && unset is_config_file
+    return 0
 }
 
 # uninstall
@@ -1088,8 +1088,11 @@ add() {
         ws | h2 | grpc | vws | vh2 | vgrpc | tws | th2 | tgrpc)
             is_new_protocol=$(sed -E "s/^V/VLESS-/;s/^T/Trojan-/;/^(W|H|G)/{s/^/VMess-/};s/G/g/" <<<${is_lower^^})-TLS
             ;;
-        vxhttp | txhttp)
-            is_new_protocol=$(sed -E "s/^V/VLESS-/;s/^T/Trojan-/" <<<${is_lower^^})
+        vxhttp)
+            is_new_protocol=VLESS-XHTTP-TLS
+            ;;
+        txhttp)
+            is_new_protocol=Trojan-XHTTP-TLS
             ;;
         r | reality)
             is_new_protocol=VLESS-XTLS-uTLS-REALITY
@@ -1120,6 +1123,19 @@ add() {
     [[ ! $is_new_protocol ]] && ask set_protocol
 
     case ${is_new_protocol,,} in
+    *-xhttp-tls)
+        is_use_tls=1
+        is_xhttp=1
+        is_use_port=$2
+        if [[ ${is_new_protocol,,} == trojan* ]]; then
+            is_use_pass=$3
+        else
+            is_use_uuid=$3
+        fi
+        is_use_host=$4
+        is_use_path=$5
+        is_add_opts="[port] [uuid|password] [host] [path]"
+        ;;
     *-tls)
         is_use_tls=1
         is_use_host=$2
@@ -1140,15 +1156,7 @@ add() {
             is_add_opts="[port] [uuid] [type]"
         fi
         ;;
-    *-xhttp-tls)
-        is_xhttp=1
-        is_use_port=$2
-        is_use_uuid=$3
-        is_use_host=$4
-        is_use_path=$5
-        is_add_opts="[port] [uuid] [host] [path]"
-        ;;
-    reality)
+    *reality*)
         is_reality=1
         is_use_port=$2
         is_use_uuid=$3
@@ -1285,6 +1293,7 @@ add() {
             get dynamic-port-test
         fi
         [[ $is_use_pass ]] && ss_password=$is_use_pass
+        [[ $is_use_pass && ${is_new_protocol,,} == trojan* ]] && trojan_password=$is_use_pass
         [[ $is_use_host ]] && host=$is_use_host
         [[ $is_use_door_addr ]] && door_addr=$is_use_door_addr
         [[ $is_use_servername ]] && is_servername=$is_use_servername
@@ -2205,6 +2214,7 @@ main() {
             is_dont_auto_exit=1
             [[ ! $2 ]] && {
                 err "无法找到需要删除的参数"
+                return 1
             } || {
                 for v in ${@:2}; do
                     del $v
@@ -2218,6 +2228,7 @@ main() {
             [[ $is_caddy ]] && manage restart caddy &
             [[ $is_nginx ]] && manage restart nginx &
         }
+        return 0
         ;;
     dns)
         load dns.sh
