@@ -111,3 +111,53 @@ func TestGenUnsupportedMihomoSingleNode(t *testing.T) {
 		t.Fatalf("stderr = %s", errOut)
 	}
 }
+
+func TestGenFrontendTemplates(t *testing.T) {
+	tests := []struct {
+		args []string
+		want []string
+	}{
+		{
+			args: []string{"gen", "--format", "nginx", "vless-ws-tls"},
+			want: []string{
+				"location /.well-known/acme-challenge/",
+				"proxy_pass http://127.0.0.1:10002;",
+				"include /etc/nginx/xray/example.com.conf.add;",
+			},
+		},
+		{
+			args: []string{"gen", "--format", "nginx-add", "vless-grpc-tls"},
+			want: []string{"location /xray-grpc/", "grpc_pass grpc://127.0.0.1:10003;"},
+		},
+		{
+			args: []string{"gen", "--format", "caddy", "vless-xhttp-tls"},
+			want: []string{"reverse_proxy /xray-test 127.0.0.1:10004", "import /etc/caddy/WangYan-Good/example.com.conf.add"},
+		},
+		{
+			args: []string{"gen", "--format", "caddy-add", "trojan-xhttp-tls"},
+			want: []string{"reverse_proxy /xray-test 127.0.0.1:10005"},
+		},
+	}
+
+	for _, tt := range tests {
+		code, out, errOut := run(tt.args...)
+		if code != ExitOK {
+			t.Fatalf("%v code = %d stderr = %s", tt.args, code, errOut)
+		}
+		for _, want := range tt.want {
+			if !strings.Contains(out, want) {
+				t.Fatalf("%v output missing %q:\n%s", tt.args, want, out)
+			}
+		}
+	}
+}
+
+func TestGenFrontendRejectsDirectProtocol(t *testing.T) {
+	code, out, errOut := run("gen", "--format", "nginx", "vless-reality")
+	if code != ExitUnsupported {
+		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	if !strings.Contains(errOut, "no TLS frontend host") {
+		t.Fatalf("stderr = %s", errOut)
+	}
+}

@@ -6,6 +6,8 @@ import (
 	"io"
 
 	"github.com/WangYan-Good/xray/internal/config"
+	frontendcaddy "github.com/WangYan-Good/xray/internal/frontend/caddy"
+	frontendnginx "github.com/WangYan-Good/xray/internal/frontend/nginx"
 	"github.com/WangYan-Good/xray/internal/protocol"
 	"github.com/WangYan-Good/xray/internal/ui"
 )
@@ -108,7 +110,7 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 	format := "xray"
 	flags := flag.NewFlagSet("xray gen", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	flags.StringVar(&format, "format", format, "generation format: xray, client, or mihomo")
+	flags.StringVar(&format, "format", format, "generation format: xray, client, mihomo, nginx, nginx-add, caddy, or caddy-add")
 	if err := flags.Parse(args); err != nil {
 		fmt.Fprintln(stderr, err)
 		return ExitUsage
@@ -160,6 +162,38 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 		}
 		if !supported {
 			fmt.Fprintln(stderr, reason)
+			return ExitUnsupported
+		}
+		fmt.Fprint(stdout, out)
+		return ExitOK
+	case "nginx":
+		out, err := frontendnginx.RenderSite(profile)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnsupported
+		}
+		fmt.Fprint(stdout, out)
+		return ExitOK
+	case "nginx-add":
+		out, err := frontendnginx.RenderAdd(profile)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnsupported
+		}
+		fmt.Fprint(stdout, out)
+		return ExitOK
+	case "caddy":
+		out, err := frontendcaddy.RenderSite(profile)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnsupported
+		}
+		fmt.Fprint(stdout, out)
+		return ExitOK
+	case "caddy-add":
+		out, err := frontendcaddy.RenderAdd(profile)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
 			return ExitUnsupported
 		}
 		fmt.Fprint(stdout, out)

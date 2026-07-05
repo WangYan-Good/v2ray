@@ -123,10 +123,15 @@ internal/legacy/          Bash 兼容与迁移辅助
 - 实现路径冲突检测、include 修复、配置测试和 reload。
 - 修复 Certbot 自动续期模型：Nginx 模式默认使用 webroot，并确保 renewal 配置不依赖 standalone。
 
+操作实施文档：`docs/10-project-management/phase-3-frontend-template-plan.md`
+
 验收：
 
 - 同域名多协议追加不覆盖已有配置。
-- `certbot renew --dry-run` 在 Nginx 运行时可通过。
+- Go 模板能生成 Nginx/Caddy 完整站点和 `.add` 追加片段。
+- 路径冲突检测能区分可追加、幂等和冲突。
+- Certbot renewal standalone 会被识别并生成 webroot 修复文本。
+- `certbot renew --dry-run` 作为 Nginx 操作计划的一部分固定；真实 VPS 验收时在 Nginx 运行状态下执行。
 
 ### Phase 4: 安装、更新、下载
 
