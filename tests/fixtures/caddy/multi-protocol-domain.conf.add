@@ -1,0 +1,21 @@
+# Xray gRPC
+reverse_proxy /xray-grpc/* h2c://127.0.0.1:10003
+
+# Xray XHTTP
+reverse_proxy /xray-xhttp 127.0.0.1:10004
+
+# conflict sample: same path as primary route but different upstream port
+reverse_proxy /xray-test 127.0.0.1:10999
+
+# xray-mihomo-sub-start
+@xray_mihomo_sub {
+    path /sub/mihomo
+    query token=fixture-token
+}
+handle @xray_mihomo_sub {
+    root * /etc/xray/sub
+    rewrite * /mihomo.yaml
+    header Content-Type text/yaml
+    file_server
+}
+# xray-mihomo-sub-end

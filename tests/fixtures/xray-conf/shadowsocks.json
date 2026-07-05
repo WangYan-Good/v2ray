@@ -1,0 +1,22 @@
+{
+  "inbounds": [
+    {
+      "tag": "Shadowsocks-10007.json",
+      "port": 10007,
+      "listen": "0.0.0.0",
+      "protocol": "shadowsocks",
+      "settings": {
+        "method": "aes-256-gcm",
+        "password": "example-password",
+        "network": "tcp,udp"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      }
+    }
+  ]
+}

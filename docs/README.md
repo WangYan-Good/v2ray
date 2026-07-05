@@ -25,8 +25,12 @@ Chinese documents are the canonical active docs for this project. English mirror
 
 - Product requirements: `01-product/prd-zh.md`
 - System design: `03-architecture/system-design-zh.md`
+- Command matrix: `04-backend/command-matrix.md`
+- Protocol contracts: `07-data/protocol-contracts.md`
 - Release guide: `08-ops/release-guide.md`
+- Test strategy: `09-testing/test-strategy.md`
 - Go refactor plan: `10-project-management/go-refactor-plan.md`
+- Phase 0 baseline plan: `10-project-management/phase-0-baseline-plan.md`
 
 ## Maintenance Rules
 

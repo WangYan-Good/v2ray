@@ -790,6 +790,162 @@ server {
     fi
 }
 
+nginx_certbot_renewal_file() {
+    local domain="$1"
+    echo "/etc/letsencrypt/renewal/${domain}.conf"
+}
+
+nginx_certbot_renewal_authenticator() {
+    local renewal_file="$1"
+    [[ -f "$renewal_file" ]] || return 1
+    awk -F= '
+        /^[[:space:]]*authenticator[[:space:]]*=/ {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+            print $2
+            exit
+        }
+    ' "$renewal_file"
+}
+
+nginx_certbot_ensure_webroot_renewal() {
+    local domain="$1"
+    local renewal_file
+    local authenticator
+    local tmp_file
+    renewal_file=$(nginx_certbot_renewal_file "$domain")
+    [[ -f "$renewal_file" ]] || return 0
+
+    authenticator=$(nginx_certbot_renewal_authenticator "$renewal_file")
+    [[ "$authenticator" == "webroot" ]] && grep -qF "webroot_path = /var/www/certbot," "$renewal_file" && grep -qF "${domain} = /var/www/certbot" "$renewal_file" && return 0
+
+    if grep -qF "authenticator = standalone" "$renewal_file" || [[ "$authenticator" == "standalone" ]]; then
+        msg warn "检测到 standalone renewal 配置，正在迁移为 webroot: $renewal_file"
+    fi
+    cp -f "$renewal_file" "${renewal_file}.bak.$(date +%Y%m%d%H%M%S)" || {
+        error_out "CERT" "无法备份 Certbot renewal 配置: $renewal_file" "请检查文件权限后重试"
+        return 1
+    }
+
+    tmp_file=$(mktemp)
+    awk '
+        /^[[:space:]]*authenticator[[:space:]]*=/ {
+            print "authenticator = webroot"
+            saw_auth = 1
+            next
+        }
+        /^[[:space:]]*webroot_path[[:space:]]*=/ {
+            print "webroot_path = /var/www/certbot,"
+            saw_path = 1
+            next
+        }
+        { print }
+        END {
+            if (!saw_auth) print "authenticator = webroot"
+            if (!saw_path) print "webroot_path = /var/www/certbot,"
+        }
+    ' "$renewal_file" >"$tmp_file" || {
+        rm -f "$tmp_file"
+        error_out "CERT" "无法重写 Certbot renewal 配置: $renewal_file" "请检查文件格式后重试"
+        return 1
+    }
+
+    if ! grep -qF "[[webroot_map]]" "$tmp_file"; then
+        {
+            echo "[[webroot_map]]"
+            echo "${domain} = /var/www/certbot"
+        } >>"$tmp_file"
+    elif ! grep -qF "${domain} = /var/www/certbot" "$tmp_file"; then
+        echo "${domain} = /var/www/certbot" >>"$tmp_file"
+    fi
+
+    mv -f "$tmp_file" "$renewal_file" || {
+        rm -f "$tmp_file"
+        error_out "CERT" "无法保存 Certbot renewal 配置: $renewal_file" "请检查文件权限后重试"
+        return 1
+    }
+}
+
+nginx_certbot_ensure_all_webroot_renewals() {
+    local renewal_file domain
+    shopt -s nullglob
+    for renewal_file in /etc/letsencrypt/renewal/*.conf; do
+        domain=${renewal_file##*/}
+        domain=${domain%.conf}
+        nginx_certbot_ensure_webroot_renewal "$domain" || return 1
+    done
+    shopt -u nullglob
+}
+
+nginx_certbot_prepare_webroot_challenge() {
+    local domain="$1"
+    local challenge_file="$is_nginx_conf/${domain}.certbot.conf"
+    local pending_site="${is_nginx_site_file}.pending-certbot"
+
+    mkdir -p /var/www/certbot/.well-known/acme-challenge "$is_nginx_conf"
+    is_certbot_challenge_file="$challenge_file"
+    is_certbot_pending_site=
+
+    if [[ -f "$is_nginx_site_file" ]] && ! nginx -t &>/dev/null; then
+        mv -f "$is_nginx_site_file" "$pending_site" || {
+            error_out "NGINX" "无法临时移动 Nginx 站点配置以申请证书" "请检查权限: $is_nginx_site_file"
+            return 1
+        }
+        is_certbot_pending_site="$pending_site"
+        msg warn "当前站点配置暂不可用，已切换到 ACME challenge 临时配置"
+    fi
+
+    cat >"$challenge_file" <<EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${domain};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+}
+EOF
+
+    if ! nginx -t &>/dev/null; then
+        nginx_certbot_cleanup_webroot_challenge "$domain"
+        error_out "NGINX" "Nginx webroot challenge 配置测试失败" "1. 查看详细错误: nginx -t 2>&1  2. 检查配置文件: $challenge_file"
+        return 1
+    fi
+
+    if pgrep -f "nginx: master" &>/dev/null; then
+        systemctl reload nginx &>/dev/null || nginx -s reload &>/dev/null || {
+            nginx_certbot_cleanup_webroot_challenge "$domain"
+            error_out "SERVICE" "Nginx reload 失败，无法使用 webroot 申请证书" "1. 检查 Nginx: nginx -t  2. 查看日志: journalctl -u nginx -n 50"
+            return 1
+        }
+    else
+        systemctl start nginx &>/dev/null || {
+            nginx_certbot_cleanup_webroot_challenge "$domain"
+            error_out "SERVICE" "Nginx 启动失败，无法使用 webroot 申请证书" "1. 检查 Nginx: nginx -t  2. 查看日志: journalctl -u nginx -n 50"
+            return 1
+        }
+    fi
+}
+
+nginx_certbot_cleanup_webroot_challenge() {
+    local domain="$1"
+    local pending_site="${is_nginx_site_file}.pending-certbot"
+
+    [[ -n "$is_certbot_challenge_file" ]] && rm -f "$is_certbot_challenge_file"
+    if [[ -n "$is_certbot_pending_site" && -f "$is_certbot_pending_site" ]]; then
+        mv -f "$is_certbot_pending_site" "$is_nginx_site_file"
+    elif [[ -f "$pending_site" && ! -f "$is_nginx_site_file" ]]; then
+        mv -f "$pending_site" "$is_nginx_site_file"
+    fi
+    is_certbot_challenge_file=
+    is_certbot_pending_site=
+    nginx -t &>/dev/null && {
+        if pgrep -f "nginx: master" &>/dev/null; then
+            systemctl reload nginx &>/dev/null || nginx -s reload &>/dev/null || true
+        fi
+    }
+}
+
 # 使用 Certbot 申请/续期证书
 nginx_certbot() {
     local action=$1
@@ -916,222 +1072,60 @@ nginx_certbot() {
             fi
         fi
 
-        # 首次申请证书：使用 standalone 模式（不需要 Nginx 运行）
-        # 续期证书：使用 webroot 模式（需要 Nginx 运行）
-        if [[ $has_valid_cert == true ]]; then
-            # 续期：使用 webroot 模式
-            msg warn "Nginx 未运行，正在启动..."
-            systemctl start nginx &>/dev/null
-            sleep 2
-            if ! pgrep -f "nginx: master" &>/dev/null; then
-                error_out "SERVICE" "Nginx 启动失败，无法申请证书" "1. 检查 Nginx 配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
-                return 1
-            fi
-            msg ok "Nginx 已启动"
+        msg warn "正在使用 webroot 模式申请/续期 SSL 证书..."
+        nginx_certbot_ensure_webroot_renewal "$domain" || return 1
+        nginx_certbot_prepare_webroot_challenge "$domain" || return 1
 
-            # 测试 Nginx 配置并重载
-            if ! nginx -t &>/dev/null; then
-                error_out "NGINX" "Nginx 配置测试失败" "1. 查看详细错误: nginx -t 2>&1  2. 检查配置文件: cat $is_nginx_file"
-                nginx -t 2>&1 | tail -5
-                return 1
-            fi
-            nginx -s reload &>/dev/null
-            sleep 1
+        certbot certonly --webroot \
+            -w /var/www/certbot \
+            -d ${domain} \
+            --email admin@${domain} \
+            --agree-tos \
+            --non-interactive \
+            --force-renewal \
+            $(_is_certbot_support_ecdsa && echo "--key-type ecdsa") 2>&1 | while IFS= read -r line; do
+                [[ $line ]] && msg info "  $line"
+            done
+        certbot_exit_code=${PIPESTATUS[0]}
+        nginx_certbot_cleanup_webroot_challenge "$domain"
 
-            # 验证挑战文件
-            msg warn "验证 Nginx 配置..."
-            local test_file="/var/www/certbot/.well-known/acme-challenge/test"
-            mkdir -p "$(dirname $test_file)"
-            echo "test" > $test_file
-            sleep 1
-            if ! curl -s --connect-timeout 3 "http://localhost/.well-known/acme-challenge/test" | grep -q "test"; then
-                error_out "NGINX" "Nginx 配置验证失败：无法访问挑战文件" "1. 检查 Nginx 是否正常运行: systemctl status nginx  2. 检查挑战目录: ls -la /var/www/certbot/.well-known/acme-challenge/"
-                rm -f $test_file
-                return 1
-            fi
-            rm -f $test_file
-            msg ok "Nginx 配置验证通过"
-
-            # 续期证书
-            certbot certonly --webroot \
-                -w /var/www/certbot \
-                -d ${domain} \
-                --email admin@${domain} \
-                --agree-tos \
-                --non-interactive \
-                --force-renewal \
-                $(_is_certbot_support_ecdsa && echo "--key-type ecdsa") 2>&1 | while IFS= read -r line; do
-                    [[ $line ]] && msg info "  $line"
-                done
-            certbot_exit_code=${PIPESTATUS[0]}
-            if [[ $certbot_exit_code -eq 0 ]]; then
+        if [[ $certbot_exit_code -eq 0 ]]; then
+            if [[ $has_valid_cert == true ]]; then
                 msg ok "证书续期成功"
-                # 检查软链接是否存在
-                if [[ ! -L $is_nginx_dir/ssl/${domain} ]]; then
-                    msg warn "创建证书软链接..."
-                    mkdir -p $is_nginx_dir/ssl
-                    if ! _create_cert_link; then
-                        error_out "CERT" "证书软链接创建失败" "1. 检查证书文件: ls -la /etc/letsencrypt/live/${domain}/  2. 重新申请证书"
-                        return 1
-                    fi
-                fi
-                if systemctl reload nginx &>/dev/null; then
-                    msg ok "Nginx 重载成功"
-                else
-                    msg warn "Nginx 重载失败，但证书已续期"
-                    msg warn "请手动检查：systemctl reload nginx"
-                fi
-                return 0
             else
-                error_out "CERT" "证书续期失败" "1. 检查 Nginx 是否正常运行  2. 检查证书文件是否损坏  3. 查看详细日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
-                msg warn "请检查:"
-                msg "  1. Nginx 是否正常运行"
-                msg "  2. 证书文件是否损坏"
-                msg "  3. 查看详细日志：tail -20 /var/log/letsencrypt/letsencrypt.log"
-                return 1
-            fi
-        else
-            # 首次申请：使用 standalone 模式
-            msg warn "正在申请 SSL 证书（standalone 模式）..."
-
-            # 确保 80 端口空闲
-            systemctl stop nginx &>/dev/null
-            sleep 1
-
-            # 检查 80 端口是否被占用
-            if ss -tlnp | grep -q ':80 '; then
-                error_out "PORT" "80 端口被占用，无法申请证书" "1. 查看占用进程: ss -tlnp | grep :80  2. 停止占用服务后重试"
-                ss -tlnp | grep ':80'
-                msg warn "请关闭占用 80 端口的服务后重试"
-                return 1
-            fi
-
-            # 防火墙预检：确保 80 端口对外可访问
-            msg warn "检查防火墙配置..."
-            firewall_issue=
-            
-            # 检查 firewalld
-            if command -v firewall-cmd &>/dev/null && firewall-cmd --state &>/dev/null; then
-                if ! firewall-cmd --query-service=http &>/dev/null && ! firewall-cmd --query-port=80/tcp &>/dev/null; then
-                    error_out "DEPENDENCY" "firewalld 未开放 80 端口" "执行: firewall-cmd --permanent --add-service=http && firewall-cmd --permanent --add-service=https && firewall-cmd --reload"
-                    msg warn "请执行以下命令开放端口："
-                    msg "  firewall-cmd --permanent --add-service=http"
-                    msg "  firewall-cmd --permanent --add-service=https"
-                    msg "  firewall-cmd --reload"
-                    firewall_issue=1
-                fi
-            fi
-
-            # 检查 ufw
-            if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
-                if ! ufw status | grep -qE "80/tcp|http"; then
-                    error_out "DEPENDENCY" "ufw 防火墙未开放 80 端口" "执行: ufw allow 80/tcp && ufw allow 443/tcp"
-                    msg warn "请执行以下命令开放端口："
-                    msg "  ufw allow 80/tcp"
-                    msg "  ufw allow 443/tcp"
-                    firewall_issue=1
-                fi
-            fi
-            
-            # 检查 iptables（如果没有 firewalld/ufw）
-            if [[ ! $firewall_issue ]] && ! command -v firewall-cmd &>/dev/null && ! command -v ufw &>/dev/null; then
-                if iptables -L -n 2>/dev/null | grep -q "REJECT\|DROP"; then
-                    if ! iptables -L -n | grep -q "dpt:80.*ACCEPT"; then
-                        msg warn "iptables 可能有阻止 80 端口的规则，请检查"
-                    fi
-                fi
-            fi
-            
-            if [[ $firewall_issue ]]; then
-                error_out "DEPENDENCY" "防火墙配置不正确，证书申请将失败" "1. 根据上方提示开放 80/443 端口  2. 重新运行安装"
-                msg warn "请先修复防火墙配置，然后重新运行安装"
-                return 1
-            fi
-
-            # 申请证书
-            certbot certonly --standalone \
-                -d ${domain} \
-                --email admin@${domain} \
-                --agree-tos \
-                --non-interactive \
-                --force-renewal \
-                $(_is_certbot_support_ecdsa && echo "--key-type ecdsa") 2>&1 | while IFS= read -r line; do
-                    [[ $line ]] && msg info "  $line"
-                done
-            certbot_exit_code=${PIPESTATUS[0]}
-            if [[ $certbot_exit_code -eq 0 ]]; then
                 msg ok "证书申请成功"
-
-                # 验证证书文件是否存在
-                if [[ ! -f "/etc/letsencrypt/live/${domain}/fullchain.pem" ]]; then
-                    error_out "CERT" "证书文件未正确生成，请检查 Certbot 日志" "1. 查看详细日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
-                    msg warn "查看详细日志：tail -20 /var/log/letsencrypt/letsencrypt.log"
-                    return 1
-                fi
-
-                # 创建软链接到 Nginx 配置目录
-                msg warn "创建证书软链接..."
-                mkdir -p $is_nginx_dir/ssl
-                if ! _create_cert_link; then
-                    error_out "CERT" "证书软链接创建失败" "1. 检查证书文件: ls -la /etc/letsencrypt/live/${domain}/  2. 重新申请证书"
-                    return 1
-                fi
-
-                # 测试并启动 Nginx
-                msg warn "测试 Nginx 配置..."
-                
-                # 先测试整个 Nginx 配置
-                nginx_test_output=$(nginx -t 2>&1)
-                nginx_test_exit_code=$?
-                
-                if [[ $nginx_test_exit_code -ne 0 ]]; then
-                    # 检查错误是否与当前域名相关
-                    if echo "$nginx_test_output" | grep -q "${domain}"; then
-                        # 当前域名的配置有问题
-                        error_out "NGINX" "Nginx 配置测试失败（当前域名配置有误）" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50"
-                        msg warn "请检查：nginx -t"
-                        msg warn "查看详细错误：journalctl -u nginx -n 50"
-                        return 1
-                    else
-                        # 其他域名的配置问题，不影响当前域名
-                        msg warn "Nginx 全局配置测试有警告（非当前域名问题）"
-                        msg warn "当前域名证书已安装，但其他域名配置可能有问题"
-                        msg warn "详细信息：nginx -t"
-                        msg warn "你可以稍后修复其他域名的配置"
-                        # 不过度报错，允许继续
-                    fi
-                fi
-
-                if systemctl start nginx 2>&1 || pgrep -f "nginx: master" &>/dev/null; then
-                    if [[ $nginx_test_exit_code -eq 0 ]]; then
-                        msg ok "Nginx 启动成功"
-                    else
-                        msg ok "证书配置成功（Nginx 可能已运行）"
-                    fi
-                    return 0
-                else
-                    error_out "SERVICE" "Nginx 启动失败" "1. 检查配置: nginx -t  2. 查看详细错误: journalctl -u nginx -n 50  3. 证书已申请，修复后可手动启动: systemctl start nginx"
-                    msg warn "Nginx 配置可能有问题"
-                    msg warn "请检查：nginx -t"
-                    msg warn "查看详细错误：journalctl -u nginx -n 50"
-                    msg warn "证书已申请，修复配置后可手动启动："
-                    msg "  systemctl start nginx"
-                    return 1
-                fi
-            else
-                error_out "CERT" "证书申请失败" "1. 检查域名解析  2. 检查防火墙80端口  3. 查看日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
-                msg warn "请检查:"
-                msg "  1. 域名是否正确解析到服务器 IP"
-                msg "  2. 防火墙是否开放 80 端口"
-                msg "  3. 查看详细日志：tail -20 /var/log/letsencrypt/letsencrypt.log"
+            fi
+            nginx_certbot_ensure_webroot_renewal "$domain" || return 1
+            mkdir -p $is_nginx_dir/ssl
+            if ! _create_cert_link; then
+                error_out "CERT" "证书软链接创建失败" "1. 检查证书文件: ls -la /etc/letsencrypt/live/${domain}/  2. 重新申请证书"
                 return 1
             fi
+            if nginx -t &>/dev/null; then
+                if pgrep -f "nginx: master" &>/dev/null; then
+                    systemctl reload nginx &>/dev/null || nginx -s reload &>/dev/null || msg warn "Nginx 重载失败，但证书已签发"
+                else
+                    systemctl start nginx &>/dev/null || msg warn "Nginx 启动失败，但证书已签发"
+                fi
+            else
+                msg warn "证书已签发，但 Nginx 配置测试失败，请执行 nginx -t 查看详情"
+            fi
+            return 0
+        else
+            error_out "CERT" "证书申请/续期失败" "1. 检查域名解析  2. 检查 Nginx 是否可访问 /.well-known/acme-challenge/  3. 查看日志: tail -20 /var/log/letsencrypt/letsencrypt.log"
+            msg warn "如必须使用 standalone，请手动执行 Certbot，并确保 renewal 配置改回 webroot 后再启用自动续期。"
+            return 1
         fi
         ;;
 
     renew)
         # 续期证书
         msg warn "续期证书..."
+        if [[ -n "$domain" ]]; then
+            nginx_certbot_ensure_webroot_renewal "$domain" || return 1
+        else
+            nginx_certbot_ensure_all_webroot_renewals || return 1
+        fi
         certbot renew --quiet --deploy-hook "systemctl reload nginx"
         ;;
 

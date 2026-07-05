@@ -1,0 +1,33 @@
+{
+  "inbounds": [
+    {
+      "tag": "Trojan-XHTTP-TLS-example.com.json",
+      "port": 10005,
+      "listen": "127.0.0.1",
+      "protocol": "trojan",
+      "settings": {
+        "clients": [
+          {
+            "password": "example-password"
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "none",
+        "xhttpSettings": {
+          "host": "example.com",
+          "path": "/xray-test",
+          "mode": "auto"
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      }
+    }
+  ]
+}

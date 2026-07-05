@@ -72,10 +72,14 @@ internal/legacy/          Bash 兼容与迁移辅助
 - 建立 fixture：示例 Xray JSON、Nginx 配置、Caddy 配置、Certbot renewal 配置。
 - 定义兼容性边界：哪些输出必须保持，哪些可以改进。
 
+操作实施文档：`docs/10-project-management/phase-0-baseline-plan.md`
+
 验收：
 
 - 当前 `tests/run.sh` 通过。
-- 新增的 Go 迁移契约测试能描述现有行为。
+- 命令矩阵、兼容性边界、fixture 目录和测试策略文档完成。
+- 新增的 Go 迁移契约测试能描述现有 Bash 行为，至少覆盖 `info/url/gen`、REALITY、XHTTP、同域名多协议、Nginx + Certbot renewal、Mihomo YAML。
+- Phase 1 开始前，只读命令的稳定输出字段和允许变化的人类提示文本已经明确区分。
 
 ### Phase 1: Go 骨架与只读命令
 
@@ -187,7 +191,8 @@ internal/legacy/          Bash 兼容与迁移辅助
 
 ## 第一批建议任务
 
-- 新增 `docs/09-testing/test-strategy.md`，定义 fixture 和容器测试策略。
-- 新增 `docs/04-backend/go-module-design.md`，细化 Go 包结构。
-- 修复 Nginx + Certbot 自动续期问题，作为 Go 重构前的 Bash 主线稳定项。
-- 为当前协议生成逻辑建立快照样例。
+- [x] 新增 `docs/09-testing/test-strategy.md`，定义 fixture 和容器测试策略。
+- [x] 新增 `docs/04-backend/command-matrix.md`，梳理 Phase 0 命令矩阵与兼容优先级。
+- [ ] 新增 `docs/04-backend/go-module-design.md`，细化 Go 包结构。
+- [x] 修复 Nginx + Certbot 自动续期问题，作为 Go 重构前的 Bash 主线稳定项。
+- [x] 为当前协议生成逻辑建立快照样例。
