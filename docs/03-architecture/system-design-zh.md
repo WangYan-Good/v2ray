@@ -9,7 +9,7 @@
 - Xray 使用一个主配置文件加一个配置目录运行。
 - 每个受管理的代理节点由 `/etc/xray/conf` 下的一个 JSON 文件表示。
 - Caddy 或 Nginx 管理公共 TLS 入口点，并将指定路径反向代理到本地 Xray 入站端口。
-- shell 命令 `xray` 是唯一的用户面向控制平面。
+- Go CLI 命令 `xray` 是默认用户面向控制平面；未迁移命令通过 Bash legacy 入口委托执行。
 
 ## 设计目标
 
@@ -269,7 +269,7 @@ Mihomo 订阅支持是一个**独立的兼容层**。一个协议配置档对 Xr
 - `xray.sh`
 - `src/`
 
-`install.sh` 负责安装依赖、下载 Xray Core 和可选前端组件、将脚本复制到 `/etc/xray/sh`，并将 `/usr/local/bin/xray` 链接到已安装的脚本入口点。
+`install.sh` 负责安装依赖、下载 Xray Core、Go CLI 和可选前端组件，将 Bash legacy 脚本复制到 `/etc/xray/sh`，并将 `/usr/local/bin/xray` 安装为 Go CLI 入口。未迁移命令由 Go legacy 层委托到 `/etc/xray/sh/xray.sh`。
 
 ## 设计权衡
 

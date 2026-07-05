@@ -13,7 +13,7 @@ for command in version status info url gen add change del mihomo refresh-sub sub
     assert_contains "docs/04-backend/command-matrix.md" "\`$command\`" "command matrix documents $command"
 done
 
-for route in 'v \| ver \| version' 's \| status' 'i \| info' 'url \| qr' 'mihomo \| clash' 'refresh-sub \| sub-refresh' 'sub-url' 'u \| up \| update \| U \| update\.sh'; do
+for route in 'gen \| i \| info \| url \| s \| status \| v \| ver \| version' 'qr\)' 'mihomo \| clash' 'refresh-sub \| sub-refresh' 'sub-url' 'u \| up \| update \| U \| update\.sh'; do
     assert_contains "src/core.sh" "$route" "main route exists: $route"
 done
 

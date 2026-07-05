@@ -2139,10 +2139,17 @@ is_main_menu() {
 ##
 ## check prefer args, if not exist prefer args and show main menu
 ##
+migrated_to_go() {
+    local command="$1"
+    err "命令 (${command}) 已迁移到 Go CLI，请使用: /usr/local/bin/xray ${command}"
+}
+
 main() {
     case $1 in
-    a | add | gen | no-auto-tls)
-        [[ $1 == 'gen' ]] && is_gen=1
+    gen | i | info | url | s | status | v | ver | version | download-plan | switch-plan)
+        migrated_to_go "$1"
+        ;;
+    a | add | no-auto-tls)
         [[ $1 == 'no-auto-tls' ]] && is_no_auto_tls=1
         add ${@:2}
         ;;
@@ -2256,9 +2263,6 @@ main() {
         load mihomo.sh
         mihomo_sub_url $2
         ;;
-    i | info)
-        info $2
-        ;;
     ip)
         get_ip
         msg $ip
@@ -2267,7 +2271,7 @@ main() {
         load log.sh
         log_set $@
         ;;
-    url | qr)
+    qr)
         url_qr $@
         ;;
     un | uninstall)
@@ -2293,11 +2297,6 @@ main() {
     ssss | ss2022)
         get $@
         ;;
-    s | status)
-        msg "\n$is_core_ver: $is_core_status\n"
-        [[ $is_caddy ]] && msg "Caddy $is_caddy_ver: $is_caddy_status\n"
-        [[ $is_nginx ]] && msg "Nginx $is_nginx_ver: $is_nginx_status\n"
-        ;;
     start | stop | r | restart)
         [[ $2 && $2 != 'caddy' ]] && err "无法识别 ($2), 请使用: $is_core $1 [caddy]"
         manage $1 $2 &
@@ -2314,10 +2313,6 @@ main() {
         ;;
     main)
         is_main_menu
-        ;;
-    v | ver | version)
-        [[ $is_caddy_ver ]] && is_caddy_ver="/ $(_blue Caddy $is_caddy_ver)"
-        msg "\n$(_green $is_core_ver) / $(_cyan $is_core_name script $is_sh_ver) $is_caddy_ver\n"
         ;;
     xapi)
         api ${@:2}

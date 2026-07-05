@@ -173,9 +173,12 @@ internal/legacy/          Bash 兼容与迁移辅助
 - 保留最小 bootstrap 和必要的故障恢复脚本。
 - 文档更新到 Go CLI 为主。
 
+操作实施文档：`docs/10-project-management/phase-6-bash-cleanup-plan.md`
+
 验收：
 
-- Bash 不再承载核心业务逻辑。
+- Bash 不再承载 Go 已迁移命令的主入口业务逻辑。
+- 未迁移命令仍可通过 legacy path 使用。
 - 发布包结构稳定。
 
 ## 优先迁移顺序
