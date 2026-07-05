@@ -4,8 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"runtime"
 
 	"github.com/WangYan-Good/xray/internal/config"
+	"github.com/WangYan-Good/xray/internal/download"
 	frontendcaddy "github.com/WangYan-Good/xray/internal/frontend/caddy"
 	frontendnginx "github.com/WangYan-Good/xray/internal/frontend/nginx"
 	"github.com/WangYan-Good/xray/internal/protocol"
@@ -75,6 +77,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return ExitOK
 	case "gen":
 		return runGen(commandArgs, stdout, stderr)
+	case "download-plan":
+		return runDownloadPlan(commandArgs, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\n", command)
 		return ExitUsage
@@ -202,4 +206,33 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "unsupported gen format: %s\n", format)
 		return ExitUsage
 	}
+}
+
+func runDownloadPlan(args []string, stdout, stderr io.Writer) int {
+	opts := download.PlanOptions{
+		Machine: runtime.GOARCH,
+	}
+	flags := flag.NewFlagSet("xray download-plan", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.StringVar(&opts.Version, "version", opts.Version, "release version or latest")
+	flags.StringVar(&opts.Machine, "arch", opts.Machine, "machine architecture")
+	flags.StringVar(&opts.Proxy, "proxy", opts.Proxy, "download proxy")
+	if err := flags.Parse(args); err != nil {
+		fmt.Fprintln(stderr, err)
+		return ExitUsage
+	}
+	rest := flags.Args()
+	if len(rest) != 1 {
+		fmt.Fprintln(stderr, "download kind required")
+		return ExitUsage
+	}
+	opts.Kind = rest[0]
+
+	plan, err := download.NewPlan(opts)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return ExitConfig
+	}
+	fmt.Fprint(stdout, download.FormatPlan(plan))
+	return ExitOK
 }

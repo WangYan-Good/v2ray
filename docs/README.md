@@ -28,6 +28,7 @@ Chinese documents are the canonical active docs for this project. English mirror
 - Command matrix: `04-backend/command-matrix.md`
 - Go module design: `04-backend/go-module-design.md`
 - Frontend template design: `04-backend/frontend-template-design.md`
+- Download and install design: `04-backend/download-install-design.md`
 - Protocol model design: `04-backend/protocol-model-design.md`
 - Protocol contracts: `07-data/protocol-contracts.md`
 - Release guide: `08-ops/release-guide.md`
@@ -37,6 +38,7 @@ Chinese documents are the canonical active docs for this project. English mirror
 - Phase 1 Go CLI plan: `10-project-management/phase-1-go-cli-plan.md`
 - Phase 2 protocol generation plan: `10-project-management/phase-2-protocol-generation-plan.md`
 - Phase 3 frontend template plan: `10-project-management/phase-3-frontend-template-plan.md`
+- Phase 4 install/download plan: `10-project-management/phase-4-install-download-plan.md`
 
 ## Maintenance Rules
 

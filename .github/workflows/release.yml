@@ -16,6 +16,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
       - name: Get version info
         id: version
         run: |
@@ -71,6 +76,22 @@ jobs:
 
           echo "✅ code.zip 包含完整的安装文件"
 
+      - name: Build Go CLI assets
+        run: |
+          set -euo pipefail
+          mkdir -p dist/xray-linux-amd64 dist/xray-linux-arm64
+
+          GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o dist/xray-linux-amd64/xray ./cmd/xray
+          GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o dist/xray-linux-arm64/xray ./cmd/xray
+
+          tar -C dist/xray-linux-amd64 -czf dist/xray-linux-amd64.tar.gz xray
+          tar -C dist/xray-linux-arm64 -czf dist/xray-linux-arm64.tar.gz xray
+
+          (cd dist && sha256sum xray-linux-amd64.tar.gz xray-linux-arm64.tar.gz > checksums.txt)
+
+          echo "Go CLI assets:"
+          ls -lh dist/*.tar.gz dist/checksums.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -99,6 +120,9 @@ jobs:
           files: |
             code.zip
             install.sh
+            dist/xray-linux-amd64.tar.gz
+            dist/xray-linux-arm64.tar.gz
+            dist/checksums.txt
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -130,5 +154,26 @@ jobs:
             echo "✅ install.sh 已成功上传到 release"
           else
             echo "❌ install.sh 未找到"
+            exit 1
+          fi
+
+          if echo "$ASSETS" | grep -q "xray-linux-amd64.tar.gz"; then
+            echo "✅ xray-linux-amd64.tar.gz 已成功上传到 release"
+          else
+            echo "❌ xray-linux-amd64.tar.gz 未找到"
+            exit 1
+          fi
+
+          if echo "$ASSETS" | grep -q "xray-linux-arm64.tar.gz"; then
+            echo "✅ xray-linux-arm64.tar.gz 已成功上传到 release"
+          else
+            echo "❌ xray-linux-arm64.tar.gz 未找到"
+            exit 1
+          fi
+
+          if echo "$ASSETS" | grep -q "checksums.txt"; then
+            echo "✅ checksums.txt 已成功上传到 release"
+          else
+            echo "❌ checksums.txt 未找到"
             exit 1
           fi

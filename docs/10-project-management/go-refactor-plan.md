@@ -140,10 +140,15 @@ internal/legacy/          Bash 兼容与迁移辅助
 - 统一错误码、日志和清理逻辑。
 - `install.sh` 缩减为下载 Go 二进制并调用 `xray install`。
 
+操作实施文档：`docs/10-project-management/phase-4-install-download-plan.md`
+
 验收：
 
-- 新安装、重新安装、保留配置更新都可通过。
-- 下载失败、校验失败、架构不支持有明确错误。
+- Go 下载计划能覆盖 Xray Core、脚本、Caddy、dat、jq 和 Go CLI 二进制资产。
+- SHA256、Xray `.dgst`、Caddy checksums 和 GitHub asset digest 解析均有单元测试。
+- proxy 环境变量和 unsupported arch 错误可被契约测试断言。
+- Release workflow 构建并上传 linux amd64/arm64 Go CLI tarball，同时保留 `code.zip` 和 `install.sh`。
+- 新安装、重新安装、保留配置更新的操作步骤以 plan 形式固定；真实默认入口切换进入 Phase 5。
 
 ### Phase 5: 命令切换与兼容层
 

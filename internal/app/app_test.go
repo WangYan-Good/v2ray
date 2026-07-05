@@ -161,3 +161,31 @@ func TestGenFrontendRejectsDirectProtocol(t *testing.T) {
 		t.Fatalf("stderr = %s", errOut)
 	}
 }
+
+func TestDownloadPlanCore(t *testing.T) {
+	code, out, errOut := run("download-plan", "--version", "v1.8.24", "--arch", "x86_64", "--proxy", "http://127.0.0.1:7890", "core")
+	if code != ExitOK {
+		t.Fatalf("code = %d stderr = %s", code, errOut)
+	}
+	for _, want := range []string{
+		"kind = core",
+		"asset.0.name = Xray-linux-64.zip",
+		"asset.0.checksum_url = https://github.com/XTLS/Xray-core/releases/download/v1.8.24/Xray-linux-64.zip.dgst",
+		"proxy.http_proxy = http://127.0.0.1:7890",
+		"install_step.0 = create /etc/xray/bin",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("download plan missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestDownloadPlanUnsupportedArch(t *testing.T) {
+	code, out, errOut := run("download-plan", "--arch", "riscv64", "core")
+	if code != ExitConfig {
+		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	if !strings.Contains(errOut, "unsupported architecture: riscv64") {
+		t.Fatalf("stderr = %s", errOut)
+	}
+}
