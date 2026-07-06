@@ -26,4 +26,4 @@ Phase 7 的目标是完成生产运行时切换：所有公开 `xray` 命令由 
 2. 更新 release workflow 和 `install.sh`，移除 `code.zip`。
 3. 删除旧 Bash runtime 和 legacy delegate。
 4. 更新测试契约和文档入口。
-5. 在 `bak.proxy.yourdie.com` 备份后部署 Go binary，移除远端 `/etc/xray/sh`，执行真实服务和客户端连通性验收。
+5. 在 `<redacted-vps-domain>` 备份后部署 Go binary，移除远端 `/etc/xray/sh`，执行真实服务和客户端连通性验收。

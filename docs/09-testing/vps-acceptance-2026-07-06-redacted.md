@@ -1,17 +1,17 @@
-# VPS 验收记录：bak.proxy.yourdie.com
+# VPS 验收记录：<redacted-vps-domain>
 
 日期: 2026-07-06 Asia/Shanghai；远端时间 2026-07-05 22:35-23:11 -0500
-主机: `bak.proxy.yourdie.com`
-公网 IP: `107.174.218.158`
+主机: `<redacted-vps-domain>`
+公网 IP: `<redacted-public-ip>`
 系统: AlmaLinux 9.7
 架构: x86_64
 Xray-core: `Xray 26.3.27`
 当前入口: Go binary `/usr/local/bin/xray`
-远端工作区: `/root/xray-vps-acceptance-20260705-223514`
+远端工作区: `<redacted-remote-workdir>`
 
 ## 执行摘要
 
-- SSH 使用 `ssh -F /dev/null -o BatchMode=yes -o StrictHostKeyChecking=accept-new root@bak.proxy.yourdie.com`。
+- SSH 使用 `ssh -F /dev/null -o BatchMode=yes -o StrictHostKeyChecking=accept-new root@<redacted-vps-domain>`。
 - 远端已备份 `/etc/xray`、`/etc/nginx`、`/etc/letsencrypt`、`/usr/local/bin/xray` 和服务状态，并生成 `rollback.sh`。
 - 远端通过 Podman 运行官方 `docker.io/library/golang:1.22` 镜像完成 `go test ./...`、构建和部署。
 - `/usr/local/bin/xray` 已替换为当前 Go CLI；`/etc/xray/sh` 最终确认不存在。
@@ -37,9 +37,9 @@ Xray-core: `Xray 26.3.27`
 ## 真实服务验收
 
 - 初始生产节点为 3 个:
-  - `Trojan-gRPC-TLS-bak.proxy.yourdie.com.json`
-  - `VLESS-gRPC-TLS-bak.proxy.yourdie.com.json`
-  - `VMess-gRPC-TLS-bak.proxy.yourdie.com.json`
+  - `Trojan-gRPC-TLS-<redacted-vps-domain>.json`
+  - `VLESS-gRPC-TLS-<redacted-vps-domain>.json`
+  - `VMess-gRPC-TLS-<redacted-vps-domain>.json`
 - 本轮临时创建并清理的测试节点:
   - VLESS WS TLS
   - VLESS XHTTP TLS
@@ -49,18 +49,18 @@ Xray-core: `Xray 26.3.27`
   - Socks
   - VLESS REALITY
 - 真实客户端连通性通过:
-  - `VLESS-WS-TLS-bak.proxy.yourdie.com`
-  - `VLESS-XHTTP-TLS-bak.proxy.yourdie.com`
-  - `Trojan-XHTTP-TLS-bak.proxy.yourdie.com`
-  - `VLESS-gRPC-TLS-bak.proxy.yourdie.com`
+  - `VLESS-WS-TLS-<redacted-vps-domain>`
+  - `VLESS-XHTTP-TLS-<redacted-vps-domain>`
+  - `Trojan-XHTTP-TLS-<redacted-vps-domain>`
+  - `VLESS-gRPC-TLS-<redacted-vps-domain>`
   - `VMess-TCP-31003`
   - `Shadowsocks-31004`
   - `Socks-31005`
-- 代理验证方式: `xray --server bak.proxy.yourdie.com client <name>` 生成 full client config，临时启动 `/etc/xray/bin/xray run -config client.json`，再通过 `curl --socks5-hostname 127.0.0.1:2333 https://www.cloudflare.com/cdn-cgi/trace` 验证出口 IP 为 `107.174.218.158`。
+- 代理验证方式: `xray --server <redacted-vps-domain> client <name>` 生成 full client config，临时启动 `/etc/xray/bin/xray run -config client.json`，再通过 `curl --socks5-hostname 127.0.0.1:2333 https://www.cloudflare.com/cdn-cgi/trace` 验证出口 IP 为 `<redacted-public-ip>`。
 - 订阅验收:
-  - `xray --server bak.proxy.yourdie.com mihomo` 成功，Trojan XHTTP 按契约输出 unsupported skip。
-  - `xray --server bak.proxy.yourdie.com refresh-sub bak.proxy.yourdie.com` 成功。
-  - `xray sub-url bak.proxy.yourdie.com` 返回的 HTTPS URL 可下载 YAML。
+  - `xray --server <redacted-vps-domain> mihomo` 成功，Trojan XHTTP 按契约输出 unsupported skip。
+  - `xray --server <redacted-vps-domain> refresh-sub <redacted-vps-domain>` 成功。
+  - `xray sub-url <redacted-vps-domain>` 返回的 HTTPS URL 可下载 YAML。
   - 最终订阅只包含原 3 个生产节点。
 - Certbot 验收:
   - 发现远端 renewal 原为 `authenticator = nginx`，且旧 Nginx 站点内 Certbot 注入的 301 会阻断 webroot challenge。

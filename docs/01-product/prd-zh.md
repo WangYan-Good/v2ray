@@ -38,4 +38,4 @@
 - `bash tests/run.sh`
 - `bash tests/shellcheck.sh`
 - Release 包含 `install.sh`、Go tarballs、`checksums.txt`。
-- `bak.proxy.yourdie.com` 验收通过并记录。
+- `<redacted-vps-domain>` 验收通过并记录。

@@ -194,7 +194,7 @@ internal/ui/              交互式 prompt 和终端输出
 - `git ls-files xray.sh src internal/legacy` 为空。
 - `/usr/local/bin/xray` 为 Go binary，`switch-plan` 显示 `runtime = go`。
 - `install.sh`、Go tarball 和 `checksums.txt` 仍作为 release assets 发布。
-- 真实 VPS 上完成部署、协议、订阅、证书 dry-run 和客户端连通性验收；当前 `bak.proxy.yourdie.com` 记录中 REALITY 真实连通性仍为 blocker，详见 `docs/09-testing/vps-acceptance-2026-07-06-bak-proxy-yourdie-com.md`。
+- 真实 VPS 上完成部署、协议、订阅、证书 dry-run 和客户端连通性验收；当前 `<redacted-vps-domain>` 记录中 REALITY 真实连通性仍为 blocker，详见 `docs/09-testing/vps-acceptance-2026-07-06-redacted.md`。
 
 ## 优先迁移顺序
 
