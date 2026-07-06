@@ -1,0 +1,27 @@
+{
+  "inbounds": [
+    {
+      "tag": "Socks-10008.json",
+      "port": 10008,
+      "listen": "0.0.0.0",
+      "protocol": "socks",
+      "settings": {
+        "auth": "password",
+        "accounts": [
+          {
+            "user": "example-user",
+            "pass": "example-password"
+          }
+        ],
+        "udp": true
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      }
+    }
+  ]
+}

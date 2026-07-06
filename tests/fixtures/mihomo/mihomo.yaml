@@ -1,0 +1,60 @@
+mixed-port: 7890
+allow-lan: false
+mode: rule
+log-level: info
+proxies:
+  - name: "VLESS-XTLS-uTLS-REALITY-10001"
+    type: vless
+    server: "203.0.113.10"
+    port: 10001
+    uuid: "11111111-1111-4111-8111-111111111111"
+    udp: true
+    tls: true
+    flow: xtls-rprx-vision
+    servername: "www.microsoft.com"
+    client-fingerprint: ios
+    reality-opts:
+      public-key: "example-public-key"
+      short-id: ""
+  - name: "VLESS-XHTTP-TLS-example.com"
+    type: vless
+    server: "example.com"
+    port: 443
+    uuid: "11111111-1111-4111-8111-111111111111"
+    udp: true
+    tls: true
+    servername: "example.com"
+    network: xhttp
+    alpn:
+      - h2
+    xhttp-opts:
+      path: "/xray-test"
+      host: "example.com"
+      mode: "auto"
+  - name: "Shadowsocks-10007"
+    type: ss
+    server: "203.0.113.10"
+    port: 10007
+    cipher: "aes-256-gcm"
+    password: "example-password"
+    udp: true
+  - name: "Socks-10008"
+    type: socks5
+    server: "203.0.113.10"
+    port: 10008
+    username: "example-user"
+    password: "example-password"
+    udp: true
+  # skip "Trojan-XHTTP-TLS-example.com": mihomo trojan transport supports ws/grpc/tcp only
+proxy-groups:
+  - name: PROXY
+    type: select
+    proxies:
+      - "VLESS-XTLS-uTLS-REALITY-10001"
+      - "VLESS-XHTTP-TLS-example.com"
+      - "Shadowsocks-10007"
+      - "Socks-10008"
+      - DIRECT
+rules:
+  - GEOIP,CN,DIRECT
+  - MATCH,PROXY

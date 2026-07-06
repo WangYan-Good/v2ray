@@ -43,3 +43,34 @@ assert_not_contains() {
     fi
     pass "$message"
 }
+
+assert_json_value() {
+    local file="$1"
+    local query="$2"
+    local expected="$3"
+    local message="$4"
+    local actual
+
+    actual=$(jq -r "$query" "$REPO_ROOT/$file") || fail "$message"
+    [[ "$actual" == "$expected" ]] || fail "$message (expected: $expected, actual: $actual)"
+    pass "$message"
+}
+
+assert_file_contains_once() {
+    local file="$1"
+    local pattern="$2"
+    local message="$3"
+    local count
+
+    count=$(grep -Ec -- "$pattern" "$REPO_ROOT/$file" || true)
+    [[ "$count" == "1" ]] || fail "$message (expected once, found $count)"
+    pass "$message"
+}
+
+assert_yaml_contains() {
+    local file="$1"
+    local pattern="$2"
+    local message="$3"
+
+    assert_contains "$file" "$pattern" "$message"
+}

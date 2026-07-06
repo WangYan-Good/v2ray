@@ -16,6 +16,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
       - name: Get version info
         id: version
         run: |
@@ -45,31 +50,21 @@ jobs:
           
           echo "changelog=$(cat changelog.md)" >> $GITHUB_OUTPUT
 
-      - name: Create code.zip
+      - name: Build Go CLI assets
         run: |
-          echo "打包完整安装文件..."
-          # 包含 install.sh, xray.sh 和 src/ 目录
-          zip -r code.zip install.sh xray.sh src/
+          set -euo pipefail
+          mkdir -p dist/xray-linux-amd64 dist/xray-linux-arm64
 
-          echo "文件信息："
-          ls -lh code.zip
+          GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o dist/xray-linux-amd64/xray ./cmd/xray
+          GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o dist/xray-linux-arm64/xray ./cmd/xray
 
-          # 验证 zip 内容
-          echo "包含文件："
-          zipinfo code.zip
+          tar -C dist/xray-linux-amd64 -czf dist/xray-linux-amd64.tar.gz xray
+          tar -C dist/xray-linux-arm64 -czf dist/xray-linux-arm64.tar.gz xray
 
-          # 确保关键文件存在
-          if ! zipinfo code.zip | grep -q "install.sh"; then
-            echo "❌ code.zip 中缺少 install.sh"
-            exit 1
-          fi
+          (cd dist && sha256sum xray-linux-amd64.tar.gz xray-linux-arm64.tar.gz > checksums.txt)
 
-          if ! zipinfo code.zip | grep -q "xray.sh"; then
-            echo "❌ code.zip 中缺少 xray.sh"
-            exit 1
-          fi
-
-          echo "✅ code.zip 包含完整的安装文件"
+          echo "Go CLI assets:"
+          ls -lh dist/*.tar.gz dist/checksums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -97,8 +92,10 @@ jobs:
             bash <(curl -Ls https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.version.outputs.tag_name }}/install.sh) --tls caddy
             ```
           files: |
-            code.zip
             install.sh
+            dist/xray-linux-amd64.tar.gz
+            dist/xray-linux-arm64.tar.gz
+            dist/checksums.txt
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -117,18 +114,31 @@ jobs:
           echo "已上传的 assets:"
           echo "$ASSETS"
           
-          # 检查 code.zip 是否存在
-          if echo "$ASSETS" | grep -q "code.zip"; then
-            echo "✅ code.zip 已成功上传到 release"
-          else
-            echo "❌ code.zip 未找到"
-            exit 1
-          fi
-          
           # 检查 install.sh 是否存在
           if echo "$ASSETS" | grep -q "install.sh"; then
             echo "✅ install.sh 已成功上传到 release"
           else
             echo "❌ install.sh 未找到"
+            exit 1
+          fi
+
+          if echo "$ASSETS" | grep -q "xray-linux-amd64.tar.gz"; then
+            echo "✅ xray-linux-amd64.tar.gz 已成功上传到 release"
+          else
+            echo "❌ xray-linux-amd64.tar.gz 未找到"
+            exit 1
+          fi
+
+          if echo "$ASSETS" | grep -q "xray-linux-arm64.tar.gz"; then
+            echo "✅ xray-linux-arm64.tar.gz 已成功上传到 release"
+          else
+            echo "❌ xray-linux-arm64.tar.gz 未找到"
+            exit 1
+          fi
+
+          if echo "$ASSETS" | grep -q "checksums.txt"; then
+            echo "✅ checksums.txt 已成功上传到 release"
+          else
+            echo "❌ checksums.txt 未找到"
             exit 1
           fi

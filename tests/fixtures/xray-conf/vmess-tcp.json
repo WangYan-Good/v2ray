@@ -1,0 +1,33 @@
+{
+  "inbounds": [
+    {
+      "tag": "VMess-TCP-10006.json",
+      "port": 10006,
+      "listen": "0.0.0.0",
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          {
+            "id": "11111111-1111-4111-8111-111111111111",
+            "alterId": 0
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {
+          "header": {
+            "type": "none"
+          }
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      }
+    }
+  ]
+}

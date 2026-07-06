@@ -1,0 +1,28 @@
+# Xray gRPC: example.com/xray-grpc
+location /xray-grpc/ {
+    grpc_pass grpc://127.0.0.1:10003;
+    grpc_set_header Host $host;
+}
+
+# Xray XHTTP: example.com/xray-xhttp
+location /xray-xhttp {
+    proxy_pass http://127.0.0.1:10004;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+}
+
+# conflict sample: same path as primary location but different upstream port
+location /xray-test {
+    proxy_pass http://127.0.0.1:10999;
+}
+
+    # xray-mihomo-sub-start
+    location = /sub/mihomo {
+        if ($arg_token != "fixture-token") {
+            return 403;
+        }
+        default_type text/yaml;
+        add_header Content-Disposition "inline; filename=mihomo.yaml";
+        alias /etc/xray/sub/mihomo.yaml;
+    }
+    # xray-mihomo-sub-end
