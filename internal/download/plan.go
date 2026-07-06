@@ -68,15 +68,15 @@ func NewPlan(opts PlanOptions) (Plan, error) {
 		}}
 		plan.InstallSteps = InstallSteps("core")
 	case "script", "sh":
-		plan.Kind = "script"
-		asset := "code.zip"
+		plan.Kind = "go"
+		asset := fmt.Sprintf("xray-linux-%s.tar.gz", arch.Go)
 		plan.Assets = []Asset{{
 			Name:          asset,
 			URL:           releaseURL(ScriptRepo, plan.Version, asset),
 			ChecksumURL:   releaseURL(ScriptRepo, plan.Version, "checksums.txt"),
-			InstallTarget: "/etc/xray/sh",
+			InstallTarget: "/usr/local/bin/xray",
 		}}
-		plan.InstallSteps = InstallSteps("script")
+		plan.InstallSteps = InstallSteps("go")
 	case "caddy":
 		if plan.Version == "" || plan.Version == "latest" {
 			return Plan{}, fmt.Errorf("caddy version required to build asset name")

@@ -42,6 +42,7 @@ type Profile struct {
 	PrivateKey  string
 	HeaderType  string
 	XHTTPMode   string
+	Address     string
 }
 
 func DefaultProfiles() []Profile {
@@ -122,6 +123,30 @@ func DefaultProfiles() []Profile {
 			HeaderType: "none",
 		},
 		{
+			Key:      "vmess-ws-tls",
+			Name:     "VMess-WS-TLS-example.com",
+			Protocol: "vmess",
+			Port:     10009,
+			Listen:   "127.0.0.1",
+			ID:       FixedUUID,
+			Network:  "ws",
+			Security: "tls",
+			Host:     FixedHost,
+			Path:     FixedPath,
+		},
+		{
+			Key:      "trojan-ws-tls",
+			Name:     "Trojan-WS-TLS-example.com",
+			Protocol: "trojan",
+			Port:     10010,
+			Listen:   "127.0.0.1",
+			Password: FixedPassword,
+			Network:  "ws",
+			Security: "tls",
+			Host:     FixedHost,
+			Path:     FixedPath,
+		},
+		{
 			Key:      "shadowsocks",
 			Name:     "Shadowsocks-10007",
 			Protocol: "shadowsocks",
@@ -194,24 +219,63 @@ func ProfileNames() []string {
 
 func (p Profile) Node() config.Node {
 	return config.Node{
-		Name:        p.Name,
-		FileName:    p.Key + ".json",
-		Protocol:    p.Protocol,
-		Port:        p.Port,
-		Listen:      p.Listen,
-		ID:          p.ID,
-		Password:    p.Password,
-		Method:      p.Method,
-		Network:     p.Network,
-		Security:    p.Security,
-		Host:        p.Host,
-		Path:        p.Path,
-		ServiceName: p.ServiceName,
-		Flow:        p.Flow,
-		ServerName:  p.ServerName,
-		Fingerprint: valueOr(p.Fingerprint, "ios"),
-		PublicKey:   p.PublicKey,
-		HeaderType:  p.HeaderType,
+		Name:            p.Name,
+		FileName:        p.Key + ".json",
+		Protocol:        p.Protocol,
+		Port:            p.Port,
+		Listen:          p.Listen,
+		ID:              p.ID,
+		Password:        p.Password,
+		Method:          p.Method,
+		Network:         p.Network,
+		Security:        p.Security,
+		Host:            p.Host,
+		Path:            p.Path,
+		ServiceName:     p.ServiceName,
+		Flow:            p.Flow,
+		ServerName:      p.ServerName,
+		Fingerprint:     valueOr(p.Fingerprint, "ios"),
+		PublicKey:       p.PublicKey,
+		PrivateKey:      p.PrivateKey,
+		HeaderType:      p.HeaderType,
+		AddressOverride: p.Address,
+	}
+}
+
+func ProfileFromNode(node config.Node) Profile {
+	key := strings.TrimSuffix(strings.ToLower(node.FileName), ".json")
+	if key == "" {
+		key = strings.ToLower(strings.ReplaceAll(node.Name, " ", "-"))
+	}
+	security := node.Security
+	if node.Host != "" && security != "reality" {
+		switch node.Network {
+		case "ws", "grpc", "xhttp", "h2":
+			security = "tls"
+		}
+	}
+	return Profile{
+		Key:         key,
+		Name:        node.Name,
+		Protocol:    node.Protocol,
+		Port:        node.Port,
+		Listen:      valueOr(node.Listen, "0.0.0.0"),
+		ID:          node.ID,
+		Password:    node.Password,
+		Method:      node.Method,
+		Network:     node.Network,
+		Security:    security,
+		Host:        node.Host,
+		Path:        node.Path,
+		ServiceName: node.ServiceName,
+		Flow:        node.Flow,
+		ServerName:  node.ServerName,
+		Fingerprint: valueOr(node.Fingerprint, "ios"),
+		PublicKey:   node.PublicKey,
+		PrivateKey:  valueOr(node.PrivateKey, "unknown-private-key"),
+		HeaderType:  node.HeaderType,
+		XHTTPMode:   "auto",
+		Address:     node.AddressOverride,
 	}
 }
 

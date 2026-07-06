@@ -30,6 +30,6 @@ assert_contains "tests/fixtures/caddy/multi-protocol-domain.conf.add" 'reverse_p
 assert_contains "tests/fixtures/caddy/multi-protocol-domain.conf.add" 'reverse_proxy /xray-test 127\.0\.0\.1:10999' "caddy fixture includes conflict sample"
 assert_file_contains_once "tests/fixtures/caddy/multi-protocol-domain.conf.add" '# xray-mihomo-sub-start' "caddy mihomo route is idempotent block"
 
-assert_contains "src/nginx.sh" 'nginx_should_append' "nginx append mode helper exists"
-assert_contains "src/nginx.sh" 'nginx_ensure_add_include' "nginx include repair helper exists"
-assert_contains "src/nginx.sh" 'return 3' "nginx path conflict return exists"
+assert_contains "internal/frontend/nginx/inspect.go" 'CheckAppend' "nginx append mode helper exists"
+assert_contains "internal/frontend/nginx/inspect.go" 'EnsureAddInclude' "nginx include repair helper exists"
+assert_contains "internal/frontend/nginx/inspect.go" 'AppendConflict' "nginx path conflict model exists"

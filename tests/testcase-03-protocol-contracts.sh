@@ -18,5 +18,5 @@ protocols=(
 )
 
 for protocol in "${protocols[@]}"; do
-    assert_contains "src/core.sh" "$protocol" "protocol present: $protocol"
+    assert_contains "internal/protocol/profile.go" "$protocol" "protocol present in Go profiles: $protocol"
 done

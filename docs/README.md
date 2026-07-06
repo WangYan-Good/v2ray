@@ -29,8 +29,9 @@ Chinese documents are the canonical active docs for this project. English mirror
 - Go module design: `04-backend/go-module-design.md`
 - Frontend template design: `04-backend/frontend-template-design.md`
 - Download and install design: `04-backend/download-install-design.md`
-- Legacy compatibility design: `04-backend/legacy-compatibility-design.md`
-- Bash cleanup design: `04-backend/bash-cleanup-design.md`
+- Go runtime design: `04-backend/go-runtime-design.md`
+- Legacy compatibility design: `04-backend/legacy-compatibility-design.md` (historical Phase 5)
+- Bash cleanup design: `04-backend/bash-cleanup-design.md` (historical Phase 6)
 - Protocol model design: `04-backend/protocol-model-design.md`
 - Protocol contracts: `07-data/protocol-contracts.md`
 - Release guide: `08-ops/release-guide.md`
@@ -43,6 +44,7 @@ Chinese documents are the canonical active docs for this project. English mirror
 - Phase 4 install/download plan: `10-project-management/phase-4-install-download-plan.md`
 - Phase 5 command switch plan: `10-project-management/phase-5-command-switch-plan.md`
 - Phase 6 Bash cleanup plan: `10-project-management/phase-6-bash-cleanup-plan.md`
+- Phase 7 production cutover plan: `10-project-management/phase-7-production-cutover-plan.md`
 
 ## Maintenance Rules
 

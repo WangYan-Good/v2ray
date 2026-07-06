@@ -4,6 +4,8 @@
 
 本文档定义 Phase 5 的 Go/Bash 兼容层。目标是允许 Go binary 成为 `/usr/local/bin/xray`，同时让未迁移命令继续通过旧 Bash 实现工作。
 
+状态：本文是历史阶段设计。当前生产边界以 `go-runtime-design.md` 和 Phase 7 为准；Go CLI 不再委托 `/etc/xray/sh/xray.sh`。
+
 ## 包结构
 
 ```text

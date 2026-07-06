@@ -64,7 +64,7 @@ pass "download-plan dat"
 go_plan=$(run_xray download-plan --version v2.0.0-alpha --arch x86_64 go)
 [[ "$go_plan" == *"asset.0.name = xray-linux-amd64.tar.gz"* ]] || fail "go cli plan asset"
 [[ "$go_plan" == *"asset.0.checksum_url = https://github.com/WangYan-Good/xray/releases/download/v2.0.0-alpha/checksums.txt"* ]] || fail "go cli plan checksum"
-[[ "$go_plan" == *"install xray binary to /usr/local/bin/xray after Phase 5 switch"* ]] || fail "go cli plan phase 5 guard"
+[[ "$go_plan" == *"install xray binary to /usr/local/bin/xray"* ]] || fail "go cli install target"
 pass "download-plan go cli"
 
 if run_xray download-plan --arch riscv64 core >"$tmp_dir/unsupported.out" 2>"$tmp_dir/unsupported.err"; then
@@ -79,7 +79,7 @@ assert_contains ".github/workflows/release.yml" 'GOOS=linux GOARCH=arm64 go buil
 assert_contains ".github/workflows/release.yml" 'xray-linux-amd64\.tar\.gz' "release workflow uploads amd64 tarball"
 assert_contains ".github/workflows/release.yml" 'xray-linux-arm64\.tar\.gz' "release workflow uploads arm64 tarball"
 assert_contains ".github/workflows/release.yml" 'checksums\.txt' "release workflow uploads checksums"
-assert_contains ".github/workflows/release.yml" 'code\.zip' "release workflow keeps code.zip"
+assert_not_contains ".github/workflows/release.yml" 'code\.zip' "release workflow does not upload code.zip"
 assert_contains ".github/workflows/release.yml" 'install\.sh' "release workflow keeps install.sh"
 
 assert_not_contains "internal/download/plan.go" 'os\.WriteFile|os\.Mkdir|os\.MkdirAll|os\.Remove|os\.RemoveAll|os\.Rename|exec\.Command|http\.Get' "download plan remains side-effect free"

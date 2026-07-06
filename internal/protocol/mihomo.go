@@ -52,6 +52,17 @@ func MihomoProxyYAML(profile Profile) (string, bool, string, error) {
 		if profile.HeaderType != "" {
 			fmt.Fprintf(&b, "    network: %s\n", profile.Network)
 		}
+	case "trojan":
+		fmt.Fprintln(&b, "    type: trojan")
+		fmt.Fprintf(&b, "    server: %q\n", node.Address())
+		fmt.Fprintf(&b, "    port: %d\n", node.PublicPort())
+		fmt.Fprintf(&b, "    password: %q\n", profile.Password)
+		fmt.Fprintln(&b, "    udp: true")
+		if profile.Security == "tls" {
+			fmt.Fprintln(&b, "    tls: true")
+			fmt.Fprintf(&b, "    sni: %q\n", profile.Host)
+		}
+		writeMihomoNetwork(&b, profile)
 	case "shadowsocks":
 		fmt.Fprintln(&b, "    type: ss")
 		fmt.Fprintf(&b, "    server: %q\n", node.Address())

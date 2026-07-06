@@ -28,7 +28,7 @@ internal/download/
 | kind | asset | checksum |
 | --- | --- | --- |
 | `core` | `Xray-linux-{xrayArch}.zip` | `{url}.dgst` |
-| `script` | `code.zip` | GitHub asset digest 或 release checksums |
+| `script` / `sh` | 兼容映射到 `xray-linux-{goArch}.tar.gz` | `checksums.txt` |
 | `caddy` | `caddy_{versionWithoutV}_linux_{caddyArch}.tar.gz` | `caddy_{versionWithoutV}_checksums.txt` |
 | `dat` | `geoip.dat`、`geosite.dat` | 无固定 checksum，后续可接入 upstream checksum |
 | `jq` | `jq-linux-{jqArch}` | GitHub asset digest |
@@ -81,37 +81,31 @@ HTTPS_PROXY={proxy}
 
 新安装：
 
-- create `/etc/xray/sh`
 - create `/etc/xray/bin`
 - create `/etc/xray/conf`
 - create `/var/log/xray`
-- extract `code.zip` to `/etc/xray/sh`
+- install Go CLI to `/usr/local/bin/xray`
 - extract core zip to `/etc/xray/bin`
-- install or keep `/usr/local/bin/xray`
 - install systemd service
 
 保留配置重装：
 
 - keep `/etc/xray/conf`
-- replace `/etc/xray/sh`
 - replace `/etc/xray/bin`
+- replace `/usr/local/bin/xray`
 - reload systemd service
 
 更新：
 
 - core update: replace `/etc/xray/bin/xray` and data files.
-- script update: replace `/etc/xray/sh`.
-- go update: replace `/usr/local/bin/xray` only after Phase 5 switch.
+- script/sh update: compatibility alias for Go CLI update.
+- go update: replace `/usr/local/bin/xray`.
 
 ## Release workflow
 
-Release 必须继续上传：
+Release 必须上传：
 
-- `code.zip`
 - `install.sh`
-
-Phase 4 新增上传：
-
 - `xray-linux-amd64.tar.gz`
 - `xray-linux-arm64.tar.gz`
 - `checksums.txt`
@@ -123,8 +117,8 @@ GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o dist/xray-linux-a
 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o dist/xray-linux-arm64/xray ./cmd/xray
 ```
 
-## 后续接入
+## 当前边界
 
-- Phase 5 才允许 `/usr/local/bin/xray` 默认指向 Go binary。
-- Phase 5 需要 legacy 委托，保证未迁移命令仍可用。
-- Phase 6 才删除 Bash 下载和安装旧逻辑。
+- `/usr/local/bin/xray` 默认是 Go binary。
+- `install.sh` 是远程 bootstrap，不承载业务逻辑。
+- `code.zip`、`xray.sh`、`src/` 和 `/etc/xray/sh` 不再是生产安装目标。

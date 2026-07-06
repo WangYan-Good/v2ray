@@ -13,12 +13,14 @@ func TestDefaultProfilesCoverFixtures(t *testing.T) {
 	want := []string{
 		"shadowsocks",
 		"socks",
+		"trojan-ws-tls",
 		"trojan-xhttp-tls",
 		"vless-grpc-tls",
 		"vless-reality",
 		"vless-ws-tls",
 		"vless-xhttp-tls",
 		"vmess-tcp",
+		"vmess-ws-tls",
 	}
 	got := ProfileNames()
 	if strings.Join(got, ",") != strings.Join(want, ",") {
@@ -181,6 +183,21 @@ func TestClientJSONContainsPublicConnectionFields(t *testing.T) {
 	assertJSONValue(t, doc, path("outbounds", "0", "settings", "servers", "0", "port"), "10007")
 	assertJSONValue(t, doc, path("outbounds", "0", "settings", "servers", "0", "method"), "aes-256-gcm")
 	assertJSONValue(t, doc, path("outbounds", "0", "settings", "servers", "0", "password"), "example-password")
+
+	vmess, err := ProfileByName("vmess-tcp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	vmess.Host = "bak.proxy.yourdie.com"
+	data, err = ClientJSON(vmess)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc = decodeJSON(t, data)
+	assertJSONValue(t, doc, path("outbounds", "0", "settings", "vnext", "0", "address"), "bak.proxy.yourdie.com")
+	if strings.Contains(string(data), `"security": "tls"`) {
+		t.Fatalf("vmess tcp client must not enable TLS just because a server address is set:\n%s", data)
+	}
 }
 
 func TestMihomoDocumentContainsSupportedNodesAndSkip(t *testing.T) {

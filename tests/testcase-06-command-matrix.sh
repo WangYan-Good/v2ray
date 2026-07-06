@@ -13,23 +13,19 @@ for command in version status info url gen add change del mihomo refresh-sub sub
     assert_contains "docs/04-backend/command-matrix.md" "\`$command\`" "command matrix documents $command"
 done
 
-for route in 'gen \| i \| info \| url \| s \| status \| v \| ver \| version' 'qr\)' 'mihomo \| clash' 'refresh-sub \| sub-refresh' 'sub-url' 'u \| up \| update \| U \| update\.sh'; do
-    assert_contains "src/core.sh" "$route" "main route exists: $route"
+for route in '"gen"' '"qr"' '"mihomo", "clash"' '"refresh-sub", "sub-refresh"' '"sub-url"' '"update", "up", "u", "update.sh", "U", "reinstall"'; do
+    assert_contains "internal/app/app.go" "$route" "Go route exists: $route"
 done
 
-for alias in 'r \| reality' 'vxhttp\)' 'txhttp\)' 'ws \| h2 \| grpc' 'vws \| vh2 \| vgrpc' 'tws \| th2 \| tgrpc' 'ss' 'socks'; do
-    assert_contains "src/core.sh" "$alias" "add alias exists: $alias"
+for alias in '"r", "reality"' '"vxhttp", "txhttp"' '"vws", "vh2", "vgrpc", "ws", "h2", "grpc", "tws", "th2", "tgrpc"' '"ss"' '"socks"'; do
+    assert_contains "internal/app/commands.go" "$alias" "Go add alias exists: $alias"
 done
 
-assert_contains "src/core.sh" 'is_new_protocol=VLESS-XHTTP-TLS' "vxhttp maps to VLESS-XHTTP-TLS"
-assert_contains "src/core.sh" 'is_new_protocol=Trojan-XHTTP-TLS' "txhttp maps to Trojan-XHTTP-TLS"
-assert_contains "src/core.sh" '\*reality\*\)' "full REALITY protocol uses reality arg parser"
-assert_contains "src/core.sh" 'trojan_password=\$is_use_pass' "trojan xhttp password bypasses uuid validation"
-
-xhttp_line=$(grep -n '^[[:space:]]*\*-xhttp-tls)' src/core.sh | head -1 | cut -d: -f1)
-tls_line=$(grep -n '^[[:space:]]*\*-tls)' src/core.sh | head -1 | cut -d: -f1)
-[[ -n "$xhttp_line" && -n "$tls_line" && "$xhttp_line" -lt "$tls_line" ]] || fail "xhttp args must be parsed before generic tls"
-pass "xhttp args are parsed before generic tls"
+assert_contains "internal/app/commands.go" 'name := "VLESS-XHTTP-TLS"' "vxhttp maps to VLESS-XHTTP-TLS"
+assert_contains "internal/app/commands.go" 'name = "Trojan-XHTTP-TLS"' "txhttp maps to Trojan-XHTTP-TLS"
+assert_contains "internal/app/commands.go" 'case "r", "reality"' "REALITY protocol uses reality arg parser"
+assert_contains "internal/app/commands.go" 'password = credential' "trojan xhttp password bypasses uuid validation"
+assert_not_contains "internal/app/app.go" 'delegating legacy command|XRAY_LEGACY_BIN|/etc/xray/sh' "Go app has no legacy delegation"
 
 for protocol in VLESS-XTLS-uTLS-REALITY VLESS-WS-TLS VLESS-gRPC-TLS VLESS-XHTTP-TLS Trojan-XHTTP-TLS VMess-TCP Shadowsocks Socks; do
     assert_contains "docs/07-data/protocol-contracts.md" "$protocol" "protocol contract documents $protocol"

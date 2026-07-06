@@ -19,8 +19,8 @@ assert_yaml_contains "tests/fixtures/mihomo/mihomo.yaml" 'skip "Trojan-XHTTP-TLS
 assert_yaml_contains "tests/fixtures/mihomo/mihomo.yaml" 'proxy-groups:' "mihomo includes proxy groups"
 assert_yaml_contains "tests/fixtures/mihomo/mihomo.yaml" '      - DIRECT' "mihomo includes direct fallback"
 
-assert_contains "src/mihomo.sh" 'chmod 600 "\$is_sub_token_file"' "mihomo token permission is 600"
-assert_contains "src/mihomo.sh" 'chmod 644 "\$is_mihomo_sub_file"' "mihomo yaml permission is 644"
-assert_contains "src/mihomo.sh" 'mihomo trojan transport supports ws/grpc/tcp only' "mihomo skips trojan xhttp explicitly"
-assert_contains "src/mihomo.sh" 'xhttp-opts:' "mihomo emits xhttp opts"
-assert_contains "src/mihomo.sh" 'reality-opts:' "mihomo emits reality opts"
+assert_contains "internal/app/commands.go" '0o600' "mihomo token permission is 600"
+assert_contains "internal/app/commands.go" '0o644' "mihomo yaml permission is 644"
+assert_contains "internal/protocol/mihomo.go" 'mihomo trojan transport supports ws/grpc/tcp only' "mihomo skips trojan xhttp explicitly"
+assert_contains "internal/protocol/mihomo.go" 'xhttp-opts:' "mihomo emits xhttp opts"
+assert_contains "internal/protocol/mihomo.go" 'reality-opts:' "mihomo emits reality opts"

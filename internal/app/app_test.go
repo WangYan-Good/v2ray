@@ -75,33 +75,212 @@ func TestUnknownCommandIsNotDelegated(t *testing.T) {
 	}
 }
 
-func TestLegacyCommandDelegatesToBash(t *testing.T) {
+func TestAddCommandUsesGoRuntime(t *testing.T) {
 	dir := t.TempDir()
-	legacyPath := filepath.Join(dir, "xray.sh")
-	if err := os.WriteFile(legacyPath, []byte("#!/usr/bin/env bash\nprintf 'legacy args: %s\\n' \"$*\"\nexit 7\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("XRAY_LEGACY_BIN", legacyPath)
-
-	code, out, errOut := run("add", "vws", "example.com")
-	if code != 7 {
+	code, out, errOut := run("--root", dir, "add", "vws", "example.com")
+	if code != ExitOK {
 		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
 	}
-	if !strings.Contains(out, "legacy args: add vws example.com") {
+	if !strings.Contains(out, "added = VLESS-WS-TLS-example.com") {
 		t.Fatalf("stdout = %s", out)
 	}
-	if !strings.Contains(errOut, `delegating legacy command "add"`) {
+	if strings.Contains(errOut, "delegating legacy command") {
+		t.Fatalf("stderr = %s", errOut)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "etc/xray/conf/VLESS-WS-TLS-example.com.json")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAddRefusesExistingConfig(t *testing.T) {
+	dir := t.TempDir()
+	code, _, errOut := run("--root", dir, "add", "vws", "example.com")
+	if code != ExitOK {
+		t.Fatalf("first add code = %d stderr = %s", code, errOut)
+	}
+
+	code, out, errOut := run("--root", dir, "add", "vws", "example.com")
+	if code != ExitConfig {
+		t.Fatalf("second add code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	if !strings.Contains(errOut, "config already exists: VLESS-WS-TLS-example.com.json") {
 		t.Fatalf("stderr = %s", errOut)
 	}
 }
 
-func TestLegacyCommandMissingPath(t *testing.T) {
-	t.Setenv("XRAY_LEGACY_BIN", filepath.Join(t.TempDir(), "missing.sh"))
-	code, _, errOut := run("update")
-	if code != ExitConfig {
+func TestClientFromStoredFrontendKeepsTLS(t *testing.T) {
+	dir := t.TempDir()
+	code, _, errOut := run("--root", dir, "add", "vws", "example.com")
+	if code != ExitOK {
+		t.Fatalf("add code = %d stderr = %s", code, errOut)
+	}
+
+	code, out, errOut := run("--root", dir, "client", "VLESS-WS-TLS-example.com")
+	if code != ExitOK {
+		t.Fatalf("client code = %d stderr = %s", code, errOut)
+	}
+	for _, want := range []string{`"security": "tls"`, `"address": "example.com"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("client output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestInstallWritesNginxInclude(t *testing.T) {
+	dir := t.TempDir()
+	code, out, errOut := run("--root", dir, "install", "--skip-core", "--tls", "nginx")
+	if code != ExitOK {
+		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "etc/nginx/conf.d/xray.conf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "include "+filepath.Join(dir, "etc/nginx/xray")+"/*.conf;") {
+		t.Fatalf("nginx include = %s", data)
+	}
+}
+
+func TestFixNginxfileRepairsWebrootRenewal(t *testing.T) {
+	dir := t.TempDir()
+	siteDir := filepath.Join(dir, "etc/nginx/xray")
+	renewalDir := filepath.Join(dir, "etc/letsencrypt/renewal")
+	if err := os.MkdirAll(siteDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(renewalDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sitePath := filepath.Join(siteDir, "bak.proxy.yourdie.com.conf")
+	site := `server {
+    if ($host = bak.proxy.yourdie.com) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+    listen 80;
+    server_name bak.proxy.yourdie.com;
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+`
+	if err := os.WriteFile(sitePath, []byte(site), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	renewalPath := filepath.Join(renewalDir, "bak.proxy.yourdie.com.conf")
+	renewal := "[renewalparams]\nauthenticator = nginx\ninstaller = nginx\n"
+	if err := os.WriteFile(renewalPath, []byte(renewal), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	code, out, errOut := run("--root", dir, "fix-nginxfile")
+	if code != ExitOK {
+		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	repairedSite, err := os.ReadFile(sitePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(repairedSite), "managed by Certbot") {
+		t.Fatalf("certbot redirect was not removed:\n%s", repairedSite)
+	}
+	repairedRenewal, err := os.ReadFile(renewalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"authenticator = webroot",
+		"webroot_path = /var/www/certbot,",
+		"bak.proxy.yourdie.com = /var/www/certbot",
+	} {
+		if !strings.Contains(string(repairedRenewal), want) {
+			t.Fatalf("renewal missing %q:\n%s", want, repairedRenewal)
+		}
+	}
+	if strings.Contains(string(repairedRenewal), "installer = nginx") {
+		t.Fatalf("nginx installer should be removed:\n%s", repairedRenewal)
+	}
+}
+
+func TestConfigTestUsesConfdir(t *testing.T) {
+	dir := t.TempDir()
+	code, out, errOut := run("--root", dir, "test")
+	if code != ExitOK {
+		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	for _, want := range []string{
+		filepath.Join(dir, "etc/xray/bin/xray") + " run -test",
+		"-config " + filepath.Join(dir, "etc/xray/config.json"),
+		"-confdir " + filepath.Join(dir, "etc/xray/conf"),
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("dry-run output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestServerOverrideDoesNotInventFrontendTLS(t *testing.T) {
+	dir := t.TempDir()
+	code, _, errOut := run("--root", dir, "add", "ss", "31004", "accept-ss-password", "aes-128-gcm")
+	if code != ExitOK {
+		t.Fatalf("add code = %d stderr = %s", code, errOut)
+	}
+
+	code, out, errOut := run("--root", dir, "--server", "bak.proxy.yourdie.com", "info", "Shadowsocks-31004")
+	if code != ExitOK {
+		t.Fatalf("info code = %d stderr = %s", code, errOut)
+	}
+	for _, want := range []string{
+		"address = bak.proxy.yourdie.com",
+		"port = 31004",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("info output missing %q:\n%s", want, out)
+		}
+	}
+	for _, unwanted := range []string{
+		"host = bak.proxy.yourdie.com",
+		"security = tls",
+	} {
+		if strings.Contains(out, unwanted) {
+			t.Fatalf("info output should not contain %q:\n%s", unwanted, out)
+		}
+	}
+}
+
+func TestRefreshSubWritesExactNginxLocation(t *testing.T) {
+	dir := t.TempDir()
+	code, out, errOut := run("--root", dir, "install", "--skip-core")
+	if code != ExitOK {
+		t.Fatalf("install code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	code, out, errOut = run("--root", dir, "refresh-sub", "bak.proxy.yourdie.com")
+	if code != ExitOK {
+		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "etc/nginx/xray/bak.proxy.yourdie.com.conf.add"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "location = /sub/") {
+		t.Fatalf("subscription route should be exact match:\n%s", text)
+	}
+	if !strings.Contains(text, "alias "+filepath.Join(dir, "etc/xray/sub/mihomo.yaml")+";") {
+		t.Fatalf("subscription route missing alias:\n%s", text)
+	}
+}
+
+func TestUpdateCommandIsRecognizedWithoutLegacyPath(t *testing.T) {
+	dir := t.TempDir()
+	code, _, errOut := run("--root", dir, "update", "go")
+	if code != ExitOK {
 		t.Fatalf("code = %d stderr = %s", code, errOut)
 	}
-	if !strings.Contains(errOut, "legacy command requires Bash entry") {
+	if strings.Contains(errOut, "legacy command requires Bash entry") {
 		t.Fatalf("stderr = %s", errOut)
 	}
 }
@@ -231,8 +410,8 @@ func TestSwitchPlan(t *testing.T) {
 	for _, want := range []string{
 		"mode = go",
 		"entry = /usr/local/bin/xray",
-		"legacy = /etc/xray/sh/xray.sh",
-		"rollback = ln -sf /etc/xray/sh/xray.sh /usr/local/bin/xray",
+		"runtime = go",
+		"install = install.sh downloads xray-linux-{arch}.tar.gz and verifies checksums.txt",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("switch plan missing %q:\n%s", want, out)

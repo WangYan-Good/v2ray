@@ -89,8 +89,8 @@ func TestDatAndGoPlans(t *testing.T) {
 	if got := goPlan.Assets[0].Name; got != "xray-linux-amd64.tar.gz" {
 		t.Fatalf("go asset = %s", got)
 	}
-	if !strings.Contains(FormatPlan(goPlan), "install xray binary to /usr/local/bin/xray after Phase 5 switch") {
-		t.Fatalf("go install steps missing phase 5 guard:\n%s", FormatPlan(goPlan))
+	if !strings.Contains(FormatPlan(goPlan), "install xray binary to /usr/local/bin/xray") {
+		t.Fatalf("go install steps missing install target:\n%s", FormatPlan(goPlan))
 	}
 }
 
@@ -124,8 +124,8 @@ func TestChecksumParsing(t *testing.T) {
 }
 
 func TestSelectAssetDigest(t *testing.T) {
-	release := `{"assets":[{"name":"code.zip","digest":"sha256:` + strings.Repeat("a", 64) + `"},{"name":"install.sh","digest":"sha256:` + strings.Repeat("b", 64) + `"}]}`
-	digest, err := SelectAssetDigest(release, "code.zip")
+	release := `{"assets":[{"name":"xray-linux-amd64.tar.gz","digest":"sha256:` + strings.Repeat("a", 64) + `"},{"name":"install.sh","digest":"sha256:` + strings.Repeat("b", 64) + `"}]}`
+	digest, err := SelectAssetDigest(release, "xray-linux-amd64.tar.gz")
 	if err != nil {
 		t.Fatal(err)
 	}

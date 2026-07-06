@@ -11,27 +11,32 @@ import (
 const DefaultDirectAddress = "203.0.113.10"
 
 type Node struct {
-	Name        string
-	FileName    string
-	Protocol    string
-	Port        int
-	Listen      string
-	ID          string
-	Password    string
-	Method      string
-	Network     string
-	Security    string
-	Host        string
-	Path        string
-	ServiceName string
-	Flow        string
-	ServerName  string
-	Fingerprint string
-	PublicKey   string
-	HeaderType  string
+	Name            string
+	FileName        string
+	Protocol        string
+	Port            int
+	Listen          string
+	ID              string
+	Password        string
+	Method          string
+	Network         string
+	Security        string
+	Host            string
+	Path            string
+	ServiceName     string
+	Flow            string
+	ServerName      string
+	Fingerprint     string
+	PublicKey       string
+	PrivateKey      string
+	HeaderType      string
+	AddressOverride string
 }
 
 func (n Node) Address() string {
+	if strings.TrimSpace(n.AddressOverride) != "" {
+		return strings.TrimSpace(n.AddressOverride)
+	}
 	if n.Host != "" {
 		return n.Host
 	}

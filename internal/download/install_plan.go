@@ -11,9 +11,9 @@ func InstallSteps(kind string) []string {
 		}
 	case "script":
 		return []string{
-			"create /etc/xray/sh",
-			"extract code.zip to /etc/xray/sh",
-			"keep /usr/local/bin/xray on Bash entry until Phase 5",
+			"script runtime removed; use Go CLI asset",
+			"install xray binary to /usr/local/bin/xray",
+			"run xray install for system setup",
 		}
 	case "caddy":
 		return []string{
@@ -36,8 +36,8 @@ func InstallSteps(kind string) []string {
 	case "go":
 		return []string{
 			"extract Go CLI tarball",
-			"install xray binary to /usr/local/bin/xray after Phase 5 switch",
-			"run xray install through compatibility layer",
+			"install xray binary to /usr/local/bin/xray",
+			"run xray install for system setup",
 		}
 	default:
 		return nil

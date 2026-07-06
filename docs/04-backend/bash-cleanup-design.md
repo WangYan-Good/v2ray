@@ -4,6 +4,8 @@
 
 本文档定义 Phase 6 的 Bash 清理边界。清理不是删除全部 Bash，而是删除已经由 Go 接管命令在 Bash 主入口中的业务路由。
 
+状态：本文是历史阶段设计。当前生产边界以 `go-runtime-design.md` 和 Phase 7 为准；Phase 7 已删除 legacy delegate。
+
 ## Go 主线
 
 Go CLI 是默认入口：

@@ -60,7 +60,6 @@ internal/cert/            Certbot 签发、续期、renewal 检查
 internal/subscription/    Mihomo YAML 和订阅 token
 internal/download/        下载、校验和、重试、代理
 internal/ui/              交互式 prompt 和终端输出
-internal/legacy/          Bash 兼容与迁移辅助
 ```
 
 ## 分阶段计划
@@ -147,10 +146,10 @@ internal/legacy/          Bash 兼容与迁移辅助
 - Go 下载计划能覆盖 Xray Core、脚本、Caddy、dat、jq 和 Go CLI 二进制资产。
 - SHA256、Xray `.dgst`、Caddy checksums 和 GitHub asset digest 解析均有单元测试。
 - proxy 环境变量和 unsupported arch 错误可被契约测试断言。
-- Release workflow 构建并上传 linux amd64/arm64 Go CLI tarball，同时保留 `code.zip` 和 `install.sh`。
+- Release workflow 构建并上传 linux amd64/arm64 Go CLI tarball、`checksums.txt` 和 `install.sh`。
 - 新安装、重新安装、保留配置更新的操作步骤以 plan 形式固定；真实默认入口切换进入 Phase 5。
 
-### Phase 5: 命令切换与兼容层
+### Phase 5: 命令切换与兼容层（历史过渡阶段）
 
 - `/usr/local/bin/xray` 默认指向 Go 二进制。
 - 对尚未迁移的命令临时委托旧 Bash。
@@ -167,7 +166,7 @@ internal/legacy/          Bash 兼容与迁移辅助
 - `switch-plan` 输出 Go 入口、legacy 路径和 rollback 步骤。
 - `install.sh` 官方在线安装路径默认安装 Go binary 到 `/usr/local/bin/xray`，并保留 Bash legacy 入口。
 
-### Phase 6: 清理 Bash 旧实现
+### Phase 6: 清理 Bash 旧实现（历史过渡阶段）
 
 - 删除已完全迁移的 Bash 逻辑。
 - 保留最小 bootstrap 和必要的故障恢复脚本。
@@ -180,6 +179,22 @@ internal/legacy/          Bash 兼容与迁移辅助
 - Bash 不再承载 Go 已迁移命令的主入口业务逻辑。
 - 未迁移命令仍可通过 legacy path 使用。
 - 发布包结构稳定。
+
+### Phase 7: 生产替换
+
+- 所有公开命令由 Go CLI 直接处理。
+- 删除生产 Bash runtime：`xray.sh`、`src/`、`internal/legacy`。
+- 保留远程一键安装：`install.sh` 下载并校验 Go tarball 后调用 `xray install`。
+- Release 不再发布 `code.zip`。
+
+操作实施文档：`docs/10-project-management/phase-7-production-cutover-plan.md`
+
+验收：
+
+- `git ls-files xray.sh src internal/legacy` 为空。
+- `/usr/local/bin/xray` 为 Go binary，`switch-plan` 显示 `runtime = go`。
+- `install.sh`、Go tarball 和 `checksums.txt` 仍作为 release assets 发布。
+- 真实 VPS 上完成部署、协议、订阅、证书 dry-run 和客户端连通性验收；当前 `bak.proxy.yourdie.com` 记录中 REALITY 真实连通性仍为 blocker，详见 `docs/09-testing/vps-acceptance-2026-07-06-bak-proxy-yourdie-com.md`。
 
 ## 优先迁移顺序
 
@@ -201,7 +216,7 @@ internal/legacy/          Bash 兼容与迁移辅助
 | 系统命令副作用难测试 | 抽象 `Runner` 和 filesystem 接口，单元测试用 fake，集成测试用容器。 |
 | Certbot 续期继续失败 | 改为 webroot 优先，并显式检查 `/etc/letsencrypt/renewal/*.conf`。 |
 | 发布包复杂度上升 | 使用 GitHub Actions 为 amd64/arm64 构建 release assets。 |
-| 一次性迁移过大 | 保留 Bash 兼容委托，按命令逐步切换。 |
+| 一次性迁移过大 | Phase 7 前保留过渡阶段；生产替换前必须完成本地和 VPS 验收。 |
 
 ## 测试策略
 
@@ -215,8 +230,8 @@ internal/legacy/          Bash 兼容与迁移辅助
 
 - `v1.x`：Bash 主线，逐步补测试和修复证书续期。
 - `v2.0.0-alpha`：Go CLI 只读命令和配置生成预览。
-- `v2.0.0-beta`：Go CLI 管理主路径，Bash 兼容未迁移命令。
-- `v2.0.0`：Go CLI 成为默认入口。
+- `v2.0.0-beta`：Go CLI 管理主路径，历史阶段曾保留 Bash 兼容。
+- `v2.0.0`：Go CLI 成为默认入口和唯一生产 runtime。
 
 ## 第一批建议任务
 

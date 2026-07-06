@@ -109,7 +109,10 @@ func clientStream(profile Profile) *clientStreamSettings {
 		Security: profile.Security,
 	}
 	if settings.Security == "" && profile.Host != "" {
-		settings.Security = "tls"
+		switch profile.Network {
+		case "ws", "grpc", "xhttp", "h2":
+			settings.Security = "tls"
+		}
 	}
 
 	switch profile.Network {

@@ -1,5 +1,7 @@
 # Phase 4 安装、更新、下载实施文档
 
+> 历史阶段说明：本文记录当前 Go 生产运行时之前的下载/安装迁移阶段。文中要求保留 `code.zip` 和 Bash script asset 的内容仅代表 Phase 4 过渡期；当前发布架构以 Phase 7 为准，保留 `install.sh`、Go tarball 和 `checksums.txt`，不再发布 `code.zip`。
+
 ## 目标
 
 Phase 4 的目标是把 Bash 中分散的下载、资产选择、SHA256 校验、安装/更新步骤，推进到可测试的 Go 模型。

@@ -4,14 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/WangYan-Good/xray/internal/config"
 	"github.com/WangYan-Good/xray/internal/download"
 	frontendcaddy "github.com/WangYan-Good/xray/internal/frontend/caddy"
 	frontendnginx "github.com/WangYan-Good/xray/internal/frontend/nginx"
-	"github.com/WangYan-Good/xray/internal/legacy"
 	"github.com/WangYan-Good/xray/internal/protocol"
 	"github.com/WangYan-Good/xray/internal/ui"
 )
@@ -27,7 +27,11 @@ const (
 type options struct {
 	confDir    string
 	configPath string
+	root       string
+	tlsMode    string
+	server     string
 	noColor    bool
+	dryRun     bool
 }
 
 func Run(args []string, stdout, stderr io.Writer) int {
@@ -35,10 +39,10 @@ func Run(args []string, stdout, stderr io.Writer) int {
 }
 
 func RunWithIO(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	return runApp(args, stdin, stdout, stderr, os.Getenv, legacy.OSRunner{})
+	return runApp(args, stdin, stdout, stderr)
 }
 
-func runApp(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv func(string) string, legacyRunner legacy.Runner) int {
+func runApp(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	opts, rest, err := parseArgs(args, stderr)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -70,6 +74,7 @@ func runApp(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv fun
 			fmt.Fprintln(stderr, err)
 			return ExitConfig
 		}
+		node = withServerAddress(node, opts.server)
 		ui.Info(stdout, node)
 		return ExitOK
 	case "url":
@@ -78,6 +83,7 @@ func runApp(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv fun
 			fmt.Fprintln(stderr, err)
 			return ExitConfig
 		}
+		node = withServerAddress(node, opts.server)
 		shareURL, err := protocol.ShareURL(node)
 		if err != nil {
 			fmt.Fprintln(stderr, err)
@@ -91,10 +97,55 @@ func runApp(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv fun
 		return runDownloadPlan(commandArgs, stdout, stderr)
 	case "switch-plan":
 		return runSwitchPlan(commandArgs, stdout, stderr)
+	case "install":
+		return runInstall(opts, commandArgs, stdout, stderr)
+	case "add", "a", "no-auto-tls":
+		return runAdd(opts, command, commandArgs, stdout, stderr)
+	case "change", "config", "c":
+		return runChange(opts, commandArgs, stdout, stderr)
+	case "del", "rm", "d":
+		return runDel(opts, commandArgs, stdout, stderr)
+	case "ddel", "dd":
+		return runDeleteMany(opts, commandArgs, stdout, stderr)
+	case "fix", "fix-all", "fix-config.json", "fix-caddyfile", "fix-nginxfile":
+		return runFix(opts, command, commandArgs, stdout, stderr)
+	case "client", "genc":
+		return runClient(opts, command == "client", commandArgs, stdout, stderr)
+	case "mihomo", "clash":
+		return runMihomo(opts, commandArgs, stdout, stderr)
+	case "refresh-sub", "sub-refresh":
+		return runRefreshSub(opts, commandArgs, stdout, stderr)
+	case "sub-url":
+		return runSubURL(opts, commandArgs, stdout, stderr)
+	case "qr":
+		return runQR(opts, commandArgs, stdout, stderr)
+	case "start", "stop", "restart", "r":
+		return runService(opts, command, commandArgs, stdout, stderr)
+	case "test", "t":
+		return runConfigTest(opts, commandArgs, stdout, stderr)
+	case "update", "up", "u", "update.sh", "U", "reinstall":
+		return runUpdate(opts, command, commandArgs, stdout, stderr)
+	case "uninstall", "un":
+		return runUninstall(opts, commandArgs, stdout, stderr)
+	case "log", "logerr", "errlog":
+		return runLog(opts, command, commandArgs, stdout, stderr)
+	case "dns":
+		return runDNS(opts, commandArgs, stdout, stderr)
+	case "bbr":
+		return runBBR(opts, commandArgs, stdout, stderr)
+	case "ip":
+		return runIP(stdout, stderr)
+	case "debug":
+		return runDebug(opts, commandArgs, stdout, stderr)
+	case "get-port":
+		return runGetPort(stdout, stderr)
+	case "api", "xapi", "bin", "run", "uuid", "tls", "convert":
+		return runCorePassthrough(opts, command, commandArgs, stdin, stdout, stderr)
+	case "ssss", "ss2022":
+		return runSS2022(stdout, stderr)
+	case "help", "h", "--help", "main":
+		return runHelp(commandArgs, stdout)
 	default:
-		if legacy.IsLegacy(command) {
-			return legacy.Delegate(legacy.PathFromEnv(getenv), rest, stdin, stdout, stderr, legacyRunner)
-		}
 		fmt.Fprintf(stderr, "unknown command: %s\n", command)
 		return ExitUsage
 	}
@@ -104,17 +155,45 @@ func parseArgs(args []string, stderr io.Writer) (options, []string, error) {
 	opts := options{
 		confDir:    "/etc/xray/conf",
 		configPath: "/etc/xray/config.json",
+		root:       "/",
+		tlsMode:    "nginx",
 		noColor:    true,
 	}
 	flags := flag.NewFlagSet("xray", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	flags.StringVar(&opts.confDir, "conf-dir", opts.confDir, "managed Xray config directory")
 	flags.StringVar(&opts.configPath, "config", opts.configPath, "main Xray config path")
+	flags.StringVar(&opts.root, "root", opts.root, "root directory for system file operations")
+	flags.StringVar(&opts.tlsMode, "tls", opts.tlsMode, "TLS frontend mode: nginx or caddy")
+	flags.StringVar(&opts.server, "server", opts.server, "public server address for direct protocols")
 	flags.BoolVar(&opts.noColor, "no-color", opts.noColor, "disable color output")
+	flags.BoolVar(&opts.dryRun, "dry-run", opts.dryRun, "print actions without changing external services")
 	if err := flags.Parse(args); err != nil {
 		return opts, nil, err
 	}
+	opts.root = filepath.Clean(opts.root)
+	if opts.root == "." || opts.root == "" {
+		opts.root = "/"
+	}
+	if opts.root != "/" {
+		if opts.confDir == "/etc/xray/conf" {
+			opts.confDir = opts.abs("/etc/xray/conf")
+		}
+		if opts.configPath == "/etc/xray/config.json" {
+			opts.configPath = opts.abs("/etc/xray/config.json")
+		}
+	}
 	return opts, flags.Args(), nil
+}
+
+func (o options) abs(path string) string {
+	if o.root == "/" || o.root == "" {
+		return path
+	}
+	if !strings.HasPrefix(path, "/") {
+		return path
+	}
+	return filepath.Join(o.root, strings.TrimPrefix(path, "/"))
 }
 
 func matchNode(confDir string, args []string) (config.Node, error) {
@@ -256,7 +335,7 @@ func runSwitchPlan(args []string, stdout, stderr io.Writer) int {
 	mode := "go"
 	flags := flag.NewFlagSet("xray switch-plan", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	flags.StringVar(&mode, "mode", mode, "switch mode: go or rollback")
+	flags.StringVar(&mode, "mode", mode, "switch mode: go or restore")
 	if err := flags.Parse(args); err != nil {
 		fmt.Fprintln(stderr, err)
 		return ExitUsage
@@ -265,6 +344,10 @@ func runSwitchPlan(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "switch-plan does not accept positional arguments")
 		return ExitUsage
 	}
-	fmt.Fprint(stdout, legacy.FormatSwitchPlan(legacy.NewSwitchPlan(mode)))
+	fmt.Fprintf(stdout, "mode = %s\n", mode)
+	fmt.Fprintln(stdout, "entry = /usr/local/bin/xray")
+	fmt.Fprintln(stdout, "runtime = go")
+	fmt.Fprintln(stdout, "install = install.sh downloads xray-linux-{arch}.tar.gz and verifies checksums.txt")
+	fmt.Fprintln(stdout, "restore = reinstall the previous Go release asset or restore /usr/local/bin/xray from backup")
 	return ExitOK
 }

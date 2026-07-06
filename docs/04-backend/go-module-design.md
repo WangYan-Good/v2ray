@@ -151,4 +151,4 @@ bash tests/shellcheck.sh
 
 - Phase 2 可在 `internal/protocol` 中扩展强类型协议模型和 JSON 生成。
 - Phase 3 可新增 `internal/frontend/nginx` 与 `internal/frontend/caddy`，但不得塞入 Phase 1 包。
-- Phase 5 才允许引入 `internal/legacy` 委托 Bash 或切换 `/usr/local/bin/xray`。
+- 历史 Phase 5 曾允许引入 `internal/legacy` 委托 Bash；当前 Phase 7 已移除该包，`/usr/local/bin/xray` 固定为 Go CLI 入口。

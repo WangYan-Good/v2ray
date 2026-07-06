@@ -71,6 +71,7 @@ type rawXHTTPSettings struct {
 type rawRealitySettings struct {
 	ServerNames []string `json:"serverNames"`
 	PublicKey   string   `json:"publicKey"`
+	PrivateKey  string   `json:"privateKey"`
 }
 
 type rawTCPSettings struct {
@@ -136,6 +137,7 @@ func ReadNode(path string) (Node, error) {
 		Path:        in.StreamSettings.WSSettings.Path,
 		ServiceName: in.StreamSettings.GRPCSettings.ServiceName,
 		PublicKey:   in.StreamSettings.RealitySettings.PublicKey,
+		PrivateKey:  in.StreamSettings.RealitySettings.PrivateKey,
 		HeaderType:  in.StreamSettings.TCPSettings.Header.Type,
 		Fingerprint: "ios",
 	}
