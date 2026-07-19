@@ -1,10 +1,12 @@
-# Xray Go CLI
+# Xray
 
-Xray installation and management CLI implemented in Go.
+> 一个支持多站点共存的 Xray 一键安装和管理脚本
 
-The production runtime is `/usr/local/bin/xray`, built from `cmd/xray`. `install.sh` is retained as a remote bootstrap that downloads and verifies the Go release asset, then runs `xray install`.
+> **本项目 Fork 自**: [233boy/v2ray](https://github.com/233boy/v2ray)
 
-## Install
+本项目使用 Go 进行了重构，并增加了 Nginx + Certbot 来配置 TLS 证书。
+
+## 安装教程
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/WangYan-Good/xray/main/install.sh)
@@ -20,7 +22,7 @@ bash install.sh --version v2.0.0-release
 bash install.sh --core-version v26.3.27
 ```
 
-## Common Commands
+## 命令参考
 
 ```bash
 xray version
@@ -39,35 +41,6 @@ xray test
 xray restart
 ```
 
-## Release Assets
+## 参考文档
 
-GitHub Release publishes:
-
-- `install.sh`
-- `xray-linux-amd64.tar.gz`
-- `xray-linux-arm64.tar.gz`
-- `checksums.txt`
-
-`code.zip` is no longer published.
-
-## Development
-
-Use a local Go toolchain or the Go container used by the test harness:
-
-```bash
-go test ./...
-bash tests/run.sh
-bash tests/shellcheck.sh
-```
-
-If `go` is unavailable locally, tests use Docker/Podman with `GO_CONTAINER_IMAGE` defaulting to `docker.m.daocloud.io/library/golang:1.22`.
-
-## Documentation
-
-Canonical docs live under `docs/`:
-
-- `docs/10-project-management/go-refactor-plan.md`
-- `docs/10-project-management/phase-7-production-cutover-plan.md`
-- `docs/04-backend/go-runtime-design.md`
-- `docs/04-backend/command-matrix.md`
-- `docs/09-testing/test-strategy.md`
+参考 [项目文档入口](./docs/README.md)

@@ -33,8 +33,6 @@ install.sh
 | `/etc/caddy/WangYan-Good/*.conf` | Caddy TLS 前端配置 |
 | `/etc/systemd/system/xray.service` | Xray systemd 服务 |
 
-旧 Bash runtime (`xray.sh`、`src/`、`/etc/xray/sh`) 已删除，不再是生产路径。
-
 ## Go 包边界
 
 | 包 | 职责 |
@@ -62,5 +60,3 @@ Release assets:
 - `xray-linux-amd64.tar.gz`
 - `xray-linux-arm64.tar.gz`
 - `checksums.txt`
-
-`code.zip` 不再发布。
