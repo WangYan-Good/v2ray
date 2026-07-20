@@ -13,6 +13,7 @@ import (
 	frontendcaddy "github.com/WangYan-Good/xray/internal/frontend/caddy"
 	frontendnginx "github.com/WangYan-Good/xray/internal/frontend/nginx"
 	"github.com/WangYan-Good/xray/internal/protocol"
+	systemexec "github.com/WangYan-Good/xray/internal/system"
 	"github.com/WangYan-Good/xray/internal/ui"
 )
 
@@ -32,6 +33,7 @@ type options struct {
 	server     string
 	noColor    bool
 	dryRun     bool
+	runner     systemexec.Runner
 }
 
 func Run(args []string, stdout, stderr io.Writer) int {
@@ -39,14 +41,25 @@ func Run(args []string, stdout, stderr io.Writer) int {
 }
 
 func RunWithIO(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	return runApp(args, stdin, stdout, stderr)
+	return runApp(args, stdin, stdout, stderr, nil)
 }
 
-func runApp(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func RunWithRunner(args []string, stdin io.Reader, stdout, stderr io.Writer, runner systemexec.Runner) int {
+	return runApp(args, stdin, stdout, stderr, runner)
+}
+
+func runApp(args []string, stdin io.Reader, stdout, stderr io.Writer, runner systemexec.Runner) int {
 	opts, rest, err := parseArgs(args, stderr)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return ExitUsage
+	}
+	if runner != nil {
+		opts.runner = runner
+	} else if opts.root != "/" || opts.dryRun {
+		opts.runner = systemexec.DryRunner{Writer: stdout}
+	} else {
+		opts.runner = &systemexec.RealRunner{Stdin: stdin, Stdout: stdout, Stderr: stderr}
 	}
 	if len(rest) == 0 {
 		fmt.Fprintln(stderr, "missing command")

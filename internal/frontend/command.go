@@ -1,13 +1,6 @@
 package frontend
 
-import "strings"
+import "github.com/WangYan-Good/xray/internal/system"
 
-type Command struct {
-	Name string
-	Args []string
-}
-
-func (c Command) String() string {
-	parts := append([]string{c.Name}, c.Args...)
-	return strings.Join(parts, " ")
-}
+// Command remains an alias so existing frontend plan APIs stay source compatible.
+type Command = system.Command

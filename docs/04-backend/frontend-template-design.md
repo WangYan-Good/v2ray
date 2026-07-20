@@ -2,11 +2,12 @@
 
 ## 目标
 
-本文档定义 Phase 3 的 Nginx/Caddy 模板化设计。它把 TLS 前端配置拆成三层：
+本文档定义 Nginx/Caddy 模板和 Nginx 事务部署。它把 TLS 前端配置拆成四层：
 
 - 模板渲染：从 `protocol.Profile` 生成 `.conf` 或 `.add` 文本。
 - 配置检查：解析现有 `.conf/.add`，判断追加、幂等或冲突。
-- 操作计划：列出应执行的 validate/reload/certbot 命令，但不在 Phase 3 自动执行。
+- 系统执行：所有 Nginx、Certbot、OpenSSL、systemctl 命令通过 Runner 执行。
+- 事务部署：候选验证、原子提交、服务 reload 与失败回滚。
 
 ## 包结构
 
@@ -16,6 +17,8 @@ internal/frontend/nginx/
   inspect.go
   certbot.go
   plan.go
+  transaction.go
+  deploy.go
 
 internal/frontend/caddy/
   render.go
@@ -23,13 +26,14 @@ internal/frontend/caddy/
   plan.go
 ```
 
-这些包只依赖标准库和 `internal/protocol`。
+渲染、解析和迁移函数保持无副作用；`deploy.go` 是唯一的 Nginx 编排边界。
 
 ## Nginx 模板
 
 ### 完整站点
 
-完整站点用于域名第一次启用 TLS 前端协议：
+首次无证书时先生成只监听 80 的 bootstrap：ACME challenge 使用
+`/var/www/certbot` 和 `try_files`，普通请求返回 503。证书验证成功后才写入完整站点：
 
 - 80 server:
   - `location /.well-known/acme-challenge/`
@@ -38,8 +42,8 @@ internal/frontend/caddy/
 - 443 server:
   - `listen 443 ssl http2`
   - `server_name {domain}`
-  - `ssl_certificate /etc/nginx/ssl/{domain}/fullchain.pem`
-  - `ssl_certificate_key /etc/nginx/ssl/{domain}/privkey.pem`
+  - `ssl_certificate /etc/letsencrypt/live/{domain}/fullchain.pem`
+  - `ssl_certificate_key /etc/letsencrypt/live/{domain}/privkey.pem`
   - 一个主协议 location
   - `include /etc/nginx/xray/{domain}.conf.add;`
 
@@ -130,20 +134,28 @@ Phase 3 Go 模型固定 Nginx webroot-first 语义：
   - `[[webroot_map]]`
   - `{domain} = /var/www/certbot`
 
+签发固定使用 `certbot certonly --webroot --non-interactive --agree-tos`。
+邮箱来自 `/etc/xray/acme.json`；无邮箱必须显式选择。部署 hook 位于
+`/etc/letsencrypt/renewal-hooks/deploy/xray-nginx-reload`，权限 0755，并在
+`systemctl reload nginx` 前运行 `nginx -t`。
+
 ## 操作计划
 
-Phase 3 不执行命令，只生成计划：
+实际部署顺序：
 
 Nginx：
 
-- `nginx -t`
-- `systemctl reload nginx`
-- `certbot certonly --webroot -w /var/www/certbot -d {domain}`
-- `certbot renew --dry-run --deploy-hook systemctl reload nginx`
+- preflight、端口/route 冲突检查和备份
+- bootstrap 候选验证、原子提交、`nginx -t`、reload
+- Certbot webroot 签发和 OpenSSL 文件/域名验证
+- final 候选验证、原子提交、`nginx -t`、reload
+- 持久 hook、renewal 迁移和首次 `certbot renew --dry-run`
 
 Caddy：
 
 - `caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile`
 - `systemctl reload caddy`
 
-后续阶段若接入 Runner，必须保留 fake runner 测试，不允许把系统命令散落在模板代码里。
+失败时恢复管理文件，并只在恢复后的 `nginx -t` 成功时 reload。已经成功
+签发的证书和 renewal 元数据不会删除。旧 `/etc/nginx/ssl/{domain}` 仅在
+Let’s Encrypt 证书验证通过时迁移；未知自定义证书和软链接保持不变。

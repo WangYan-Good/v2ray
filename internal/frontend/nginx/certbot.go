@@ -2,8 +2,29 @@ package nginx
 
 import (
 	"fmt"
+	"path/filepath"
+	"regexp"
 	"strings"
 )
+
+const (
+	DeployHookPath = "/etc/letsencrypt/renewal-hooks/deploy/xray-nginx-reload"
+	DeployHook     = `#!/usr/bin/env bash
+set -euo pipefail
+nginx -t
+systemctl reload nginx
+`
+)
+
+var oldSSLDirectiveRE = regexp.MustCompile(`(?m)(ssl_certificate(?:_key)?\s+)/etc/nginx/ssl/([^/;\s]+)/((?:fullchain|privkey)\.pem)(;)`)
+
+func CertificatePath(domain string) string {
+	return filepath.Join(LiveDir, domain, "fullchain.pem")
+}
+
+func PrivateKeyPath(domain string) string {
+	return filepath.Join(LiveDir, domain, "privkey.pem")
+}
 
 func RenewalAuthenticator(content string) string {
 	for _, line := range strings.Split(content, "\n") {
@@ -73,4 +94,39 @@ func EnsureWebrootRenewal(content, domain string) (string, bool) {
 
 	out := strings.Join(lines, "\n")
 	return strings.TrimRight(out, "\n") + "\n", changed
+}
+
+func RemoveNginxInstaller(content string) (string, bool) {
+	lines := strings.Split(content, "\n")
+	out := make([]string, 0, len(lines))
+	changed := false
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "installer = nginx" {
+			changed = true
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n", changed
+}
+
+// MigrateCertificatePaths changes only directives for the expected managed domain.
+// The caller must verify the Let's Encrypt certificate before setting verified=true.
+func MigrateCertificatePaths(content, domain string, verified bool) (string, bool, string) {
+	if !strings.Contains(content, "/etc/nginx/ssl/") {
+		return content, false, ""
+	}
+	if !verified {
+		return content, false, "valid Let's Encrypt certificate not confirmed; old certificate path retained"
+	}
+	changed := false
+	out := oldSSLDirectiveRE.ReplaceAllStringFunc(content, func(match string) string {
+		parts := oldSSLDirectiveRE.FindStringSubmatch(match)
+		if len(parts) != 5 || parts[2] != domain {
+			return match
+		}
+		changed = true
+		return parts[1] + filepath.Join(LiveDir, domain, parts[3]) + parts[4]
+	})
+	return out, changed, ""
 }

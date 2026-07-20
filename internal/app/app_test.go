@@ -2,10 +2,13 @@ package app
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	systemexec "github.com/WangYan-Good/xray/internal/system"
 )
 
 const fixtureDir = "../../tests/fixtures/xray-conf"
@@ -14,6 +17,20 @@ func run(args ...string) (int, string, string) {
 	var stdout, stderr bytes.Buffer
 	code := Run(args, &stdout, &stderr)
 	return code, stdout.String(), stderr.String()
+}
+
+func runWithRunner(runner systemexec.Runner, args ...string) (int, string, string) {
+	var stdout, stderr bytes.Buffer
+	code := RunWithRunner(args, nil, &stdout, &stderr, runner)
+	return code, stdout.String(), stderr.String()
+}
+
+func installNginxFixture(t *testing.T, dir string) {
+	t.Helper()
+	code, out, errOut := run("--root", dir, "install", "--skip-core", "--tls", "nginx", "--acme-email", "user@example.com")
+	if code != ExitOK {
+		t.Fatalf("install code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
 }
 
 func TestVersionAlias(t *testing.T) {
@@ -77,6 +94,7 @@ func TestUnknownCommandIsNotDelegated(t *testing.T) {
 
 func TestAddCommandUsesGoRuntime(t *testing.T) {
 	dir := t.TempDir()
+	installNginxFixture(t, dir)
 	code, out, errOut := run("--root", dir, "add", "vws", "example.com")
 	if code != ExitOK {
 		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
@@ -94,6 +112,7 @@ func TestAddCommandUsesGoRuntime(t *testing.T) {
 
 func TestAddRefusesExistingConfig(t *testing.T) {
 	dir := t.TempDir()
+	installNginxFixture(t, dir)
 	code, _, errOut := run("--root", dir, "add", "vws", "example.com")
 	if code != ExitOK {
 		t.Fatalf("first add code = %d stderr = %s", code, errOut)
@@ -108,8 +127,30 @@ func TestAddRefusesExistingConfig(t *testing.T) {
 	}
 }
 
+func TestAddWithSameExplicitRouteAndPortIsIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	installNginxFixture(t, dir)
+	args := []string{"--root", dir, "add", "vxhttp", "18431", "11111111-1111-4111-8111-111111111111", "example.com", "/same-route"}
+	code, out, errOut := run(args...)
+	if code != ExitOK {
+		t.Fatalf("first add code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	code, out, errOut = run(args...)
+	if code != ExitOK {
+		t.Fatalf("idempotent add code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+
+	conflicting := append([]string(nil), args...)
+	conflicting[5] = "22222222-2222-4222-8222-222222222222"
+	code, out, errOut = run(conflicting...)
+	if code != ExitConfig || !strings.Contains(errOut, "config already exists") {
+		t.Fatalf("conflicting add code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+}
+
 func TestClientFromStoredFrontendKeepsTLS(t *testing.T) {
 	dir := t.TempDir()
+	installNginxFixture(t, dir)
 	code, _, errOut := run("--root", dir, "add", "vws", "example.com")
 	if code != ExitOK {
 		t.Fatalf("add code = %d stderr = %s", code, errOut)
@@ -138,6 +179,120 @@ func TestInstallWritesNginxInclude(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "include "+filepath.Join(dir, "etc/nginx/xray")+"/*.conf;") {
 		t.Fatalf("nginx include = %s", data)
+	}
+}
+
+func TestInstallPersistsACMEEmail(t *testing.T) {
+	dir := t.TempDir()
+	code, out, errOut := run("--root", dir, "install", "--skip-core", "--tls", "nginx", "--acme-email", "user@example.com")
+	if code != ExitOK {
+		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	path := filepath.Join(dir, "etc/xray/acme.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"email": "user@example.com"`) {
+		t.Fatalf("ACME config = %s", data)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode = %o", info.Mode().Perm())
+	}
+}
+
+func TestInstallEnablesValidatedServices(t *testing.T) {
+	dir := t.TempDir()
+	code, out, errOut := run("--root", dir, "install", "--skip-core", "--tls", "nginx", "--acme-email", "user@example.com")
+	if code != ExitOK {
+		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	ordered := []string{
+		filepath.Join(dir, "etc/xray/bin/xray") + " run -test",
+		"nginx -t",
+		"systemctl daemon-reload",
+		"systemctl enable --now xray",
+		"systemctl enable --now nginx",
+	}
+	last := -1
+	for _, command := range ordered {
+		index := strings.Index(out, command)
+		if index <= last {
+			t.Fatalf("command %q out of order:\n%s", command, out)
+		}
+		last = index
+	}
+}
+
+func TestInstallDryRunWritesNothing(t *testing.T) {
+	dir := t.TempDir()
+	code, out, errOut := run("--root", dir, "--dry-run", "install", "--skip-core", "--tls", "nginx", "--acme-email", "user@example.com")
+	if code != ExitOK {
+		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("dry-run wrote files: %v", entries)
+	}
+	if !strings.Contains(out, "systemctl enable --now nginx") || !strings.Contains(out, "dry_run_file") {
+		t.Fatalf("dry-run plan incomplete:\n%s", out)
+	}
+}
+
+func TestNginxAddRollsBackXrayWhenCertbotFails(t *testing.T) {
+	dir := t.TempDir()
+	installNginxFixture(t, dir)
+	mainBefore, err := os.ReadFile(filepath.Join(dir, "etc/xray/config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &systemexec.RecordingRunner{Failures: map[int]error{11: errors.New("certbot unavailable")}}
+	code, out, errOut := runWithRunner(runner, "--root", dir, "add", "vws", "example.com")
+	if code != ExitUnexpected || !strings.Contains(errOut, "certbot unavailable") {
+		t.Fatalf("code = %d stdout = %s stderr = %s commands = %v", code, out, errOut, runner.Strings())
+	}
+	nodePath := filepath.Join(dir, "etc/xray/conf/VLESS-WS-TLS-example.com.json")
+	if _, err := os.Stat(nodePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("node was not rolled back: %v", err)
+	}
+	mainAfter, err := os.ReadFile(filepath.Join(dir, "etc/xray/config.json"))
+	if err != nil || !bytes.Equal(mainBefore, mainAfter) {
+		t.Fatalf("main config was not restored: %v", err)
+	}
+	commands := runner.Strings()
+	if commands[len(commands)-1] != "systemctl restart xray" {
+		t.Fatalf("Xray rollback was not attempted: %v", commands)
+	}
+}
+
+func TestNonTLSAddDoesNotCallNginxOrCertbot(t *testing.T) {
+	dir := t.TempDir()
+	runner := &systemexec.RecordingRunner{}
+	code, out, errOut := runWithRunner(runner, "--root", dir, "add", "ss", "31004", "example-password", "aes-128-gcm")
+	if code != ExitOK {
+		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	commands := strings.Join(runner.Strings(), "\n")
+	if strings.Contains(commands, "nginx") || strings.Contains(commands, "certbot") {
+		t.Fatalf("non-TLS commands:\n%s", commands)
+	}
+}
+
+func TestCaddyInstallDoesNotStartNginx(t *testing.T) {
+	dir := t.TempDir()
+	code, out, errOut := run("--root", dir, "install", "--skip-core", "--tls", "caddy")
+	if code != ExitOK {
+		t.Fatalf("code = %d stdout = %s stderr = %s", code, out, errOut)
+	}
+	if strings.Contains(out, "nginx") || strings.Contains(out, "certbot") {
+		t.Fatalf("Caddy install touched Nginx/Certbot:\n%s", out)
 	}
 }
 
@@ -172,7 +327,7 @@ func TestFixNginxfileRepairsWebrootRenewal(t *testing.T) {
 	}
 	renewalPath := filepath.Join(renewalDir, "bak.proxy.yourdie.com.conf")
 	renewal := "[renewalparams]\nauthenticator = nginx\ninstaller = nginx\n"
-	if err := os.WriteFile(renewalPath, []byte(renewal), 0o644); err != nil {
+	if err := os.WriteFile(renewalPath, []byte(renewal), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -202,6 +357,13 @@ func TestFixNginxfileRepairsWebrootRenewal(t *testing.T) {
 	}
 	if strings.Contains(string(repairedRenewal), "installer = nginx") {
 		t.Fatalf("nginx installer should be removed:\n%s", repairedRenewal)
+	}
+	info, err := os.Stat(renewalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("renewal mode = %v", info.Mode().Perm())
 	}
 }
 
@@ -332,7 +494,7 @@ func TestGenFrontendTemplates(t *testing.T) {
 		{
 			args: []string{"gen", "--format", "nginx", "vless-ws-tls"},
 			want: []string{
-				"location /.well-known/acme-challenge/",
+				"location ^~ /.well-known/acme-challenge/",
 				"proxy_pass http://127.0.0.1:10002;",
 				"include /etc/nginx/xray/example.com.conf.add;",
 			},

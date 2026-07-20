@@ -91,6 +91,11 @@ URL 测试不应依赖颜色和横线，只检查：
 - Nginx 模式目标状态是 webroot 优先。
 - `certbot renew --dry-run` 的设计不要求停止 Nginx。
 - renewal 检查逻辑不能依赖真实证书目录。
+- bootstrap 必须在签发前通过 Nginx 验证和 reload，且不能引用证书。
+- 最终站点必须使用 `/etc/letsencrypt/live`。
+- RecordingRunner 在每个关键命令失败时必须证明配置回滚。
+- deploy hook 权限为 0755，内容先 `nginx -t` 再 reload。
+- dry-run 不得在临时 root 中留下任何文件。
 
 ### Mihomo 契约
 
@@ -146,3 +151,7 @@ TLS 模式:
 失败日志:
 结论:
 ```
+
+真实 VPS 验收还应记录 DNS、TCP 80/443、防火墙、`nginx -t`、
+`certbot renew --dry-run`、两个 systemd service 状态及重启后的客户端连通性。
+普通单元测试只使用 `--root` fixture 和 RecordingRunner，不得修改宿主机 `/etc`。

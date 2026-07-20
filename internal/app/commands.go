@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -26,11 +25,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/WangYan-Good/xray/internal/acme"
 	"github.com/WangYan-Good/xray/internal/config"
 	"github.com/WangYan-Good/xray/internal/download"
 	frontendcaddy "github.com/WangYan-Good/xray/internal/frontend/caddy"
 	frontendnginx "github.com/WangYan-Good/xray/internal/frontend/nginx"
 	"github.com/WangYan-Good/xray/internal/protocol"
+	systemexec "github.com/WangYan-Good/xray/internal/system"
 )
 
 const (
@@ -49,12 +50,16 @@ func runAdd(opts options, command string, args []string, stdout, stderr io.Write
 		fmt.Fprintln(stderr, err)
 		return ExitUsage
 	}
-	if err := writeProfile(opts, profile); err != nil {
+	if err := deployProfile(opts, profile, stdout, stderr); err != nil {
 		fmt.Fprintln(stderr, err)
 		if errors.Is(err, errConfigExists) {
 			return ExitConfig
 		}
 		return ExitUnexpected
+	}
+	if opts.dryRun {
+		fmt.Fprintf(stdout, "planned = %s\n", profile.Name)
+		return ExitOK
 	}
 	fmt.Fprintf(stdout, "added = %s\n", profile.Name)
 	fmt.Fprintf(stdout, "file = %s\n", filepath.Join(opts.confDir, profile.Name+".json"))
@@ -62,6 +67,152 @@ func runAdd(opts options, command string, args []string, stdout, stderr io.Write
 		fmt.Fprintf(stdout, "url = %s\n", share)
 	}
 	return ExitOK
+}
+
+func deployProfile(opts options, profile protocol.Profile, stdout, stderr io.Writer) (retErr error) {
+	fileName := profile.Name + ".json"
+	nodePath := filepath.Join(opts.confDir, fileName)
+	data, err := protocol.XrayJSON(profile)
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	nodeExists := false
+	if existing, err := os.ReadFile(nodePath); err == nil {
+		if !bytes.Equal(bytes.TrimSpace(existing), bytes.TrimSpace(data)) {
+			return fmt.Errorf("%w: %s", errConfigExists, fileName)
+		}
+		nodeExists = true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := validateXrayCandidate(opts, fileName, data, profile); err != nil {
+		return err
+	}
+	if profile.Host != "" {
+		if err := checkFrontendConflict(opts, profile); err != nil {
+			return err
+		}
+	}
+	if opts.dryRun {
+		if nodeExists {
+			fmt.Fprintf(stdout, "dry_run_file = keep %s\n", nodePath)
+		} else {
+			fmt.Fprintf(stdout, "dry_run_file = write %s\n", nodePath)
+		}
+		if profile.Host != "" && opts.tlsMode != "caddy" {
+			config, _ := loadACMEConfig(opts)
+			deployer, err := frontendnginx.NewDeployer(frontendnginx.DeployOptions{
+				Root:   opts.root,
+				DryRun: true,
+				Runner: opts.runner,
+				ACME:   config,
+				Warn: func(message string) {
+					fmt.Fprintf(stderr, "warning: %s\n", message)
+				},
+				FileAction: func(message string) { fmt.Fprintf(stdout, "dry_run_file = %s\n", message) },
+			})
+			if err != nil {
+				return err
+			}
+			_, err = deployer.Deploy(context.Background(), profile)
+			return err
+		}
+		return nil
+	}
+	if nodeExists {
+		if profile.Host == "" {
+			return nil
+		}
+		if opts.tlsMode == "caddy" {
+			return writeCaddyFrontend(opts, profile)
+		}
+		config, err := loadACMEConfig(opts)
+		if err != nil {
+			return err
+		}
+		deployer, err := frontendnginx.NewDeployer(frontendnginx.DeployOptions{
+			Root:   opts.root,
+			Runner: opts.runner,
+			ACME:   config,
+			Warn: func(message string) {
+				fmt.Fprintf(stderr, "warning: %s\n", message)
+			},
+		})
+		if err != nil {
+			return err
+		}
+		_, err = deployer.Deploy(context.Background(), profile)
+		return err
+	}
+
+	nodeSnapshot, err := captureFile(nodePath)
+	if err != nil {
+		return err
+	}
+	mainSnapshot, err := captureFile(opts.configPath)
+	if err != nil {
+		return err
+	}
+	rollback := func(cause error) error {
+		rollbackErr := restoreFiles(nodeSnapshot, mainSnapshot)
+		if _, err := opts.runner.Run(context.Background(), systemexec.Command{Name: "systemctl", Args: []string{"restart", "xray"}, Step: "restore Xray service"}); err != nil {
+			rollbackErr = errors.Join(rollbackErr, err)
+		}
+		if rollbackErr != nil {
+			return fmt.Errorf("%w; Xray rollback failed: %v", cause, rollbackErr)
+		}
+		return cause
+	}
+	if err := ensureDir(opts.confDir); err != nil {
+		return err
+	}
+	if err := atomicWrite(nodePath, data, 0o600); err != nil {
+		return err
+	}
+	if err := writeMainConfig(opts); err != nil {
+		return rollback(err)
+	}
+	if err := runRunner(opts, systemexec.Command{
+		Name:            opts.abs(xrayBinPath),
+		Args:            []string{"run", "-test", "-config", opts.configPath, "-confdir", opts.confDir},
+		Step:            "validate committed Xray configuration",
+		SensitiveValues: profileSecrets(profile),
+	}); err != nil {
+		return rollback(err)
+	}
+	if err := runRunner(opts, systemexec.Command{Name: "systemctl", Args: []string{"restart", "xray"}, Step: "restart Xray service"}); err != nil {
+		return rollback(err)
+	}
+
+	if profile.Host == "" {
+		return nil
+	}
+	if opts.tlsMode == "caddy" {
+		if err := writeCaddyFrontend(opts, profile); err != nil {
+			return rollback(err)
+		}
+		return nil
+	}
+	config, err := loadACMEConfig(opts)
+	if err != nil {
+		return rollback(err)
+	}
+	deployer, err := frontendnginx.NewDeployer(frontendnginx.DeployOptions{
+		Root:   opts.root,
+		Runner: opts.runner,
+		ACME:   config,
+		Warn: func(message string) {
+			fmt.Fprintf(stderr, "warning: %s\n", message)
+		},
+	})
+	if err != nil {
+		return rollback(err)
+	}
+	if _, err := deployer.Deploy(context.Background(), profile); err != nil {
+		return rollback(err)
+	}
+	return nil
 }
 
 func runChange(opts options, args []string, stdout, stderr io.Writer) int {
@@ -158,7 +309,7 @@ func runFix(opts options, command string, args []string, stdout, stderr io.Write
 		}
 		fmt.Fprintln(stdout, "fixed = Caddyfile")
 	case "fix-nginxfile":
-		if err := writeNginxInclude(opts); err != nil {
+		if err := fixNginx(opts, stdout, stderr); err != nil {
 			fmt.Fprintln(stderr, err)
 			return ExitUnexpected
 		}
@@ -333,8 +484,63 @@ func runService(opts options, command string, args []string, stdout, stderr io.W
 	return runExternal(opts, stdout, stderr, "systemctl", action, service)
 }
 
-func runConfigTest(opts options, _ []string, stdout, stderr io.Writer) int {
-	return runExternal(opts, stdout, stderr, opts.abs(xrayBinPath), "run", "-test", "-config", opts.configPath, "-confdir", opts.confDir)
+func runConfigTest(opts options, args []string, stdout, stderr io.Writer) int {
+	target := firstArg(args)
+	if len(args) > 1 {
+		fmt.Fprintln(stderr, "usage: xray test [xray|nginx|certbot|all]")
+		return ExitUsage
+	}
+	if target == "" {
+		target = "xray"
+	}
+	if target != "xray" && target != "nginx" && target != "certbot" && target != "all" {
+		fmt.Fprintf(stderr, "unsupported test target: %s\n", target)
+		return ExitUsage
+	}
+	if target == "xray" || target == "all" {
+		if code := runExternal(opts, stdout, stderr, opts.abs(xrayBinPath), "run", "-test", "-config", opts.configPath, "-confdir", opts.confDir); code != ExitOK {
+			return code
+		}
+	}
+	if target == "nginx" || target == "all" {
+		if err := runRunner(opts, frontendnginx.ValidateCommand()); err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnexpected
+		}
+		sites, err := filepath.Glob(filepath.Join(opts.abs(frontendnginx.SiteDir), "*.conf"))
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnexpected
+		}
+		for _, site := range sites {
+			domain := strings.TrimSuffix(filepath.Base(site), ".conf")
+			if !certificateFilesPresent(opts, domain) {
+				fmt.Fprintf(stderr, "certificate files missing for %s\n", domain)
+				return ExitConfig
+			}
+			if err := verifyCertificateWithRunner(opts, domain); err != nil {
+				fmt.Fprintln(stderr, err)
+				return ExitConfig
+			}
+		}
+		if err := runRunner(opts, systemexec.Command{Name: "systemctl", Args: []string{"is-active", "nginx"}, Step: "check Nginx service"}); err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnexpected
+		}
+	}
+	if target == "certbot" || target == "all" {
+		if err := runRunner(opts, frontendnginx.CertbotRenewDryRunCommand()); err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnexpected
+		}
+	}
+	if target == "all" {
+		if err := runRunner(opts, systemexec.Command{Name: "systemctl", Args: []string{"is-active", "xray"}, Step: "check Xray service"}); err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnexpected
+		}
+	}
+	return ExitOK
 }
 
 func runUpdate(opts options, command string, args []string, stdout, stderr io.Writer) int {
@@ -515,7 +721,11 @@ func runInstall(opts options, args []string, stdout, stderr io.Writer) int {
 	coreFile := ""
 	proxy := ""
 	skipCore := false
+	acmeEmail := ""
+	acmeNoEmail := false
 	flags.StringVar(&tlsMode, "tls", tlsMode, "TLS frontend mode")
+	flags.StringVar(&acmeEmail, "acme-email", acmeEmail, "ACME account email")
+	flags.BoolVar(&acmeNoEmail, "acme-no-email", acmeNoEmail, "explicitly register ACME without email")
 	flags.StringVar(&coreVersion, "core-version", coreVersion, "Xray-core version")
 	flags.StringVar(&coreFile, "core-file", coreFile, "local Xray-core zip")
 	flags.StringVar(&proxy, "proxy", proxy, "download proxy")
@@ -523,6 +733,41 @@ func runInstall(opts options, args []string, stdout, stderr io.Writer) int {
 	if err := flags.Parse(args); err != nil {
 		fmt.Fprintln(stderr, err)
 		return ExitUsage
+	}
+	if tlsMode == "nginx" || tlsMode == "" {
+		if err := configureACME(opts, acmeEmail, acmeNoEmail); err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitConfig
+		}
+	}
+	if opts.dryRun {
+		if tlsMode == "nginx" || tlsMode == "" {
+			if opts.root == "/" {
+				installer := systemexec.PackageInstaller{Runner: opts.runner, Root: opts.root}
+				if err := installer.EnsureNginxDependencies(context.Background(), proxy); err != nil {
+					fmt.Fprintln(stderr, err)
+					return ExitUnexpected
+				}
+			} else {
+				fmt.Fprintln(stdout, "dry_run = install missing nginx certbot openssl systemd iproute dependencies")
+			}
+		}
+		for _, action := range []string{
+			"write /etc/xray/config.json",
+			"write /etc/systemd/system/xray.service",
+			"write TLS frontend include",
+			"write /etc/letsencrypt/renewal-hooks/deploy/xray-nginx-reload",
+		} {
+			fmt.Fprintf(stdout, "dry_run_file = %s\n", action)
+		}
+		return finishInstallServices(opts, tlsMode, stdout, stderr)
+	}
+	if (tlsMode == "nginx" || tlsMode == "") && opts.root == "/" {
+		installer := systemexec.PackageInstaller{Runner: opts.runner, Root: opts.root}
+		if err := installer.EnsureNginxDependencies(context.Background(), proxy); err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnexpected
+		}
 	}
 	if err := ensureInstallLayout(opts); err != nil {
 		fmt.Fprintln(stderr, err)
@@ -553,13 +798,108 @@ func runInstall(opts options, args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, err)
 			return ExitUnexpected
 		}
+		if err := atomicWrite(opts.abs(frontendnginx.DeployHookPath), []byte(frontendnginx.DeployHook), 0o755); err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnexpected
+		}
 	default:
 		fmt.Fprintf(stderr, "unsupported TLS frontend mode: %s\n", tlsMode)
 		return ExitUnsupported
 	}
+	if code := finishInstallServices(opts, tlsMode, stdout, stderr); code != ExitOK {
+		return code
+	}
 	fmt.Fprintf(stdout, "installed = true\n")
 	fmt.Fprintf(stdout, "tls = %s\n", tlsMode)
+	if tlsMode == "nginx" || tlsMode == "" {
+		fmt.Fprintln(stdout, "firewall = open TCP 80 and 443")
+		fmt.Fprintln(stdout, "next = xray add vws example.com")
+	}
 	return ExitOK
+}
+
+func finishInstallServices(opts options, tlsMode string, stdout, stderr io.Writer) int {
+	commands := []systemexec.Command{
+		{Name: opts.abs(xrayBinPath), Args: []string{"run", "-test", "-config", opts.configPath, "-confdir", opts.confDir}, Step: "validate Xray configuration"},
+	}
+	if tlsMode == "nginx" || tlsMode == "" {
+		commands = append(commands,
+			frontendnginx.ValidateCommand(),
+			systemexec.Command{Name: "ss", Args: []string{"-ltnp"}, Step: "check TCP 80 and 443 listeners"},
+		)
+	}
+	commands = append(commands,
+		systemexec.Command{Name: "systemctl", Args: []string{"daemon-reload"}, Step: "reload systemd units"},
+		systemexec.Command{Name: "systemctl", Args: []string{"enable", "--now", "xray"}, Step: "enable Xray service"},
+	)
+	if tlsMode == "nginx" || tlsMode == "" {
+		commands = append(commands, systemexec.Command{Name: "systemctl", Args: []string{"enable", "--now", "nginx"}, Step: "enable Nginx service"})
+	}
+	for _, command := range commands {
+		result, err := opts.runner.Run(context.Background(), command)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnexpected
+		}
+		if command.Name == "ss" {
+			if conflict := frontendnginx.ConflictingListener(result.Stdout); conflict != "" {
+				fmt.Fprintf(stderr, "TCP 80 or 443 is occupied by another service: %s\n", conflict)
+				return ExitConfig
+			}
+		}
+	}
+	if tlsMode == "nginx" || tlsMode == "" {
+		if err := ensureCertbotScheduler(opts, stdout); err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitUnexpected
+		}
+	}
+	return ExitOK
+}
+
+func ensureCertbotScheduler(opts options, output io.Writer) error {
+	result, err := opts.runner.Run(context.Background(), systemexec.Command{
+		Name: "systemctl", Args: []string{"list-unit-files", "certbot.timer", "certbot-renew.timer", "--no-legend"}, Step: "detect Certbot timer",
+	})
+	if timer := frontendnginx.RenewalTimerFromUnitFiles(result.Stdout); err == nil && timer != "" {
+		return runRunner(opts, systemexec.Command{Name: "systemctl", Args: []string{"enable", "--now", timer}, Step: "enable Certbot timer"})
+	}
+	if _, statErr := os.Stat(opts.abs("/etc/cron.d/certbot")); statErr == nil {
+		return nil
+	}
+	fmt.Fprintln(output, "warning = Certbot automatic renewal timer or cron job was not found")
+	return nil
+}
+
+func configureACME(opts options, flagEmail string, flagNoEmail bool) error {
+	path := opts.abs(acme.ConfigPath)
+	var persisted *acme.Config
+	if data, err := os.ReadFile(path); err == nil {
+		config, err := acme.Parse(data)
+		if err != nil {
+			return err
+		}
+		persisted = &config
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	envEmail := strings.TrimSpace(os.Getenv("XRAY_ACME_EMAIL"))
+	if strings.TrimSpace(flagEmail) == "" && !flagNoEmail && envEmail == "" && persisted == nil {
+		return nil
+	}
+	config, err := acme.Resolve(flagEmail, flagNoEmail, envEmail, persisted)
+	if err != nil {
+		return err
+	}
+	data, err := acme.Marshal(config)
+	if err != nil {
+		return err
+	}
+	if opts.dryRun {
+		return nil
+	}
+	return atomicWrite(path, data, 0o600)
 }
 
 func profileFromAddArgs(command string, args []string) (protocol.Profile, error) {
@@ -798,6 +1138,14 @@ func writeMainConfig(opts options) error {
 	if err := ensureDir(filepath.Dir(opts.configPath)); err != nil {
 		return err
 	}
+	out, err := renderMainConfig()
+	if err != nil {
+		return err
+	}
+	return atomicWrite(opts.configPath, out, 0o644)
+}
+
+func renderMainConfig() ([]byte, error) {
 	doc := map[string]any{
 		"log": map[string]any{
 			"access":   "/var/log/xray/access.log",
@@ -828,9 +1176,181 @@ func writeMainConfig(opts options) error {
 	}
 	out, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
+		return nil, err
+	}
+	return append(out, '\n'), nil
+}
+
+func validateXrayCandidate(opts options, fileName string, candidate []byte, profile protocol.Profile) error {
+	secrets := profileSecrets(profile)
+	if opts.dryRun {
+		return runRunner(opts, systemexec.Command{
+			Name:            opts.abs(xrayBinPath),
+			Args:            []string{"run", "-test", "-config", "/tmp/xray-add-candidate/config.json", "-confdir", "/tmp/xray-add-candidate/conf"},
+			Step:            "validate staged Xray configuration",
+			SensitiveValues: secrets,
+		})
+	}
+	tmpRoot := opts.abs("/tmp")
+	if err := os.MkdirAll(tmpRoot, 0o755); err != nil {
 		return err
 	}
-	return atomicWrite(opts.configPath, append(out, '\n'), 0o644)
+	tmpDir, err := os.MkdirTemp(tmpRoot, "xray-add-candidate-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmpDir)
+	confDir := filepath.Join(tmpDir, "conf")
+	if err := os.MkdirAll(confDir, 0o755); err != nil {
+		return err
+	}
+	files, err := filepath.Glob(filepath.Join(opts.confDir, "*.json"))
+	if err != nil {
+		return err
+	}
+	for _, source := range files {
+		data, err := os.ReadFile(source)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(confDir, filepath.Base(source)), data, 0o600); err != nil {
+			return err
+		}
+	}
+	if err := os.WriteFile(filepath.Join(confDir, fileName), candidate, 0o600); err != nil {
+		return err
+	}
+	mainConfig, err := renderMainConfig()
+	if err != nil {
+		return err
+	}
+	configPath := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(configPath, mainConfig, 0o644); err != nil {
+		return err
+	}
+	return runRunner(opts, systemexec.Command{
+		Name:            opts.abs(xrayBinPath),
+		Args:            []string{"run", "-test", "-config", configPath, "-confdir", confDir},
+		Step:            "validate staged Xray configuration",
+		SensitiveValues: secrets,
+	})
+}
+
+func checkFrontendConflict(opts options, profile protocol.Profile) error {
+	if opts.tlsMode == "caddy" {
+		site := opts.abs(filepath.Join(frontendcaddy.SiteDir, profile.Host+".conf"))
+		mainConf, _, err := readOptionalApp(site)
+		if err != nil {
+			return err
+		}
+		addConf, _, err := readOptionalApp(site + ".add")
+		if err != nil {
+			return err
+		}
+		if len(mainConf) == 0 {
+			return nil
+		}
+		check, err := frontendcaddy.CheckAppend(string(mainConf), string(addConf), profile)
+		if err != nil {
+			return err
+		}
+		if check.Status == frontendcaddy.AppendConflict {
+			return fmt.Errorf("Caddy route %s already maps to port %d, requested port %d", check.Path, check.ExistingPort, check.WantedPort)
+		}
+		return nil
+	}
+	site := opts.abs(filepath.Join(frontendnginx.SiteDir, profile.Host+".conf"))
+	mainConf, _, err := readOptionalApp(site)
+	if err != nil {
+		return err
+	}
+	addConf, _, err := readOptionalApp(site + ".add")
+	if err != nil {
+		return err
+	}
+	if len(mainConf) == 0 {
+		return nil
+	}
+	check, err := frontendnginx.CheckAppend(string(mainConf), string(addConf), profile)
+	if err != nil {
+		return err
+	}
+	if check.Status == frontendnginx.AppendConflict {
+		return fmt.Errorf("Nginx route %s already maps to port %d, requested port %d", check.Path, check.ExistingPort, check.WantedPort)
+	}
+	return nil
+}
+
+func loadACMEConfig(opts options) (acme.Config, error) {
+	data, err := os.ReadFile(opts.abs(acme.ConfigPath))
+	if errors.Is(err, os.ErrNotExist) {
+		envEmail := strings.TrimSpace(os.Getenv("XRAY_ACME_EMAIL"))
+		if envEmail == "" {
+			return acme.Config{}, nil
+		}
+		return acme.Resolve("", false, envEmail, nil)
+	}
+	if err != nil {
+		return acme.Config{}, err
+	}
+	return acme.Parse(data)
+}
+
+func profileSecrets(profile protocol.Profile) []string {
+	return []string{profile.ID, profile.Password, profile.PrivateKey}
+}
+
+func runRunner(opts options, command systemexec.Command) error {
+	_, err := opts.runner.Run(context.Background(), command)
+	return err
+}
+
+type appFileSnapshot struct {
+	path    string
+	data    []byte
+	mode    os.FileMode
+	existed bool
+}
+
+func captureFile(path string) (appFileSnapshot, error) {
+	snapshot := appFileSnapshot{path: path}
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return snapshot, nil
+	}
+	if err != nil {
+		return snapshot, err
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return snapshot, err
+	}
+	snapshot.data = data
+	snapshot.mode = info.Mode().Perm()
+	snapshot.existed = true
+	return snapshot, nil
+}
+
+func restoreFiles(snapshots ...appFileSnapshot) error {
+	var restoreErr error
+	for _, snapshot := range snapshots {
+		if snapshot.existed {
+			restoreErr = errors.Join(restoreErr, atomicWrite(snapshot.path, snapshot.data, snapshot.mode))
+			continue
+		}
+		if err := os.Remove(snapshot.path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			restoreErr = errors.Join(restoreErr, err)
+		}
+	}
+	return restoreErr
+}
+
+func readOptionalApp(path string) ([]byte, bool, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+	return data, err == nil, err
 }
 
 func writeService(opts options) error {
@@ -943,7 +1463,117 @@ func writeNginxInclude(opts options) error {
 		return err
 	}
 	content := fmt.Sprintf("include %s/*.conf;\n", opts.abs(frontendnginx.SiteDir))
-	return atomicWrite(path, []byte(content), 0o644)
+	if err := atomicWrite(path, []byte(content), 0o644); err != nil {
+		return err
+	}
+	mainPath := opts.abs("/etc/nginx/nginx.conf")
+	mainData, err := os.ReadFile(mainPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	updated, changed, err := frontendnginx.EnsureHTTPInclude(string(mainData), opts.abs(nginxIncludePath))
+	if err != nil {
+		return err
+	}
+	if !changed {
+		return nil
+	}
+	return atomicWrite(mainPath, []byte(updated), 0o644)
+}
+
+func fixNginx(opts options, stdout, stderr io.Writer) error {
+	if opts.dryRun {
+		for _, action := range []string{"repair Nginx include", "repair managed Certbot redirects", "repair Certbot renewal", "migrate verified certificate paths", "write persistent deploy hook"} {
+			fmt.Fprintf(stdout, "dry_run_file = %s\n", action)
+		}
+		if err := runRunner(opts, frontendnginx.ValidateCommand()); err != nil {
+			return err
+		}
+		return runRunner(opts, frontendnginx.ReloadCommand())
+	}
+	paths := []string{
+		opts.abs(nginxIncludePath),
+		opts.abs("/etc/nginx/nginx.conf"),
+		opts.abs(frontendnginx.DeployHookPath),
+	}
+	sites, err := filepath.Glob(filepath.Join(opts.abs(frontendnginx.SiteDir), "*.conf"))
+	if err != nil {
+		return err
+	}
+	paths = append(paths, sites...)
+	for _, site := range sites {
+		domain := strings.TrimSuffix(filepath.Base(site), ".conf")
+		paths = append(paths, opts.abs(filepath.Join("/etc/letsencrypt/renewal", domain+".conf")))
+		data, readErr := os.ReadFile(site)
+		if readErr == nil && strings.Contains(string(data), "/etc/nginx/ssl/") && !certificateFilesPresent(opts, domain) {
+			fmt.Fprintf(stderr, "warning: %s retains its old certificate path because a valid Let's Encrypt certificate was not confirmed\n", domain)
+		}
+	}
+	snapshots := make([]appFileSnapshot, 0, len(paths))
+	for _, path := range paths {
+		snapshot, err := captureFile(path)
+		if err != nil {
+			return err
+		}
+		snapshots = append(snapshots, snapshot)
+	}
+	rollback := func(cause error) error {
+		rollbackErr := restoreFiles(snapshots...)
+		if rollbackErr == nil {
+			if err := runRunner(opts, frontendnginx.ValidateCommand()); err == nil {
+				rollbackErr = runRunner(opts, frontendnginx.ReloadCommand())
+			} else {
+				rollbackErr = err
+			}
+		}
+		if rollbackErr != nil {
+			return fmt.Errorf("%w; Nginx rollback failed: %v", cause, rollbackErr)
+		}
+		return cause
+	}
+	if err := writeNginxInclude(opts); err != nil {
+		return rollback(err)
+	}
+	if err := atomicWrite(opts.abs(frontendnginx.DeployHookPath), []byte(frontendnginx.DeployHook), 0o755); err != nil {
+		return rollback(err)
+	}
+	if err := runRunner(opts, frontendnginx.ValidateCommand()); err != nil {
+		return rollback(err)
+	}
+	if err := runRunner(opts, frontendnginx.ReloadCommand()); err != nil {
+		return rollback(err)
+	}
+	return nil
+}
+
+func certificateFilesPresent(opts options, domain string) bool {
+	for _, path := range []string{frontendnginx.CertificatePath(domain), frontendnginx.PrivateKeyPath(domain)} {
+		info, err := os.Stat(opts.abs(path))
+		if err != nil || info.Size() == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func verifyCertificateWithRunner(opts options, domain string) error {
+	certificate := opts.abs(frontendnginx.CertificatePath(domain))
+	privateKey := opts.abs(frontendnginx.PrivateKeyPath(domain))
+	commands := []systemexec.Command{
+		{Name: "openssl", Args: []string{"x509", "-in", certificate, "-noout"}, Step: "parse TLS certificate"},
+		{Name: "openssl", Args: []string{"pkey", "-in", privateKey, "-noout"}, Step: "parse TLS private key"},
+		{Name: "openssl", Args: []string{"x509", "-in", certificate, "-noout", "-checkend", "0"}, Step: "check TLS certificate expiry"},
+		{Name: "openssl", Args: []string{"x509", "-in", certificate, "-noout", "-checkhost", domain}, Step: "check TLS certificate domain"},
+	}
+	for _, command := range commands {
+		if err := runRunner(opts, command); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func repairNginxSites(opts options) error {
@@ -956,7 +1586,17 @@ func repairNginxSites(opts options) error {
 		if err != nil {
 			return err
 		}
-		repaired := removeManagedCertbotRedirect(string(data))
+		domain := strings.TrimSuffix(filepath.Base(path), ".conf")
+		repaired, _ := frontendnginx.RemoveManagedCertbotRedirects(string(data), domain)
+		verified := certificateFilesPresent(opts, domain)
+		if verified {
+			verified = verifyCertificateWithRunner(opts, domain) == nil
+		}
+		repaired, _, warning := frontendnginx.MigrateCertificatePaths(repaired, domain, verified)
+		if warning != "" {
+			// The fix command reports this as a warning through unchanged content.
+			_ = warning
+		}
 		if repaired == string(data) {
 			continue
 		}
@@ -967,64 +1607,32 @@ func repairNginxSites(opts options) error {
 	return nil
 }
 
-func removeManagedCertbotRedirect(content string) string {
-	lines := strings.Split(content, "\n")
-	out := make([]string, 0, len(lines))
-	skipping := false
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if !skipping && strings.HasPrefix(trimmed, "if ($host = ") {
-			skipping = true
-			continue
-		}
-		if skipping {
-			if strings.Contains(trimmed, "} # managed by Certbot") {
-				skipping = false
-			}
-			continue
-		}
-		out = append(out, line)
-	}
-	return strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
-}
-
 func repairCertbotRenewals(opts options) error {
-	files, err := filepath.Glob(opts.abs("/etc/letsencrypt/renewal/*.conf"))
+	sites, err := filepath.Glob(filepath.Join(opts.abs(frontendnginx.SiteDir), "*.conf"))
 	if err != nil {
 		return err
 	}
-	for _, path := range files {
+	for _, site := range sites {
+		domain := strings.TrimSuffix(filepath.Base(site), ".conf")
+		path := opts.abs(filepath.Join("/etc/letsencrypt/renewal", domain+".conf"))
 		data, err := os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
 		if err != nil {
 			return err
 		}
-		domain := strings.TrimSuffix(filepath.Base(path), ".conf")
 		repaired, changed := frontendnginx.EnsureWebrootRenewal(string(data), domain)
-		withoutInstaller := removeNginxRenewalInstaller(repaired)
-		if withoutInstaller != repaired {
-			repaired = withoutInstaller
-			changed = true
-		}
+		repaired, installerChanged := frontendnginx.RemoveNginxInstaller(repaired)
+		changed = changed || installerChanged
 		if !changed {
 			continue
 		}
-		if err := atomicWrite(path, []byte(repaired), 0o644); err != nil {
+		if err := atomicWrite(path, []byte(repaired), 0o600); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-func removeNginxRenewalInstaller(content string) string {
-	lines := strings.Split(content, "\n")
-	out := make([]string, 0, len(lines))
-	for _, line := range lines {
-		if strings.TrimSpace(line) == "installer = nginx" {
-			continue
-		}
-		out = append(out, line)
-	}
-	return strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
 }
 
 func writeCaddyImport(opts options) error {
@@ -1236,18 +1844,14 @@ func runExternal(opts options, stdout, stderr io.Writer, name string, args ...st
 }
 
 func runCommand(opts options, stdin io.Reader, stdout, stderr io.Writer, name string, args ...string) int {
-	if opts.root != "/" || opts.dryRun {
-		fmt.Fprintf(stdout, "dry_run = %s %s\n", name, strings.Join(args, " "))
-		return ExitOK
+	runner := opts.runner
+	if runner == nil {
+		runner = &systemexec.RealRunner{Stdin: stdin, Stdout: stdout, Stderr: stderr}
 	}
-	cmd := exec.CommandContext(context.Background(), name, args...)
-	cmd.Stdin = stdin
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	if err := cmd.Run(); err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return exitErr.ExitCode()
+	result, err := runner.Run(context.Background(), systemexec.Command{Name: name, Args: args})
+	if err != nil {
+		if result.ExitCode >= 0 {
+			return result.ExitCode
 		}
 		fmt.Fprintln(stderr, err)
 		return ExitUnexpected

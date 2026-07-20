@@ -23,6 +23,7 @@
 | `gen` | 无 | 生成预览 | 协议和参数 | Xray inbound JSON | 无 | 无 | P0 |
 | `download-plan` | 无 | 生成预览 | 组件、版本、架构、代理 | 下载资产与安装步骤计划 | 无 | 无 | P3 |
 | `switch-plan` | 无 | 生成预览 | 可选模式 | Go/Bash 入口切换和回滚计划 | 无 | 无 | P3 |
+| `install` | 无 | 安装/写入 | `--tls`、`--acme-email` 或显式 `--acme-no-email` | 安装结果和下一步 | 系统依赖、Xray、前端和 hook | 验证后 enable Xray/Nginx | P3 |
 | `client` | `genc` | 生成预览 | 配置名 | 客户端 outbound/full JSON | 无 | 无 | P1 |
 | `add` | `a` | 写入 | 协议和参数 | 节点信息、URL | 写 `/etc/xray/conf`、可能写前端配置和订阅 | API 热加载、重启 Xray/Caddy/Nginx | P1 |
 | `change` | `c`, `config` | 写入 | 配置名、字段和值 | 更新后节点信息 | 重写节点 JSON、可能更新前端配置和订阅 | API 热加载、重启服务 | P2 |
@@ -32,7 +33,7 @@
 | `fix-all` | 无 | 写入 | 无 | 批量修复结果 | 重建所有受管理节点、刷新订阅 | 可能重启服务 | P2 |
 | `fix-config.json` | 无 | 写入 | 无 | 修复结果 | 重写 `/etc/xray/config.json` | 无 | P2 |
 | `fix-caddyfile` | 无 | 写入 | 无 | 修复结果 | 重写或修复 Caddy 导入 | 重启 Caddy | P2 |
-| `fix-nginxfile` | 无 | 写入 | 无 | 修复结果 | 重写或修复 Nginx 导入 | reload Nginx | P2 |
+| `fix-nginxfile` | 无 | 写入 | 无 | include、renewal、旧路径和 redirect 修复结果 | 原子更新项目管理文件与 deploy hook | `nginx -t` 成功后 reload | P2 |
 | `mihomo` | `clash` | 生成预览 | 可选配置名 | Mihomo YAML | 无 | 无 | P1 |
 | `refresh-sub` | `sub-refresh` | 写入 | 可选域名 | 订阅 URL | 写 `/etc/xray/sub/mihomo.yaml`、token、前端路由 | reload Caddy/Nginx | P1 |
 | `sub-url` | 无 | 只读 | 可选域名 | 订阅 URL | 可能创建 token | 无 | P1 |
@@ -43,7 +44,7 @@
 | `start` | 无 | 服务 | 可选 `caddy` | 服务启动结果 | 无 | start Xray/Caddy | P3 |
 | `stop` | 无 | 服务 | 可选 `caddy` | 服务停止结果 | 无 | stop Xray/Caddy | P3 |
 | `restart` | `r` | 服务 | 可选 `caddy` | 服务重启结果 | 无 | restart Xray/Caddy | P3 |
-| `test` | `t` | 只读/验证 | 无 | Xray 配置测试结果 | 无 | 调用 Xray test | P1 |
+| `test` | `t` | 只读/验证 | `[xray\|nginx\|certbot\|all]` | 配置、证书、renewal 和服务检查 | 无 | 显式 certbot 目标可运行 renewal dry-run | P1 |
 | `log` | 无 | 只读/维护 | 可选动作 | 访问日志 | 可能清理日志 | 无 | P3 |
 | `logerr` | `errlog` | 只读/维护 | 可选动作 | 错误日志 | 可能清理日志 | 无 | P3 |
 | `dns` | 无 | 写入 | DNS 参数 | 设置结果 | 修改系统 DNS 配置 | 可能影响网络 | P3 |
