@@ -37,6 +37,7 @@ trap 'rm -rf "$tmp_dir"' EXIT
 run_go test ./...
 pass "go test ./..."
 
+run_xray --root "$tmp_dir" install --skip-core --tls nginx --acme-email user@example.com >"$tmp_dir/install.out"
 add_output=$(run_xray --root "$tmp_dir" add vws example.com 2>"$tmp_dir/add.err")
 [[ "$add_output" == *"added = VLESS-WS-TLS-example.com"* ]] || fail "add is handled by Go"
 [[ -f "$tmp_dir/etc/xray/conf/VLESS-WS-TLS-example.com.json" ]] || fail "add writes config through Go"

@@ -9,10 +9,12 @@ tls_mode="nginx"
 core_version=""
 core_file=""
 skip_core=0
+acme_email=""
+acme_no_email=0
 
 usage() {
     cat <<'USAGE'
-Usage: install.sh [--tls nginx|caddy] [--proxy URL] [--version TAG] [--core-version TAG] [--core-file FILE] [--skip-core]
+Usage: install.sh [--tls nginx|caddy] [--acme-email EMAIL] [--acme-no-email] [--proxy URL] [--version TAG] [--core-version TAG] [--core-file FILE] [--skip-core]
 
 Installs the xray Go CLI to /usr/local/bin/xray, then runs:
   xray install
@@ -27,6 +29,14 @@ while [[ $# -gt 0 ]]; do
     --tls)
         tls_mode="${2:-}"
         shift 2
+        ;;
+    --acme-email)
+        acme_email="${2:-}"
+        shift 2
+        ;;
+    --acme-no-email)
+        acme_no_email=1
+        shift
         ;;
     -p | --proxy)
         proxy="${2:-}"
@@ -117,6 +127,12 @@ tar -xzf "${tmpdir}/${asset}" -C "$tmpdir"
 install -m 0755 "${tmpdir}/xray" /usr/local/bin/xray
 
 install_args=(install --tls "$tls_mode")
+if [[ -n "$acme_email" ]]; then
+    install_args+=(--acme-email "$acme_email")
+fi
+if [[ "$acme_no_email" -eq 1 ]]; then
+    install_args+=(--acme-no-email)
+fi
 if [[ -n "$core_version" ]]; then
     install_args+=(--core-version "$core_version")
 fi

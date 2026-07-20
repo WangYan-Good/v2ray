@@ -39,8 +39,9 @@ run_go test ./...
 pass "go test ./..."
 
 nginx_site=$(run_xray gen --format nginx vless-ws-tls)
-[[ "$nginx_site" == *"location /.well-known/acme-challenge/"* ]] || fail "nginx site has webroot challenge"
+[[ "$nginx_site" == *"location ^~ /.well-known/acme-challenge/"* ]] || fail "nginx site has prioritized webroot challenge"
 [[ "$nginx_site" == *"root /var/www/certbot;"* ]] || fail "nginx site uses certbot webroot"
+[[ "$nginx_site" == *"ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;"* ]] || fail "nginx site uses Certbot live certificate"
 [[ "$nginx_site" == *"location /xray-test"* ]] || fail "nginx site has ws location"
 [[ "$nginx_site" == *"proxy_pass http://127.0.0.1:10002;"* ]] || fail "nginx site routes ws upstream"
 [[ "$nginx_site" == *"proxy_set_header Upgrade \$http_upgrade;"* ]] || fail "nginx site has websocket upgrade"

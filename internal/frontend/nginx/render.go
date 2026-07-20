@@ -11,8 +11,8 @@ import (
 
 const (
 	SiteDir     = "/etc/nginx/xray"
-	SSLDir      = "/etc/nginx/ssl"
 	CertbotRoot = "/var/www/certbot"
+	LiveDir     = "/etc/letsencrypt/live"
 )
 
 type Route struct {
@@ -40,8 +40,9 @@ server {
     listen [::]:80;
     server_name {{ .Domain }};
 
-    location /.well-known/acme-challenge/ {
+    location ^~ /.well-known/acme-challenge/ {
         root {{ .CertbotRoot }};
+        try_files $uri =404;
     }
 
     location / {
@@ -60,6 +61,25 @@ server {
 {{ .Route }}
 
     include {{ .IncludePath }};
+}
+`))
+
+var bootstrapTemplate = template.Must(template.New("nginx-bootstrap").Parse(`# {{ .Domain }} - Xray ACME bootstrap
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ .Domain }};
+
+    location ^~ /.well-known/acme-challenge/ {
+        root {{ .CertbotRoot }};
+        try_files $uri =404;
+    }
+
+    location / {
+        default_type text/plain;
+        return 503 "TLS certificate provisioning in progress\n";
+    }
 }
 `))
 
@@ -99,12 +119,19 @@ func RenderSite(profile protocol.Profile) (string, error) {
 	data := siteData{
 		Domain:      route.Domain,
 		CertbotRoot: CertbotRoot,
-		CertPath:    fmt.Sprintf("%s/%s/fullchain.pem", SSLDir, route.Domain),
-		KeyPath:     fmt.Sprintf("%s/%s/privkey.pem", SSLDir, route.Domain),
+		CertPath:    fmt.Sprintf("%s/%s/fullchain.pem", LiveDir, route.Domain),
+		KeyPath:     fmt.Sprintf("%s/%s/privkey.pem", LiveDir, route.Domain),
 		IncludePath: fmt.Sprintf("%s/%s.conf.add", SiteDir, route.Domain),
 		Route:       strings.TrimRight(location, "\n"),
 	}
 	return execute(siteTemplate, data)
+}
+
+func RenderBootstrap(domain string) (string, error) {
+	if err := ValidateDomain(domain); err != nil {
+		return "", err
+	}
+	return execute(bootstrapTemplate, siteData{Domain: domain, CertbotRoot: CertbotRoot})
 }
 
 func RenderAdd(profile protocol.Profile) (string, error) {
@@ -124,6 +151,12 @@ func routeForProfile(profile protocol.Profile) (Route, error) {
 	}
 	if profile.Host == "" {
 		return Route{}, fmt.Errorf("%s: no TLS frontend host", profile.Key)
+	}
+	if err := ValidateDomain(profile.Host); err != nil {
+		return Route{}, fmt.Errorf("%s: %w", profile.Key, err)
+	}
+	if err := ValidateBackendPort(profile.Port); err != nil {
+		return Route{}, fmt.Errorf("%s: %w", profile.Key, err)
 	}
 
 	route := Route{

@@ -2,6 +2,8 @@ package nginx
 
 import (
 	"fmt"
+	"net"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -34,11 +36,51 @@ type Location struct {
 var (
 	nginxLocationRe = regexp.MustCompile(`^\s*location\s+(?:=\s+)?([^\s{]+)`)
 	nginxPassRe     = regexp.MustCompile(`(?:proxy_pass|grpc_pass)\s+(?:https?|grpc)://[^:;]+:(\d+)`)
+	domainLabelRE   = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
 )
+
+func ValidateDomain(domain string) error {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	if domain == "" || len(domain) > 253 {
+		return fmt.Errorf("invalid domain name")
+	}
+	if net.ParseIP(strings.Trim(domain, "[]")) != nil {
+		return fmt.Errorf("domain must not be an IP address")
+	}
+	domain = strings.TrimSuffix(domain, ".")
+	labels := strings.Split(domain, ".")
+	if len(labels) < 2 {
+		return fmt.Errorf("domain must contain at least two labels")
+	}
+	for _, label := range labels {
+		if !domainLabelRE.MatchString(label) {
+			return fmt.Errorf("invalid domain name")
+		}
+	}
+	return nil
+}
+
+func ValidateBackendPort(port int) error {
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("invalid Xray backend port: %d", port)
+	}
+	return nil
+}
+
+func RemoveManagedCertbotRedirects(content, domain string) (string, bool) {
+	pattern := `(?ms)^[ \t]*if[ \t]+\(\$host[ \t]*=[ \t]*` + regexp.QuoteMeta(domain) + `\)[ \t]*\{\s*` +
+		`return[ \t]+301[ \t]+https://\$host\$request_uri;\s*\}[ \t]*#[ \t]*managed by Certbot[ \t]*\n?`
+	re := regexp.MustCompile(pattern)
+	out := re.ReplaceAllString(content, "")
+	return out, out != content
+}
 
 func CheckAppend(mainConf, addConf string, profile protocol.Profile) (AppendCheck, error) {
 	route, err := routeForProfile(profile)
 	if err != nil {
+		return AppendCheck{}, err
+	}
+	if err := ValidateBackendPort(route.Port); err != nil {
 		return AppendCheck{}, err
 	}
 	wantPath := normalizePath(route.Path)
@@ -125,6 +167,35 @@ func EnsureAddInclude(content, includePath string) (string, bool, error) {
 	}
 	insert := fmt.Sprintf("\n    %s", line)
 	return content[:index] + insert + content[index:], true, nil
+}
+
+func EnsureHTTPInclude(content, includePath string) (string, bool, error) {
+	nginxDir := filepath.Dir(filepath.Dir(includePath))
+	directSiteInclude := "include " + filepath.Join(nginxDir, "xray", "*.conf") + ";"
+	if strings.Contains(content, "include /etc/nginx/conf.d/*.conf;") || strings.Contains(content, "include "+includePath+";") || strings.Contains(content, directSiteInclude) {
+		return content, false, nil
+	}
+	lines := strings.Split(content, "\n")
+	httpStart := -1
+	depth := 0
+	for index, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if httpStart < 0 {
+			if strings.HasPrefix(trimmed, "http") && strings.Contains(trimmed, "{") {
+				httpStart = index
+				depth = braceDelta(line)
+			}
+			continue
+		}
+		depth += braceDelta(line)
+		if depth == 0 {
+			indent := strings.TrimSuffix(line, strings.TrimLeft(line, " \t"))
+			include := indent + "    include " + includePath + ";"
+			lines = append(lines[:index], append([]string{include}, lines[index:]...)...)
+			return strings.Join(lines, "\n"), true, nil
+		}
+	}
+	return "", false, fmt.Errorf("Nginx configuration has no unambiguous http block")
 }
 
 func normalizePath(path string) string {
